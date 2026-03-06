@@ -3,10 +3,12 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bell, Save } from 'lucide-react';
+import { Bell, Globe, Save } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+
+const NOTIFICATIONS_URL = process.env.NEXT_PUBLIC_NOTIFICATIONS_URL || 'https://notifications.codevertexitsolutions.com';
 
 interface TenantSettings {
     lowStockThresholdPercent: number;
@@ -71,6 +73,24 @@ export default function SettingsPage() {
                 <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
                 <p className="text-muted-foreground mt-1">Manage tenant inventory configuration</p>
             </div>
+
+            <Card className="max-w-2xl">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <Globe className="h-5 w-5 text-primary" />
+                        <h2 className="text-lg font-semibold">Brand & organisation</h2>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                        Logo and brand colours are managed in the Notifications service. To change your organisation logo, primary colour, or secondary colour, open the{' '}
+                        <a href={orgSlug ? `${NOTIFICATIONS_URL}/${orgSlug}/settings/branding` : '#'} className="text-primary underline" target="_blank" rel="noopener noreferrer">
+                            Branding settings
+                        </a>
+                        {' '}page in Notifications (opens in new tab). Theme is applied automatically on this app from that config.
+                    </p>
+                </CardContent>
+            </Card>
 
             <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
                 <Card>

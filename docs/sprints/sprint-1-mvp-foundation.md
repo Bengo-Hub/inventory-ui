@@ -9,7 +9,7 @@
 
 ## Progress Update (March 6, 2026)
 
-**Scaffold complete.** Full Next.js 16 app with SSO/PKCE, multi-tenant `[orgSlug]`, Zustand auth, PWA, Tailwind v4. Pages: dashboard, catalog (list + detail), warehouses, adjustments, settings, platform admin (role-gated). Auth callback, API client (inventoryapi.codevertexitsolutions.com), sidebar with platform section. **Remaining:** Replace mock/placeholder data with real API calls; run `pnpm install` and `pnpm build`; deploy via devops-k8s (values.yaml at `apps/inventory-ui/`).
+**Scaffold complete.** Full Next.js 16 app with SSO/PKCE, multi-tenant `[orgSlug]`, Zustand auth, PWA, Tailwind v4. Pages: dashboard, catalog (list + detail), warehouses, adjustments, settings, platform admin (role-gated). Auth callback, API client (inventoryapi.codevertexitsolutions.com), sidebar with platform section. **RBAC & data (2026-03-06):** Roles/permissions from auth-api `GET /me` via TanStack Query with 5 min TTL (`hooks/useMe`); used for nav visibility (platform admin for super_admin/admin) and route protection. All fetches use TanStack Query (QueryClientProvider in layout). **Remaining:** Replace mock/placeholder data with real API calls; run `pnpm install` and `pnpm build`; deploy via devops-k8s (values.yaml at `apps/inventory-ui/`). **Tenant/brand:** UI uses [orgSlug] or NEXT_PUBLIC_TENANT_SLUG; tenant from auth-api GET /api/v1/tenants/by-slug/{slug}; branding from notifications-api GET /api/v1/{tenantId}/branding (BrandingProvider pattern). Inventory-api: auth-api is source of truth for roles/permissions; Redis and NATS/outbox documented in plan.md.
 
 ---
 
@@ -23,11 +23,11 @@ The inventory-ui repo is scaffolded (Next.js 16, React 19) with implemented page
 
 ### Project Setup
 
-- [ ] **F1-01:** Initialize Next.js 15 project with App Router, TypeScript strict mode
+- [x] **F1-01:** Initialize Next.js 15 project with App Router, TypeScript strict mode
   - Configure `next.config.ts` with environment variables
   - Set up Tailwind CSS + Shadcn UI
   - Install core dependencies: TanStack Query, Zustand, Axios
-- [ ] **F1-02:** Configure path aliases and project structure
+- [x] **F1-02:** Configure path aliases and project structure
   - `@/components`, `@/lib`, `@/stores`, `@/types`
   - Set up ESLint + Prettier config aligned with BengoBox standards
 
@@ -62,10 +62,10 @@ The inventory-ui repo is scaffolded (Next.js 16, React 19) with implemented page
 
 ### Layout & Navigation
 
-- [ ] **F1-09:** Create root layout with providers
+- [x] **F1-09:** Create root layout with providers
   - AuthProvider, QueryClientProvider, ThemeProvider (next-themes)
   - Global styles, font loading (Inter + JetBrains Mono)
-- [ ] **F1-10:** Create tenant layout with sidebar and header
+- [x] **F1-10:** Create tenant layout with sidebar and header
   - Sidebar: Dashboard, Stock, Adjustments (P1) links
   - Header: user info, tenant name, outlet selector (Busia only), dark mode toggle
   - Responsive: full sidebar on desktop, collapsed on tablet, hidden on mobile

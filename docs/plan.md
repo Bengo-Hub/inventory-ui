@@ -11,7 +11,7 @@
 
 ## Current State
 
-The inventory-ui repository is scaffolded but has no implemented pages or components. The `docs/plan.md` outlined a 3-sprint roadmap (Foundation, Catalog & Stock, Procurement). For the MVP, the scope is compressed to a single sprint focused on operational visibility.
+The inventory-ui repository is scaffolded with SSO, [orgSlug] routes, dashboard, catalog, warehouses, adjustments, settings, and platform admin. **RBAC (2026-03-06):** Roles/permissions loaded from auth-api `GET /me` via TanStack Query (5 min TTL, `hooks/useMe`) for nav visibility and route protection; all data fetches use TanStack Query. Inventory-api uses auth-api as source of truth for roles/permissions; Redis and NATS/outbox documented in backend plan.md. The `docs/plan.md` outlined a 3-sprint roadmap (Foundation, Catalog & Stock, Procurement). For the MVP, the scope is compressed to a single sprint focused on operational visibility.
 
 ---
 

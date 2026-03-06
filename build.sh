@@ -47,6 +47,8 @@ KUBE_CONFIG=${KUBE_CONFIG:-${KUBE_CONFIG_B64:-}}
 NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-"https://inventoryapi.codevertexitsolutions.com"}
 NEXT_PUBLIC_SSO_URL=${NEXT_PUBLIC_SSO_URL:-"https://sso.codevertexitsolutions.com"}
 NEXT_PUBLIC_NOTIFICATIONS_URL=${NEXT_PUBLIC_NOTIFICATIONS_URL:-"https://notifications.codevertexitsolutions.com"}
+NEXT_PUBLIC_AUTH_API_URL=${NEXT_PUBLIC_AUTH_API_URL:-"${NEXT_PUBLIC_SSO_URL}"}
+NEXT_PUBLIC_TENANT_SLUG=${NEXT_PUBLIC_TENANT_SLUG:-""}
 
 info "Building ${APP_NAME}:${GIT_COMMIT_ID}"
 
@@ -72,7 +74,9 @@ info "Building Docker image"
 DOCKER_BUILDKIT=1 docker build . -t "${IMAGE_REPO}:${GIT_COMMIT_ID}" \
   --build-arg NEXT_PUBLIC_API_URL="$NEXT_PUBLIC_API_URL" \
   --build-arg NEXT_PUBLIC_SSO_URL="$NEXT_PUBLIC_SSO_URL" \
-  --build-arg NEXT_PUBLIC_NOTIFICATIONS_URL="$NEXT_PUBLIC_NOTIFICATIONS_URL"
+  --build-arg NEXT_PUBLIC_NOTIFICATIONS_URL="$NEXT_PUBLIC_NOTIFICATIONS_URL" \
+  --build-arg NEXT_PUBLIC_AUTH_API_URL="$NEXT_PUBLIC_AUTH_API_URL" \
+  --build-arg NEXT_PUBLIC_TENANT_SLUG="$NEXT_PUBLIC_TENANT_SLUG"
 success "Docker build complete"
 
 # =============================================================================
