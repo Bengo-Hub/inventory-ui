@@ -1,6 +1,6 @@
 # Inventory UI - MVP Plan
 
-**Last updated:** 2026-03-06
+**Last updated:** 2026-03-07
 **MVP deadline:** 2026-03-17
 **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
 **Styling:** Tailwind CSS + Shadcn UI
@@ -11,7 +11,17 @@
 
 ## Current State
 
-The inventory-ui repository is scaffolded with SSO, [orgSlug] routes, dashboard, catalog, warehouses, adjustments, settings, and platform admin. **RBAC (2026-03-06):** Roles/permissions loaded from auth-api `GET /me` via TanStack Query (5 min TTL, `hooks/useMe`) for nav visibility and route protection; all data fetches use TanStack Query. Inventory-api uses auth-api as source of truth for roles/permissions; Redis and NATS/outbox documented in backend plan.md. The `docs/plan.md` outlined a 3-sprint roadmap (Foundation, Catalog & Stock, Procurement). For the MVP, the scope is compressed to a single sprint focused on operational visibility.
+The inventory-ui repository is scaffolded with SSO, [orgSlug] routes, dashboard, catalog, warehouses, adjustments, settings, and platform admin.
+
+**RBAC (2026-03-07):**
+- **useMe:** `hooks/useMe.ts` loads current user and RBAC from auth-api `GET /me` using **TanStack Query** with 5 min TTL (`staleTime`/`gcTime`); returns `user`, `roles`, `permissions`, `hasRole`, `hasPermission`, `isAuthenticated`.
+- **hasRole / hasPermission:** Exposed by useMe; used for nav visibility and optional per-route checks. Permission codes align with inventory-api `docs/rbac-and-seed.md`: `items:read`, `warehouses:read`, `adjustments:read`, etc.
+- **Permission-based nav/sidebar:** `components/sidebar.tsx` filters routes by `hasPermission(permission)` (e.g. Catalog → `items:read`, Warehouses → `warehouses:read`, Adjustments → `adjustments:read`); platform admin section gated by `hasRole('super_admin')` or `hasRole('admin')`.
+- **Route protection:** `providers/auth-provider.tsx` redirects unauthenticated users to SSO; on 403 from `GET /me` redirects to `/[orgSlug]/unauthorized`.
+- **403 and 404 pages:** `app/[orgSlug]/unauthorized/page.tsx` (access denied), `app/not-found.tsx` (404).
+- **Data fetches:** Page-level data uses **TanStack Query** (catalog, warehouses, adjustments, dashboard, settings, platform). Tenant lookup (`lib/api/tenant.ts`) and branding (`lib/api/branding.ts`) use raw `fetch`; consider wrapping in useQuery for caching/TTL consistency later.
+
+Inventory-api uses auth-api as source of truth for roles/permissions; see inventory-api `docs/rbac-and-seed.md`. DevOps: see **DevOps file locations** below.
 
 ---
 
@@ -82,6 +92,15 @@ The inventory-ui repository is scaffolded with SSO, [orgSlug] routes, dashboard,
 - **No procurement/PO workflows** in MVP.
 
 ---
+
+## DevOps file locations (reference only; do not change in this task)
+
+| Asset | Location |
+|-------|----------|
+| Build script | `inventory-ui/build.sh` (repo root) |
+| Dockerfile | `inventory-ui/Dockerfile` (repo root) |
+| Deploy workflow | `inventory-ui/.github/workflows/deploy.yml` |
+| Helm values | `devops-k8s/apps/inventory-ui/values.yaml` |
 
 ## Dependencies
 

@@ -15,49 +15,45 @@ import {
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
 
+const mainRoutesConfig: Array<{
+    label: string;
+    icon: typeof LayoutDashboard;
+    href: string;
+    permission?: string;
+}> = [
+    { label: 'Dashboard', icon: LayoutDashboard, href: '' },
+    { label: 'Catalog', icon: Package, href: '/catalog', permission: 'items:read' },
+    { label: 'Warehouses', icon: Warehouse, href: '/warehouses', permission: 'warehouses:read' },
+    { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', permission: 'adjustments:read' },
+    { label: 'Settings', icon: Settings, href: '/settings' },
+];
+
+function canSeeRoute(
+    item: (typeof mainRoutesConfig)[0],
+    hasRole: (r: string) => boolean,
+    hasPermission: (p: string) => boolean
+) {
+    if (item.permission && !hasPermission(item.permission)) return false;
+    return true;
+}
+
 export function Sidebar() {
     const pathname = usePathname();
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const session = useAuthStore((s) => s.session);
-    const user = useAuthStore((s) => s.user);
     const logout = useAuthStore((s) => s.logout);
-    const { data: me } = useMe(!!session);
-    const roles = me?.roles ?? user?.roles ?? [];
-    const isAdmin = roles.some((r) => r === 'super_admin' || r === 'admin');
+    const { hasRole, hasPermission } = useMe(!!session);
+    const isAdmin = hasRole('super_admin') || hasRole('admin');
 
-    const routes = [
-        {
-            label: 'Dashboard',
-            icon: LayoutDashboard,
-            href: `/${orgSlug}`,
-            active: pathname === `/${orgSlug}`,
-        },
-        {
-            label: 'Catalog',
-            icon: Package,
-            href: `/${orgSlug}/catalog`,
-            active: pathname.startsWith(`/${orgSlug}/catalog`),
-        },
-        {
-            label: 'Warehouses',
-            icon: Warehouse,
-            href: `/${orgSlug}/warehouses`,
-            active: pathname.startsWith(`/${orgSlug}/warehouses`),
-        },
-        {
-            label: 'Adjustments',
-            icon: ClipboardList,
-            href: `/${orgSlug}/adjustments`,
-            active: pathname.startsWith(`/${orgSlug}/adjustments`),
-        },
-        {
-            label: 'Settings',
-            icon: Settings,
-            href: `/${orgSlug}/settings`,
-            active: pathname.startsWith(`/${orgSlug}/settings`),
-        },
-    ];
+    const routes = mainRoutesConfig
+        .filter((item) => canSeeRoute(item, hasRole, hasPermission))
+        .map((item) => ({
+            label: item.label,
+            icon: item.icon,
+            href: `/${orgSlug}${item.href}`,
+            active: item.href === '' ? pathname === `/${orgSlug}` : pathname.startsWith(`/${orgSlug}${item.href}`),
+        }));
 
     const adminRoutes = [
         {
