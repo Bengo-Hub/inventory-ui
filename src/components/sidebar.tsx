@@ -44,7 +44,7 @@ export function Sidebar() {
     const session = useAuthStore((s) => s.session);
     const logout = useAuthStore((s) => s.logout);
     const { hasRole, hasPermission } = useMe(!!session);
-    const isAdmin = hasRole('super_admin') || hasRole('admin');
+    const isPlatformOwner = orgSlug === 'codevertex';
 
     const routes = mainRoutesConfig
         .filter((item) => canSeeRoute(item, hasRole, hasPermission))
@@ -93,7 +93,7 @@ export function Sidebar() {
                     ))}
                 </div>
 
-                {isAdmin && (
+                {isPlatformOwner && (
                     <div className="mt-6 pt-4 border-t border-border">
                         <div className="px-3 mb-2 text-xs text-muted-foreground uppercase tracking-widest font-semibold">
                             Platform
