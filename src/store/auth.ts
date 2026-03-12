@@ -84,6 +84,7 @@ export const useAuthStore = create<AuthState>()(
                         codeChallenge: challenge,
                         state,
                         redirectUri: callbackUrl,
+                        tenant: orgSlug,
                     });
 
                     window.location.href = authorizeUrl;
