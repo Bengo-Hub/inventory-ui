@@ -2,28 +2,53 @@
 
 import { Button } from '@/components/ui/base';
 import { Download, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+const DISMISS_KEY = 'pwa-install-dismissed-inventory-ui';
+const DISMISS_DURATION_MS = 30 * 60 * 1000;
+
+function isStandalone(): boolean {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true)
+  );
+}
+
+function wasDismissedRecently(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = localStorage.getItem(DISMISS_KEY);
+  if (!raw) return false;
+  const ts = parseInt(raw, 10);
+  return !Number.isNaN(ts) && Date.now() - ts < DISMISS_DURATION_MS;
+}
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt(): Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
+
 export function PWARegistration() {
-    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
     const [showInstall, setShowInstall] = useState(false);
-    const [dismissed, setDismissed] = useState(false);
+    const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
 
     useEffect(() => {
+        if (isStandalone()) return;
+
         const handler = (e: Event) => {
             e.preventDefault();
-            setDeferredPrompt(e);
-            const wasDismissed = sessionStorage.getItem('pwa_dismissed');
-            if (!wasDismissed) {
-                setShowInstall(true);
-            }
+            const ev = e as BeforeInstallPromptEvent;
+            promptRef.current = ev;
+            setDeferredPrompt(ev);
+            if (!wasDismissedRecently()) setTimeout(() => setShowInstall(true), 2000);
         };
 
         window.addEventListener('beforeinstallprompt', handler);
-
         window.addEventListener('appinstalled', () => {
             setDeferredPrompt(null);
+            promptRef.current = null;
             setShowInstall(false);
             toast.success('BengoBox Inventory installed successfully!');
         });
@@ -31,30 +56,24 @@ export function PWARegistration() {
         return () => window.removeEventListener('beforeinstallprompt', handler);
     }, []);
 
-    useEffect(() => {
-        if (deferredPrompt && !dismissed) {
-            const timer = setTimeout(() => {
-                setShowInstall(true);
-            }, 3000);
-            return () => clearTimeout(timer);
-        }
-    }, [deferredPrompt, dismissed]);
-
-    const handleInstall = async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
+    const handleInstall = useCallback(async () => {
+        const prompt = promptRef.current ?? deferredPrompt;
+        if (!prompt) return;
+        await prompt.prompt();
+        const { outcome } = await prompt.userChoice;
         if (outcome === 'accepted') {
             setDeferredPrompt(null);
+            promptRef.current = null;
             setShowInstall(false);
         }
-    };
+    }, [deferredPrompt]);
 
-    const handleDismiss = () => {
+    const handleDismiss = useCallback(() => {
         setShowInstall(false);
-        setDismissed(true);
-        sessionStorage.setItem('pwa_dismissed', '1');
-    };
+        try {
+            localStorage.setItem(DISMISS_KEY, Date.now().toString());
+        } catch {}
+    }, []);
 
     if (!showInstall) return null;
 
@@ -69,7 +88,7 @@ export function PWARegistration() {
                     <p className="text-xs text-muted-foreground truncate">Get instant access from your home screen.</p>
                 </div>
                 <div className="flex gap-2 shrink-0">
-                    <button onClick={handleDismiss} className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition">
+                    <button type="button" onClick={handleDismiss} className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent transition" aria-label="Dismiss">
                         <X className="h-4 w-4 text-muted-foreground" />
                     </button>
                     <Button size="sm" onClick={handleInstall} className="shadow-lg shadow-primary/20">Install</Button>
