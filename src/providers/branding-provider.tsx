@@ -1,66 +1,78 @@
-'use client';
-
-import { getBranding } from '@/lib/api/branding';
-import { getTenantBySlug } from '@/lib/api/tenant';
-import { useAuthStore } from '@/store/auth';
+import { fetchTenantBySlug, type TenantBrand } from '@/lib/api/tenant';
 import { useParams } from 'next/navigation';
-import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { createContext, ReactNode, useContext, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 interface BrandingContextType {
-  logoUrl: string;
-  primaryColor: string;
-  secondaryColor: string;
-  orgName: string;
+  slug: string;
+  tenant: TenantBrand | null;
+  isLoading: boolean;
+  error: Error | null;
+  getServiceTitle: (appName: string) => string;
 }
 
 const BrandingContext = createContext<BrandingContextType | undefined>(undefined);
 
-const fallback = {
-  logoUrl: '/logo.png',
-  primaryColor: '#0ea5e9',
-  secondaryColor: '#6366f1',
-  orgName: '',
+const DEFAULT_BRAND: TenantBrand = {
+  id: 'platform',
+  name: 'Codevertex',
+  slug: 'codevertex',
+  logoUrl: '/images/logo/codevertex.png',
+  primaryColor: '#5B1C4D',
+  secondaryColor: '#ea8022',
+  orgName: 'Codevertex IT Solutions',
 };
 
 export function BrandingProvider({ children }: { children: ReactNode }) {
   const params = useParams();
-  const orgSlug =
-    (params?.orgSlug as string) ||
-    (typeof window !== 'undefined' ? process.env.NEXT_PUBLIC_TENANT_SLUG : null) ||
-    '';
-  const accessToken = useAuthStore((s) => s.session?.accessToken ?? null);
-  const [branding, setBranding] = useState<BrandingContextType>(fallback);
+  const slug = (params?.orgSlug as string) || '';
 
-  useEffect(() => {
-    if (!orgSlug) {
-      setBranding((b) => ({ ...b, ...fallback }));
-      return;
+  const { data: tenant, isLoading, error } = useQuery({
+    queryKey: ['tenant', slug],
+    queryFn: () => fetchTenantBySlug(slug),
+    staleTime: 1000 * 60 * 10,
+    enabled: !!slug,
+  });
+
+  const effectiveBrand = useMemo(() => {
+    if (tenant) return tenant;
+    if (!isLoading && !tenant && slug) {
+      return { ...DEFAULT_BRAND, slug, name: slug, orgName: slug };
     }
-    let cancelled = false;
-    (async () => {
-      const tenant = await getTenantBySlug(orgSlug);
-      if (cancelled || !tenant) {
-        setBranding((b) => ({ ...b, orgName: orgSlug }));
-        return;
-      }
-      const data = await getBranding(tenant.id, accessToken);
-      if (cancelled) return;
-      const next = {
-        logoUrl: data.logo_url || fallback.logoUrl,
-        primaryColor: data.primary_color || fallback.primaryColor,
-        secondaryColor: data.secondary_color || fallback.secondaryColor,
-        orgName: tenant.name || orgSlug,
-      };
-      setBranding(next);
-      document.documentElement.style.setProperty('--primary', next.primaryColor);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [orgSlug, accessToken]);
+    return DEFAULT_BRAND;
+  }, [tenant, isLoading, slug]);
+
+  useMemo(() => {
+    if (typeof window !== 'undefined') {
+      const primary = effectiveBrand?.primaryColor || DEFAULT_BRAND.primaryColor!;
+      const secondary = effectiveBrand?.secondaryColor || DEFAULT_BRAND.secondaryColor!;
+      const logo = effectiveBrand?.logoUrl || DEFAULT_BRAND.logoUrl!;
+      
+      document.documentElement.style.setProperty('--tenant-primary', primary);
+      document.documentElement.style.setProperty('--tenant-secondary', secondary);
+      document.documentElement.style.setProperty('--tenant-logo-url', `url(${logo})`);
+    }
+  }, [effectiveBrand]);
+
+  const getServiceTitle = (appName: string) => {
+    const tenantName = effectiveBrand?.orgName || effectiveBrand?.name || '';
+    const firstWord = tenantName.split(' ')[0] || 'Codevertex';
+    return `${firstWord} ${appName}`;
+  };
+
+  const value = useMemo(
+    () => ({
+      slug,
+      tenant: effectiveBrand,
+      isLoading,
+      error: error as Error | null,
+      getServiceTitle,
+    }),
+    [slug, effectiveBrand, isLoading, error]
+  );
 
   return (
-    <BrandingContext.Provider value={branding}>
+    <BrandingContext.Provider value={value}>
       {children}
     </BrandingContext.Provider>
   );
@@ -68,6 +80,14 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
 
 export const useBranding = () => {
   const context = useContext(BrandingContext);
-  if (!context) return fallback;
+  if (!context) {
+    return {
+      slug: '',
+      tenant: null,
+      isLoading: false,
+      error: null,
+      getServiceTitle: (s: string) => s,
+    };
+  }
   return context;
 };
