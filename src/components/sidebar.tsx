@@ -71,24 +71,24 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     ];
 
     const content = (
-        <div className="space-y-4 py-4 flex flex-col h-full bg-brand-dark text-brand-light border-r border-white/10 min-w-[260px]">
-            <div className="px-6 py-4 flex-1">
-                <div className="flex items-center justify-between mb-12">
-                    <Link href={`/${orgSlug}`} onClick={onClose} className="flex items-center">
-                        {tenant?.logoUrl ? (
-                            <img src={tenant.logoUrl} alt={tenant.name} className="h-10 w-auto object-contain" />
-                        ) : (
-                            <div className="w-10 h-10 bg-brand-orange rounded-xl flex items-center justify-center shadow-glow-orange">
-                                <Package className="text-white h-6 w-6" />
-                            </div>
-                        )}
-                    </Link>
-                    <button onClick={onClose} className="md:hidden opacity-80 hover:opacity-100 p-2">
-                        <X className="h-6 w-6" />
-                    </button>
-                </div>
+        <div className="space-y-4 py-6 flex flex-col h-full bg-brand-dark text-white border-r border-white/10 min-w-[280px]">
+            <div className="px-6 py-4 flex flex-col h-full overflow-y-auto custom-scrollbar">
+                <Link href={`/${orgSlug}`} onClick={onClose} className="flex items-center justify-center mb-10 transition-all hover:scale-105 duration-500">
+                    {tenant?.logoUrl ? (
+                        <img src={tenant.logoUrl} alt={tenant.name} className="h-12 w-auto object-contain drop-shadow-2xl" />
+                    ) : (
+                        <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+                            <Package className="text-white h-6 w-6" />
+                        </div>
+                    )}
+                </Link>
 
-                <div className="space-y-2">
+                <div className="space-y-1 mt-4">
+                    <div className="px-6 pb-2">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/30">
+                            Operations
+                        </p>
+                    </div>
                     {routes.map((route) => (
                         <Link
                             key={route.href}
@@ -97,22 +97,22 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                             className={cn(
                                 "group flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300",
                                 route.active 
-                                    ? "bg-brand-orange text-white shadow-glow-orange" 
-                                    : "opacity-70 hover:opacity-100 hover:bg-white/5"
+                                    ? "bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]" 
+                                    : "text-white/50 hover:bg-white/5 hover:text-white"
                             )}
                         >
-                            <route.icon className={cn("h-5 w-5", route.active ? "text-white" : "text-brand-beige")} />
-                            <span className="font-bold tracking-tight">{route.label}</span>
+                            <route.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", route.active ? "text-white" : "group-hover:text-white")} />
+                            <span className="font-bold text-xs uppercase tracking-widest">{route.label}</span>
                         </Link>
                     ))}
                 </div>
 
                 {isPlatformOwner && (
                     <div className="mt-8 pt-8 border-t border-white/10">
-                        <div className="px-6 mb-4 text-[10px] text-brand-beige uppercase tracking-[0.2em] font-black opacity-50">
+                        <div className="px-6 mb-4 text-[10px] text-white/30 uppercase tracking-[0.2em] font-black">
                             Platform
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                             {adminRoutes.map((route) => (
                                 <Link
                                     key={route.href}
@@ -121,12 +121,12 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                                     className={cn(
                                         "group flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-300",
                                         route.active 
-                                            ? "bg-brand-orange text-white shadow-glow-orange" 
-                                            : "opacity-70 hover:opacity-100 hover:bg-white/5"
+                                            ? "bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]" 
+                                            : "text-white/50 hover:bg-white/5 hover:text-white"
                                     )}
                                 >
-                                    <route.icon className={cn("h-5 w-5", route.active ? "text-white" : "text-brand-beige")} />
-                                    <span className="font-bold tracking-tight">{route.label}</span>
+                                    <route.icon className={cn("h-5 w-5 transition-transform duration-300 group-hover:scale-110", route.active ? "text-white" : "group-hover:text-white")} />
+                                    <span className="font-bold text-xs uppercase tracking-widest">{route.label}</span>
                                 </Link>
                             ))}
                         </div>
@@ -134,15 +134,18 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 )}
             </div>
 
-            <div className="px-6 py-6 border-t border-white/10 mt-auto">
-                <div className="flex items-center gap-4 px-6 py-4 opacity-70">
-                    <div className="w-8 h-8 rounded-xl bg-brand-orange/20 flex items-center justify-center text-xs font-black text-brand-orange uppercase">
+            <div className="p-6 border-t border-white/10 mt-auto">
+                <div className="flex items-center gap-4 px-5 py-4 rounded-2xl bg-white/5 text-white/70">
+                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-xs font-black text-primary uppercase shadow-inner">
                         {tenant?.name?.[0] || orgSlug?.[0]}
                     </div>
-                    <span className="font-bold tracking-tight truncate flex-1 uppercase text-xs opacity-70">{tenant?.name || orgSlug}</span>
+                    <div className="flex flex-col min-w-0 flex-1">
+                        <span className="font-black text-[10px] uppercase tracking-widest truncate">{tenant?.name || orgSlug}</span>
+                        <span className="text-[9px] font-bold opacity-50 uppercase tracking-tighter">Inventory Node</span>
+                    </div>
                     <button
                         onClick={() => logout()}
-                        className="p-2 rounded-xl hover:bg-white/5 transition-colors text-brand-beige hover:text-red-400"
+                        className="p-2 rounded-xl hover:bg-white/5 transition-colors text-white/50 hover:text-rose-400"
                         title="Sign out"
                     >
                         <LogOut className="h-5 w-5" />
@@ -159,7 +162,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             )}
             <aside
                 className={cn(
-                    "fixed inset-y-0 left-0 z-50 flex w-[260px] flex-col transition-transform duration-300 md:static md:z-auto md:translate-x-0",
+                    "fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col transition-transform duration-300 md:sticky md:top-0 md:h-screen md:z-auto md:translate-x-0 md:min-w-[280px]",
                     open ? "translate-x-0" : "-translate-x-full md:translate-x-0",
                 )}
             >
