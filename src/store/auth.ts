@@ -16,7 +16,8 @@ export interface UserProfile {
     email: string;
     fullName: string;
     roles: string[];
-    organizationId: string;
+    tenant_id: string;
+    tenant_slug: string;
 }
 
 interface Session {
@@ -47,17 +48,21 @@ export const useAuthStore = create<AuthState>()(
             error: null,
 
             initialize: async () => {
-                const { session } = get();
+                const { session, user } = get();
                 if (!session) {
                     set({ status: 'idle' });
                     return;
                 }
 
                 apiClient.setAccessToken(session.accessToken);
+                if (user) {
+                    apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
+                }
                 set({ status: 'loading' });
 
                 try {
                     const user = await fetchProfile();
+                    apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
                     set({ user, status: 'authenticated' });
                 } catch (error) {
                     console.error('Failed to initialize auth:', error);
@@ -123,6 +128,7 @@ export const useAuthStore = create<AuthState>()(
                     while (attempts < 5) {
                         try {
                             const user = await fetchProfile();
+                            apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
                             set({ user, status: 'authenticated' });
                             return;
                         } catch {
@@ -140,6 +146,7 @@ export const useAuthStore = create<AuthState>()(
             logout: async () => {
                 set({ status: 'idle', user: null, session: null });
                 apiClient.setAccessToken(null);
+                apiClient.setTenantInfo(null, null);
                 window.location.href = buildLogoutUrl(window.location.origin);
             },
 

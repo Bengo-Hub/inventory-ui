@@ -5,6 +5,8 @@ const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.code
 class ApiClient {
     private instance: AxiosInstance;
     private accessToken: string | null = null;
+    private tenantId: string | null = null;
+    private tenantSlug: string | null = null;
 
     constructor() {
         this.instance = axios.create({
@@ -23,6 +25,12 @@ class ApiClient {
         if (this.accessToken) {
             config.headers.Authorization = `Bearer ${this.accessToken}`;
         }
+        if (this.tenantId) {
+            config.headers['X-Tenant-ID'] = this.tenantId;
+        }
+        if (this.tenantSlug) {
+            config.headers['X-Tenant-Slug'] = this.tenantSlug;
+        }
         return config;
     };
 
@@ -37,6 +45,11 @@ class ApiClient {
 
     public setAccessToken(token: string | null) {
         this.accessToken = token;
+    }
+
+    public setTenantInfo(id: string | null, slug: string | null) {
+        this.tenantId = id;
+        this.tenantSlug = slug;
     }
 
     public get<T>(url: string, params?: any): Promise<T> {
