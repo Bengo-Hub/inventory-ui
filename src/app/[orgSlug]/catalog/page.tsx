@@ -3,10 +3,13 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
+import { Pagination } from '@/components/ui/pagination';
 import { Filter, Package, Search } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+
+const ITEMS_PER_PAGE = 20;
 
 interface StockItem {
     id: string;
@@ -38,6 +41,7 @@ export default function CatalogPage() {
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('All');
+    const [page, setPage] = useState(1);
 
     const { data: items, isLoading } = useQuery<StockItem[]>({
         queryKey: ['catalog', orgSlug, search, category],
@@ -49,6 +53,12 @@ export default function CatalogPage() {
         },
         placeholderData: [],
     });
+
+    const totalPages = Math.max(1, Math.ceil((items?.length ?? 0) / ITEMS_PER_PAGE));
+    const paginatedItems = items?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+
+    // Reset to page 1 when filters change
+    useMemo(() => { setPage(1); }, [search, category]);
 
     return (
         <div className="p-6 space-y-6">
@@ -114,7 +124,7 @@ export default function CatalogPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    items?.map((item) => (
+                                    paginatedItems.map((item) => (
                                         <tr key={item.id} className="hover:bg-accent/30 transition-colors">
                                             <td className="px-6 py-4 font-mono text-xs">{item.sku}</td>
                                             <td className="px-6 py-4">
@@ -139,6 +149,9 @@ export default function CatalogPage() {
                             </tbody>
                         </table>
                     </div>
+                    {!isLoading && (items?.length ?? 0) > 0 && (
+                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+                    )}
                 </CardContent>
             </Card>
         </div>
