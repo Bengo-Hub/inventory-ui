@@ -67,6 +67,28 @@ export async function exchangeCodeForTokens(params: TokenExchangeParams) {
     return response.json();
 }
 
-export async function fetchProfile() {
-    return apiClient.get<any>('auth/me');
+export async function fetchProfile(): Promise<{
+    id: string;
+    email: string;
+    fullName: string;
+    roles: string[];
+    permissions: string[];
+    tenant_id: string;
+    tenant_slug: string;
+    isPlatformOwner: boolean;
+    isSuperUser: boolean;
+}> {
+    const data = await apiClient.get<any>('auth/me');
+    const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
+    return {
+        id: data.id ?? '',
+        email: data.email ?? '',
+        fullName: data.fullName ?? data.full_name ?? data.email ?? '',
+        roles,
+        permissions: Array.isArray(data.permissions) ? data.permissions : [],
+        tenant_id: data.tenant_id ?? '',
+        tenant_slug: data.tenant_slug ?? '',
+        isPlatformOwner: data.is_platform_owner === true || (data.tenant_slug ?? '') === 'codevertex',
+        isSuperUser: roles.includes('superuser'),
+    };
 }
