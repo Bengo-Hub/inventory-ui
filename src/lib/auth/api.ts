@@ -78,7 +78,7 @@ export async function fetchProfile(): Promise<{
     isPlatformOwner: boolean;
     isSuperUser: boolean;
 }> {
-    const data = await apiClient.get<any>('auth/me');
+    const data = await apiClient.get<any>('/api/v1/auth/me');
     const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
     return {
         id: data.id ?? '',

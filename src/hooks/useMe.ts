@@ -18,7 +18,7 @@ const ME_QUERY_KEY = ['auth', 'me'] as const;
 const ME_STALE_MS = 5 * 60 * 1000; // 5 min TTL
 
 async function fetchMe(): Promise<MeResponse> {
-  const data = await apiClient.get<MeResponse>('auth/me');
+  const data = await apiClient.get<MeResponse>('/api/v1/auth/me');
   return {
     ...data,
     roles: Array.isArray((data as any).roles) ? (data as any).roles : [],
