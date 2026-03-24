@@ -158,7 +158,12 @@ export const useAuthStore = create<AuthState>()(
                 set({ status: 'idle', user: null, session: null });
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
-                window.location.href = buildLogoutUrl(window.location.origin);
+                if (typeof window !== 'undefined') {
+                    localStorage.removeItem('tenantId');
+                    localStorage.removeItem('tenantSlug');
+                    localStorage.removeItem('inventory-auth-storage');
+                    window.location.href = buildLogoutUrl(window.location.origin);
+                }
             },
 
             fetchUser: async () => {
