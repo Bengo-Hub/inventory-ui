@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import {
     ArrowRightLeft,
+    ChefHat,
     ClipboardList,
     FileText,
     Layers,
@@ -11,6 +12,7 @@ import {
     Package,
     Settings,
     Shield,
+    SquareStack,
     Truck,
     Warehouse,
     X,
@@ -32,6 +34,8 @@ const mainRoutesConfig: Array<{
 }> = [
     { label: 'Dashboard', icon: LayoutDashboard, href: '' },
     { label: 'Catalog', icon: Package, href: '/catalog', permission: 'items:read' },
+    { label: 'Recipes', icon: ChefHat, href: '/recipes', permission: 'recipes:read' },
+    { label: 'Modifiers', icon: SquareStack, href: '/modifiers', permission: 'modifier_groups:read' },
     { label: 'Warehouses', icon: Warehouse, href: '/warehouses', permission: 'warehouses:read' },
     { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', permission: 'adjustments:read' },
     { label: 'Suppliers', icon: Truck, href: '/suppliers', permission: 'suppliers:read' },
