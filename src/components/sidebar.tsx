@@ -2,12 +2,16 @@ import { useMe } from '@/hooks/useMe';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth';
 import {
+    ArrowRightLeft,
     ClipboardList,
+    FileText,
+    Layers,
     LayoutDashboard,
     LogOut,
     Package,
     Settings,
     Shield,
+    Truck,
     Warehouse,
     X,
 } from 'lucide-react';
@@ -30,6 +34,10 @@ const mainRoutesConfig: Array<{
     { label: 'Catalog', icon: Package, href: '/catalog', permission: 'items:read' },
     { label: 'Warehouses', icon: Warehouse, href: '/warehouses', permission: 'warehouses:read' },
     { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', permission: 'adjustments:read' },
+    { label: 'Suppliers', icon: Truck, href: '/suppliers', permission: 'suppliers:read' },
+    { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', permission: 'purchase_orders:read' },
+    { label: 'Transfers', icon: ArrowRightLeft, href: '/transfers', permission: 'transfers:read' },
+    { label: 'Lots', icon: Layers, href: '/lots', permission: 'lots:read' },
     { label: 'Settings', icon: Settings, href: '/settings' },
 ];
 

@@ -2,12 +2,13 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { Filter, Package, Search } from 'lucide-react';
+import { Filter, Package, Search, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useRef, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -39,9 +40,39 @@ const CATEGORIES = ['All', 'Raw Materials', 'Finished Goods', 'Packaging', 'Supp
 export default function CatalogPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
+    const queryClient = useQueryClient();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('All');
     const [page, setPage] = useState(1);
+
+    const importMutation = useMutation({
+        mutationFn: (file: File) => {
+            const formData = new FormData();
+            formData.append('file', file);
+            return apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/items/import`, formData);
+        },
+        onSuccess: () => {
+            toast.success('Items imported successfully');
+            queryClient.invalidateQueries({ queryKey: ['catalog'] });
+        },
+        onError: () => {
+            toast.error('Failed to import items');
+        },
+    });
+
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0];
+        if (file) {
+            if (!file.name.endsWith('.csv')) {
+                toast.error('Please select a CSV file');
+                return;
+            }
+            importMutation.mutate(file);
+        }
+        // Reset input so the same file can be re-selected
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
 
     const { data: items, isLoading } = useQuery<StockItem[]>({
         queryKey: ['catalog', orgSlug, search, category],
@@ -66,6 +97,23 @@ export default function CatalogPage() {
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Stock Catalog</h1>
                     <p className="text-muted-foreground mt-1">Manage your inventory items</p>
+                </div>
+                <div>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv"
+                        className="hidden"
+                        onChange={handleFileChange}
+                    />
+                    <Button
+                        variant="outline"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={importMutation.isPending}
+                    >
+                        <Upload className="h-4 w-4 mr-2" />
+                        {importMutation.isPending ? 'Importing...' : 'Import CSV'}
+                    </Button>
                 </div>
             </div>
 
