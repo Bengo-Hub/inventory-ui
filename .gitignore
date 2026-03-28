@@ -53,3 +53,9 @@ next-env.d.ts
 
 #backup files
 .bak
+
+# Security hardening
+!.env.example
+*-key.pem
+KubeSecrets/
+kubeSecrets/
