@@ -44,6 +44,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!session || isUnauthorizedPage || meLoading) return;
         const statusCode = (error as { response?: { status?: number } })?.response?.status;
         if (isError && statusCode === 403 && orgSlug) {
+            // Skip redirect for subscription 403 — let SubscriptionBanner handle it
+            const data = (error as any)?.response?.data;
+            if (data?.code === 'subscription_inactive' || data?.upgrade === true) return;
             router.replace(`/${orgSlug}/unauthorized`);
         }
     }, [session, isError, error, isUnauthorizedPage, meLoading, orgSlug, router]);
