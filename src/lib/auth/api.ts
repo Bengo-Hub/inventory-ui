@@ -67,7 +67,11 @@ export async function exchangeCodeForTokens(params: TokenExchangeParams) {
     return response.json();
 }
 
-export async function fetchProfile(): Promise<{
+/**
+ * Fetch user profile from SSO auth-api (not backend — avoids JIT sync delay).
+ * SSO always has the user immediately after login; backend may still be syncing via NATS.
+ */
+export async function fetchProfile(accessToken?: string): Promise<{
     id: string;
     email: string;
     fullName: string;
@@ -77,8 +81,19 @@ export async function fetchProfile(): Promise<{
     tenant_slug: string;
     isPlatformOwner: boolean;
     isSuperUser: boolean;
+    tenant?: Record<string, unknown>;
 }> {
-    const data = await apiClient.get<any>('/api/v1/auth/me');
+    const token = accessToken ?? (typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null);
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${SSO_BASE_URL}/api/v1/auth/me`, { headers });
+    if (!res.ok) {
+        const err: any = new Error(res.status === 401 ? 'Unauthorized' : 'SSO /me failed');
+        err.response = { status: res.status };
+        throw err;
+    }
+    const data = await res.json();
     const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
     return {
         id: data.id ?? '',
@@ -90,5 +105,6 @@ export async function fetchProfile(): Promise<{
         tenant_slug: data.tenant_slug ?? '',
         isPlatformOwner: data.is_platform_owner === true || (data.tenant_slug ?? '') === 'codevertex',
         isSuperUser: roles.includes('superuser'),
+        tenant: data.tenant,
     };
 }
