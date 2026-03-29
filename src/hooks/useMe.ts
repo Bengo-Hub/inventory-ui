@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api/client';
+import { fetchProfile } from '@/lib/auth/api';
+import { useAuthStore } from '@/store/auth';
 
 /** Auth-api GET /me response: user profile with roles and permissions (source of truth for RBAC). */
 export interface MeResponse {
@@ -17,20 +18,20 @@ export interface MeResponse {
 const ME_QUERY_KEY = ['auth', 'me'] as const;
 const ME_STALE_MS = 5 * 60 * 1000; // 5 min TTL
 
-async function fetchMe(): Promise<MeResponse> {
-  const data = await apiClient.get<MeResponse>('/api/v1/auth/me');
-  return {
-    ...data,
-    roles: Array.isArray((data as any).roles) ? (data as any).roles : [],
-    permissions: Array.isArray((data as any).permissions) ? (data as any).permissions : [],
-  };
-}
-
-/** Load current user and RBAC (roles/permissions) from auth-api GET /me with TanStack Query and TTL. */
+/** Load current user and RBAC from SSO auth-api GET /me with TanStack Query and TTL. */
 export function useMe(enabled = true) {
+  const accessToken = useAuthStore((s) => s.session?.accessToken);
+
   const query = useQuery({
     queryKey: ME_QUERY_KEY,
-    queryFn: fetchMe,
+    queryFn: async (): Promise<MeResponse> => {
+      const data = await fetchProfile(accessToken ?? undefined);
+      return {
+        ...data,
+        roles: Array.isArray(data.roles) ? data.roles : [],
+        permissions: Array.isArray(data.permissions) ? data.permissions : [],
+      };
+    },
     enabled,
     staleTime: ME_STALE_MS,
     gcTime: ME_STALE_MS * 2,
