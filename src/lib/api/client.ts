@@ -54,6 +54,9 @@ class ApiClient {
 
     private handleError = async (error: any) => {
         if (error.response?.status === 401) {
+            // If token is already cleared (explicit logout in progress), skip entirely
+            if (!this.accessToken) return Promise.reject(error);
+
             const url: string = error.config?.url ?? '';
             if (!url.includes('/auth/me') && !error.config?._retried) {
                 const { refreshAccessToken } = await import('@/lib/auth/token-refresh');
