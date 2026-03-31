@@ -67,6 +67,20 @@ export async function exchangeCodeForTokens(params: TokenExchangeParams) {
     return response.json();
 }
 
+export async function refreshTokens(refreshToken: string): Promise<{
+    access_token: string;
+    refresh_token?: string;
+    expires_in?: number;
+}> {
+    const response = await fetch(`${SSO_BASE_URL}/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken, client_id: SSO_CLIENT_ID }),
+    });
+    if (!response.ok) throw new Error('Token refresh failed');
+    return response.json();
+}
+
 /**
  * Fetch user profile from SSO auth-api (not backend — avoids JIT sync delay).
  * SSO always has the user immediately after login; backend may still be syncing via NATS.
