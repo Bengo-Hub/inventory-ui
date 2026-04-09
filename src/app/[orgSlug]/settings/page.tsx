@@ -64,7 +64,12 @@ export default function SettingsPage() {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        mutation.mutate(form);
+        // Strip empty string values to avoid overwriting existing settings with blanks
+        const payload: Partial<TenantSettings> = {};
+        for (const [k, v] of Object.entries(form) as [keyof TenantSettings, unknown][]) {
+            if (v !== '') (payload as Record<string, unknown>)[k] = v;
+        }
+        mutation.mutate(payload as TenantSettings);
     };
 
     return (
