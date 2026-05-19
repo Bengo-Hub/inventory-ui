@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { Bell, ChevronDown, LogOut, Menu, Package, Search, Settings, User } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { useBranding } from '@/providers/branding-provider';
+import { OutletFilter } from './outlet-filter';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -47,6 +48,7 @@ export function Header({ onMenuClick }: HeaderProps) {
                             className="w-full h-10 bg-slate-50 dark:bg-white/5 border-none rounded-xl py-1.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/30 transition-all outline-none"
                         />
                     </div>
+                    <OutletFilter className="hidden md:block" />
                 </div>
             </div>
 
