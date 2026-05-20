@@ -25,6 +25,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useBranding } from '@/providers/branding-provider';
 import { useAuthStore } from '@/store/auth';
+import { useOutletStore } from '@/store/outlet';
 
 interface SidebarProps {
   open?: boolean;
@@ -121,7 +122,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { tenant, getServiceTitle } = useBranding();
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
+  const { outlet, clearOutlet } = useOutletStore();
   const isPlatformOwner = orgSlug === 'codevertex';
+
+  async function handleLogout() {
+    clearOutlet();
+    await logout();
+  }
 
   // ── Nav groups ────────────────────────────────────────────────────────────
 
@@ -235,10 +242,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-white truncate">{displayName}</p>
-            <p className="text-[10px] text-white/40 mt-0.5">Inventory</p>
+            <p className="text-[10px] text-white/40 mt-0.5">{outlet?.name ?? 'Inventory'}</p>
           </div>
           <button
-            onClick={() => logout()}
+            onClick={handleLogout}
             className="h-7 w-7 rounded-lg flex items-center justify-center text-white/35 hover:text-rose-400 hover:bg-white/8 transition-colors"
             title="Sign out"
           >

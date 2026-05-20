@@ -24,9 +24,16 @@ function AuthCallbackContent() {
 
     useEffect(() => {
         if (status === 'authenticated') {
-            const returnTo = sessionStorage.getItem('sso_return_to') || `/${orgSlug}`;
+            const returnTo = sessionStorage.getItem('sso_return_to');
             sessionStorage.removeItem('sso_return_to');
-            router.replace(returnTo);
+            const storedOutlet = typeof window !== 'undefined'
+                ? localStorage.getItem('inventory-selected-outlet-id') : null;
+            if (storedOutlet) {
+                router.replace(returnTo || `/${orgSlug}`);
+            } else {
+                const next = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+                router.replace(`/${orgSlug}/auth/select-outlet${next}`);
+            }
         }
     }, [status, orgSlug, router]);
 
