@@ -36,12 +36,34 @@ interface NavItem {
   label: string;
   icon: React.ElementType;
   href: string;
+  /** Module key used for use_case filtering. Omit to always show. */
+  moduleKey?: string;
 }
 
 interface NavGroup {
   label: string;
   defaultCollapsed?: boolean;
   items: NavItem[];
+}
+
+// ── Use-case module gating ────────────────────────────────────────────────────
+// Maps outlet use_case to the set of module keys visible in the sidebar.
+// Mirrors pos-ui's USE_CASE_MODULES pattern.
+
+const USE_CASE_MODULES: Record<string, string[]> = {
+  hospitality:   ['dashboard', 'catalog', 'recipes', 'modifiers', 'warehouses', 'adjustments', 'transfers', 'settings'],
+  quick_service: ['dashboard', 'catalog', 'recipes', 'warehouses', 'adjustments', 'settings'],
+  retail:        ['dashboard', 'catalog', 'warehouses', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'suppliers', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'warehouses', 'adjustments', 'lots', 'purchase_orders', 'suppliers', 'settings'],
+  services:      ['dashboard', 'catalog', 'warehouses', 'adjustments', 'settings'],
+  warehouse:     ['dashboard', 'catalog', 'warehouses', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'settings'],
+  logistics:     ['dashboard', 'warehouses', 'transfers', 'adjustments', 'settings'],
+};
+
+function hasModule(key: string | undefined, useCase: string | undefined): boolean {
+  if (!key) return true; // no key = always visible
+  const modules = USE_CASE_MODULES[useCase ?? ''] ?? USE_CASE_MODULES.hospitality;
+  return modules.includes(key);
 }
 
 // ── Nav link ──────────────────────────────────────────────────────────────────
@@ -132,46 +154,56 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
   // ── Nav groups ────────────────────────────────────────────────────────────
 
-  const navGroups: NavGroup[] = [
+  const useCase = outlet?.use_case;
+
+  const allNavGroups: NavGroup[] = [
     {
       label: 'Overview',
       items: [
-        { label: 'Dashboard', icon: LayoutDashboard, href: '' },
+        { label: 'Dashboard', icon: LayoutDashboard, href: '', moduleKey: 'dashboard' },
       ],
     },
     {
       label: 'Catalog',
       items: [
-        { label: 'Items', icon: Package, href: '/catalog' },
-        { label: 'Recipes / BOM', icon: ChefHat, href: '/recipes' },
-        { label: 'Modifiers', icon: SquareStack, href: '/modifiers' },
+        { label: 'Items', icon: Package, href: '/catalog', moduleKey: 'catalog' },
+        { label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' },
+        { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
       ],
     },
     {
       label: 'Warehouse',
       items: [
-        { label: 'Warehouses', icon: Warehouse, href: '/warehouses' },
-        { label: 'Adjustments', icon: ClipboardList, href: '/adjustments' },
-        { label: 'Transfers', icon: ArrowRightLeft, href: '/transfers' },
-        { label: 'Lots & Batches', icon: Layers, href: '/lots' },
+        { label: 'Warehouses', icon: Warehouse, href: '/warehouses', moduleKey: 'warehouses' },
+        { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', moduleKey: 'adjustments' },
+        { label: 'Transfers', icon: ArrowRightLeft, href: '/transfers', moduleKey: 'transfers' },
+        { label: 'Lots & Batches', icon: Layers, href: '/lots', moduleKey: 'lots' },
       ],
     },
     {
       label: 'Procurement',
       defaultCollapsed: true,
       items: [
-        { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders' },
-        { label: 'Suppliers', icon: Truck, href: '/suppliers' },
+        { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', moduleKey: 'purchase_orders' },
+        { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
       ],
     },
     {
       label: 'Management',
       defaultCollapsed: true,
       items: [
-        { label: 'Settings', icon: Settings, href: '/settings' },
+        { label: 'Settings', icon: Settings, href: '/settings', moduleKey: 'settings' },
       ],
     },
   ];
+
+  // Filter groups and items by outlet use_case
+  const navGroups = allNavGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => hasModule(item.moduleKey, useCase)),
+    }))
+    .filter((group) => group.items.length > 0);
 
   function isGroupInitiallyOpen(group: NavGroup): boolean {
     if (!group.defaultCollapsed) return true;
