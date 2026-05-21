@@ -3,7 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BoxIcon, GitBranch, History } from 'lucide-react';
+import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -38,6 +38,13 @@ interface StockHistoryEntry {
     createdBy: string;
 }
 
+interface PricingTier {
+    id: string;
+    minQty: number;
+    maxQty: number | null;
+    unitPrice: number;
+}
+
 export default function ItemDetailPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
@@ -52,6 +59,13 @@ export default function ItemDetailPage() {
     const { data: history } = useQuery<StockHistoryEntry[]>({
         queryKey: ['catalog', 'history', orgSlug, id],
         queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}/history`),
+        enabled: !!id,
+        placeholderData: [],
+    });
+
+    const { data: pricingTiers } = useQuery<PricingTier[]>({
+        queryKey: ['catalog', 'pricing', orgSlug, id],
+        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}/pricing-tiers`),
         enabled: !!id,
         placeholderData: [],
     });
@@ -90,9 +104,17 @@ export default function ItemDetailPage() {
                     <h1 className="text-2xl font-bold tracking-tight">{item.name}</h1>
                     <p className="text-muted-foreground font-mono text-sm">{item.sku}</p>
                 </div>
-                <Badge variant={statusVariant} className="ml-auto">
-                    {item.status.replace('_', ' ')}
-                </Badge>
+                <div className="ml-auto flex items-center gap-3">
+                    <Link href={`/${orgSlug}/catalog/${id}/recipe`}>
+                        <Button variant="outline" size="sm">
+                            <ChefHat className="h-4 w-4 mr-2" />
+                            View Recipe
+                        </Button>
+                    </Link>
+                    <Badge variant={statusVariant}>
+                        {item.status.replace('_', ' ')}
+                    </Badge>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -154,6 +176,46 @@ export default function ItemDetailPage() {
                     </Card>
                 )}
             </div>
+
+            {/* Pricing Tiers */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        <h2 className="text-lg font-semibold">Pricing Tiers</h2>
+                    </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                    {(pricingTiers?.length ?? 0) === 0 ? (
+                        <div className="p-6 text-center text-muted-foreground text-sm">
+                            No custom pricing tiers — standard price applies.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Min Qty</th>
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Max Qty</th>
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {pricingTiers?.map((tier) => (
+                                        <tr key={tier.id} className="hover:bg-accent/30 transition-colors">
+                                            <td className="px-6 py-3 text-right tabular-nums">{tier.minQty.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-right tabular-nums">
+                                                {tier.maxQty != null ? tier.maxQty.toLocaleString() : '—'}
+                                            </td>
+                                            <td className="px-6 py-3 text-right font-semibold tabular-nums">{tier.unitPrice.toLocaleString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>

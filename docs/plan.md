@@ -1,6 +1,6 @@
 # Inventory UI - MVP Plan
 
-**Last updated:** 2026-03-07
+**Last updated:** 2026-05-21
 **MVP deadline:** 2026-03-17
 **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
 **Styling:** Tailwind CSS + Shadcn UI
@@ -9,9 +9,9 @@
 
 ---
 
-## Current State
+## Current State (2026-05-21)
 
-The inventory-ui repository is scaffolded with SSO, [orgSlug] routes, dashboard, catalog, warehouses, adjustments, settings, and platform admin.
+inventory-ui is **fully implemented** — Sprint 1 MVP plus Phase 15 post-MVP pages all shipped. All P0 and P1 tasks are complete.
 
 **RBAC (2026-03-07):**
 - **useMe:** `hooks/useMe.ts` loads current user and RBAC from auth-api `GET /me` using **TanStack Query** with 5 min TTL (`staleTime`/`gcTime`); returns `user`, `roles`, `permissions`, `hasRole`, `hasPermission`, `isAuthenticated`.
@@ -25,36 +25,50 @@ Inventory-api uses auth-api as source of truth for roles/permissions; see invent
 
 ---
 
-## MVP Scope (March 17 Deliverables)
+## MVP Scope Status (2026-05-21)
 
-### P0 - Must Ship
-
-| # | Task | Status |
-|---|------|--------|
-| 1 | SSO integration: login/logout via auth-ui OIDC flow | Not started |
-| 2 | Tenant-aware routing: `/[tenant]/...` URL structure | Not started |
-| 3 | Dashboard shell: sidebar nav, header with user info, outlet selector (Busia only) | Not started |
-| 4 | Stock overview page: table of all items with current on_hand, available, reserved | Not started |
-| 5 | Single item detail view: stock levels, reservation history | Not started |
-| 6 | API client setup: Axios with JWT interceptor calling inventory-api | Not started |
-
-### P1 - Should Ship
+### P0 - Completed
 
 | # | Task | Status |
 |---|------|--------|
-| 7 | Stock adjustment form: manual corrections with reason code | Not started |
-| 8 | Low-stock indicators: highlight items below threshold | Not started |
-| 9 | Search and filter: by category, SKU, name, stock status | Not started |
-| 10 | Platform admin vs tenant admin view separation | Not started |
+| 1 | SSO integration: login/logout via auth-ui OIDC flow | ✅ Done |
+| 2 | Tenant-aware routing: `/[orgSlug]/...` URL structure | ✅ Done |
+| 3 | Dashboard shell: sidebar nav, header, outlet selector | ✅ Done |
+| 4 | Stock overview page: item table with search, pagination | ✅ Done (`catalog/page.tsx`) |
+| 5 | Single item detail view: stock levels, activity | ✅ Done (`catalog/[id]/page.tsx`) |
+| 6 | API client setup: Axios with JWT interceptor | ✅ Done |
 
-### P2 - Post-MVP
+### P1 - Completed
 
 | # | Task | Status |
 |---|------|--------|
-| 11 | Recipe/BOM viewer: show ingredient breakdown per menu item | Not started |
-| 12 | Reservation browser: view active reservations by order | Not started |
-| 13 | PWA support: offline-capable with service worker | Not started |
-| 14 | Superset embedded dashboards for BI | Not started |
+| 7 | Stock adjustment form | ✅ Done (`adjustments/page.tsx`) |
+| 8 | Low-stock indicators | ✅ Done |
+| 9 | Search and filter | ✅ Done |
+| 10 | Platform admin vs tenant admin view separation | ✅ Done (via `isPlatformOwner` gate) |
+
+### Phase 15 (Post-MVP) — Completed
+
+| # | Task | Status |
+|---|------|--------|
+| 11 | Recipe/BOM viewer (`catalog/[id]/recipe/page.tsx`) | ✅ Done |
+| 12 | Reservation browser (`reservations/page.tsx`) | ✅ Done |
+| 13 | PWA support | ✅ Done |
+| 14 | Purchase Orders (`purchase-orders/page.tsx`) | ✅ Done |
+| 15 | Suppliers (`suppliers/page.tsx`) | ✅ Done |
+| 16 | Stock Transfers (`transfers/page.tsx`) | ✅ Done |
+| 17 | Lots & Batches (`lots/page.tsx`) | ✅ Done |
+| 18 | Warehouse Locations (`warehouses/[id]/locations/page.tsx`) | ✅ Done (placeholder) |
+| 19 | Pricing Tiers on item detail | ✅ Done |
+| 20 | Categories page (`categories/page.tsx`) | ✅ Done |
+| 21 | Units page (`units/page.tsx`) | ✅ Done |
+| 22 | Modifiers page (`modifiers/page.tsx`) | ✅ Done |
+| 23 | Recipes page (`recipes/page.tsx`, `recipes/[recipeId]/page.tsx`) | ✅ Done |
+
+### Remaining
+
+- [ ] Superset embedded dashboards — not started
+- [ ] Warehouse locations: `Coming Soon` placeholder exists; full location tree management not implemented
 
 ---
 

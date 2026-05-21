@@ -1,0 +1,59 @@
+import { apiClient } from './client';
+
+export interface InventorySettings {
+  tenant_id: string;
+  low_stock_threshold_pct: number;
+  critical_stock_threshold_pct: number;
+  default_reorder_level: number;
+  expiry_warning_days: number;
+  enable_low_stock_notifications: boolean;
+  enable_expiry_notifications: boolean;
+  notification_email?: string | null;
+  default_warehouse_id?: string | null;
+  enable_lot_tracking: boolean;
+  enable_expiry_tracking: boolean;
+  purchase_order_approval_required: boolean;
+  auto_adjust_on_transfer: boolean;
+  lots_module_enabled: boolean;
+  recipes_module_enabled: boolean;
+  purchase_orders_enabled: boolean;
+  supplier_management_enabled: boolean;
+  updated_at: string;
+}
+
+export interface UpdateInventorySettingsInput {
+  low_stock_threshold_pct?: number;
+  critical_stock_threshold_pct?: number;
+  default_reorder_level?: number;
+  expiry_warning_days?: number;
+  enable_low_stock_notifications?: boolean;
+  enable_expiry_notifications?: boolean;
+  notification_email?: string | null;
+  default_warehouse_id?: string | null;
+  enable_lot_tracking?: boolean;
+  enable_expiry_tracking?: boolean;
+  purchase_order_approval_required?: boolean;
+  auto_adjust_on_transfer?: boolean;
+}
+
+export interface UpdateInventoryModulesInput {
+  lots_module_enabled?: boolean;
+  recipes_module_enabled?: boolean;
+  purchase_orders_enabled?: boolean;
+  supplier_management_enabled?: boolean;
+}
+
+function settingsBase(orgSlug: string) {
+  return `/api/v1/tenants/${orgSlug}/inventory/settings`;
+}
+
+export const inventorySettingsApi = {
+  get: (orgSlug: string) =>
+    apiClient.get<InventorySettings>(settingsBase(orgSlug)),
+
+  put: (orgSlug: string, body: UpdateInventorySettingsInput) =>
+    apiClient.put<InventorySettings>(settingsBase(orgSlug), body),
+
+  patchModules: (orgSlug: string, body: UpdateInventoryModulesInput) =>
+    apiClient.patch<InventorySettings>(`${settingsBase(orgSlug)}/modules`, body),
+};

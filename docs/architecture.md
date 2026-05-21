@@ -4,6 +4,8 @@
 **Language:** TypeScript
 **Backend:** inventory-api at `inventoryapi.codevertexitsolutions.com`
 **Auth:** OIDC/OAuth2 via auth-ui (`sso.codevertexitsolutions.com`)
+**Last updated:** 2026-05-21
+**Status:** Fully implemented — Sprint 1 MVP + Phase 15 post-MVP pages all shipped
 
 ---
 
@@ -25,44 +27,38 @@
 
 ---
 
-## Project Layout (Target)
+## Implemented Route Structure (as of 2026-05-21)
 
 ```
-inventory-ui/
-├── src/
-│   ├── app/
-│   │   ├── layout.tsx              # Root layout (providers, global styles)
-│   │   ├── page.tsx                # Redirect to /[tenant]/dashboard
-│   │   ├── login/page.tsx          # OIDC login redirect
-│   │   └── [tenant]/
-│   │       ├── layout.tsx          # Tenant layout (sidebar, header)
-│   │       ├── dashboard/page.tsx  # Stock overview dashboard
-│   │       ├── stock/
-│   │       │   ├── page.tsx        # Stock list table
-│   │       │   └── [sku]/page.tsx  # Item detail view
-│   │       └── adjustments/
-│   │           └── new/page.tsx    # Stock adjustment form (P1)
-│   ├── components/
-│   │   ├── ui/                     # Shadcn UI primitives
-│   │   ├── layout/                 # Sidebar, Header, OutletSelector
-│   │   ├── stock/                  # StockTable, StockCard, AvailabilityBadge
-│   │   └── auth/                   # AuthProvider, ProtectedRoute
-│   ├── lib/
-│   │   ├── api/                    # Axios client, endpoint functions
-│   │   ├── auth/                   # OIDC config, token management
-│   │   └── utils/                  # Formatters, helpers
-│   ├── stores/
-│   │   ├── auth-store.ts           # Zustand: user, tokens, tenant
-│   │   └── ui-store.ts             # Zustand: sidebar state, preferences
-│   └── types/
-│       ├── inventory.ts            # StockAvailability, Reservation, etc.
-│       └── auth.ts                 # User, Token types
-├── public/
-├── docs/
-├── next.config.ts
-├── tailwind.config.ts
-├── tsconfig.json
-└── package.json
+src/app/
+  layout.tsx                                  # Root layout (providers)
+  page.tsx                                    # Redirect to /[orgSlug]/dashboard
+  not-found.tsx                               # 404 page
+  [orgSlug]/
+    layout.tsx                                # Tenant layout (sidebar, header)
+    dashboard/page.tsx                        # Stock overview dashboard
+    catalog/page.tsx                          # Item catalog with search/pagination
+    catalog/[id]/page.tsx                     # Item detail (stock levels, activity, pricing tiers)
+    catalog/[id]/recipe/page.tsx              # Recipe/BOM viewer
+    warehouses/page.tsx                       # Warehouse list
+    warehouses/[id]/locations/page.tsx        # Warehouse locations (placeholder)
+    adjustments/page.tsx                      # Stock adjustment form
+    suppliers/page.tsx                        # Supplier management
+    purchase-orders/page.tsx                  # Purchase orders list
+    transfers/page.tsx                        # Stock transfers
+    lots/page.tsx                             # Lots & batches
+    reservations/page.tsx                     # Reservation browser
+    modifiers/page.tsx                        # Modifier groups
+    recipes/page.tsx                          # Recipes list
+    recipes/[recipeId]/page.tsx               # Recipe detail
+    categories/page.tsx                       # Item categories
+    units/page.tsx                            # Units of measure
+    stock/page.tsx                            # Stock list view
+    settings/page.tsx                         # Settings
+    platform/page.tsx                         # Platform admin (super_admin/admin only)
+    unauthorized/page.tsx                     # 403 access denied
+    auth/callback/page.tsx                    # OIDC callback
+    auth/login/page.tsx                       # Login redirect
 ```
 
 ---

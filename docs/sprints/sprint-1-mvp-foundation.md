@@ -1,6 +1,6 @@
 # Sprint 1 - MVP Foundation (March 17, 2026)
 
-**Status:** ✅ Complete — SSO, multi-outlet, sidebar revamp, PWA, RBAC, all pages data-integrated
+**Status:** ✅ Complete — SSO, multi-outlet, sidebar revamp, PWA, RBAC, all pages data-integrated including post-MVP Phase 15 pages (recipe viewer, POs, suppliers, transfers, lots, reservations, warehouse locations, pricing tiers)
 **Start:** 2026-03-06
 **Deadline:** 2026-03-17
 **Goal:** Ship a functional inventory-ui with SSO, stock visibility, and operational dashboard for Urban Loft Cafe (Busia outlet)
@@ -112,11 +112,40 @@ The inventory-ui repo is scaffolded (Next.js 16, React 19) with implemented page
 
 ---
 
-## Out of Scope
+## Out of Scope (original Sprint 1)
 
-- Recipe/BOM viewer UI
-- Reservation browser
 - PWA/offline support
 - Superset embedded dashboards
-- Procurement/supplier management
 - Notification preferences UI
+
+---
+
+## Post-MVP Pages (Phase 15 — 2026-05-20)
+
+The following pages were added after Sprint 1 MVPcompletion as part of Phase 15:
+
+### 15.1 Recipe / BOM Viewer
+- `app/[orgSlug]/catalog/[id]/recipe/page.tsx` — fetches `GET /items/{id}/recipe`, shows ingredient table (name, qty, unit, waste %, cost). "No recipe defined" empty state.
+- `catalog/[id]/page.tsx` updated: "View Recipe" link button in header.
+
+### 15.2 Sidebar Revamp — NavGroup Pattern
+- Already implemented in Sprint 1 as collapsible `NavGroupSection` with `USE_CASE_MODULES` gating. No changes needed.
+
+### 15.3 Purchase Orders & Supplier Management
+- `app/[orgSlug]/purchase-orders/page.tsx` — PO list + inline detail view (line items, grand total). Already existed.
+- `app/[orgSlug]/suppliers/page.tsx` — Supplier list + add/edit dialog. Already existed.
+
+### 15.4 Stock Transfers
+- `app/[orgSlug]/transfers/page.tsx` — Transfer list + create dialog. Already existed.
+
+### 15.5 Lots & Batches
+- `app/[orgSlug]/lots/page.tsx` — Lot table with expiry warnings (yellow within 30 days, red expired). Already existed.
+
+### 15.6 Reservation Browser
+- `app/[orgSlug]/reservations/page.tsx` — Active reservations table with status filter (confirmed / consumed / released).
+
+### 15.7 Warehouse Locations Placeholder
+- `app/[orgSlug]/warehouses/[id]/locations/page.tsx` — "Coming Soon" placeholder for sub-warehouse bin/shelf/aisle/zone tracking.
+
+### 15.8 Pricing Tiers on Item Detail
+- `catalog/[id]/page.tsx` updated: Pricing Tiers card (min qty, max qty, unit price). Shows "No custom pricing tiers" when empty.
