@@ -58,14 +58,14 @@ export default function PurchaseOrdersPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/purchase-orders`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/purchase-orders`, p);
         },
         placeholderData: [],
     });
 
     const { data: poDetail } = useQuery<PurchaseOrder>({
         queryKey: ['purchase-orders', 'detail', orgSlug, selectedPO],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/purchase-orders/${selectedPO}`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/purchase-orders/${selectedPO}`),
         enabled: !!selectedPO,
     });
 

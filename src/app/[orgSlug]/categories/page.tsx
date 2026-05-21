@@ -45,7 +45,7 @@ export default function CategoriesPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/categories`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/categories`, p);
         },
         placeholderData: [],
     });
@@ -53,8 +53,8 @@ export default function CategoriesPage() {
     const mutation = useMutation({
         mutationFn: (payload: CategoryPayload) =>
             editing
-                ? apiClient.put(`/api/v1/tenants/${orgSlug}/inventory/categories/${editing.id}`, payload)
-                : apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/categories`, payload),
+                ? apiClient.put(`/api/v1/${orgSlug}/inventory/categories/${editing.id}`, payload)
+                : apiClient.post(`/api/v1/${orgSlug}/inventory/categories`, payload),
         onSuccess: () => {
             toast.success(editing ? 'Category updated' : 'Category created');
             queryClient.invalidateQueries({ queryKey: ['categories'] });

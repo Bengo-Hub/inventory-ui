@@ -51,7 +51,7 @@ export default function ReservationsPage() {
             const p: Record<string, string> = {};
             if (search) p.search = search;
             if (statusFilter !== 'All') p.status = statusFilter;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/reservations`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/reservations`, p);
         },
         placeholderData: [],
     });

@@ -37,7 +37,7 @@ export default function ItemRecipePage() {
 
     const { data: recipe, isLoading, isError } = useQuery<RecipeDetail>({
         queryKey: ['item-recipe', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}/recipe`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/recipe`),
         enabled: !!orgSlug && !!id,
     });
 

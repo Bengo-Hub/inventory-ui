@@ -20,7 +20,7 @@ export default function WarehousesPage() {
 
     const { data: warehouses, isLoading } = useQuery<WarehouseItem[]>({
         queryKey: ['warehouses', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/warehouses`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/warehouses`),
         placeholderData: [
             {
                 id: 'wh-001',

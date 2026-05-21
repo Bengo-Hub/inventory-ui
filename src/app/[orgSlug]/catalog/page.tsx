@@ -50,7 +50,7 @@ export default function CatalogPage() {
         mutationFn: (file: File) => {
             const formData = new FormData();
             formData.append('file', file);
-            return apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/items/import`, formData);
+            return apiClient.post(`/api/v1/${orgSlug}/inventory/items/import`, formData);
         },
         onSuccess: () => {
             toast.success('Items imported successfully');
@@ -80,7 +80,7 @@ export default function CatalogPage() {
             const params: Record<string, string> = {};
             if (search) params.search = search;
             if (category !== 'All') params.category = category;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items`, params);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/items`, params);
         },
         placeholderData: [],
     });

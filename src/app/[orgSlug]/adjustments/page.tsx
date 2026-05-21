@@ -29,7 +29,7 @@ export default function AdjustmentsPage() {
 
     const mutation = useMutation({
         mutationFn: (payload: AdjustmentPayload) =>
-            apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/adjustments`, payload),
+            apiClient.post(`/api/v1/${orgSlug}/inventory/adjustments`, payload),
         onSuccess: () => {
             toast.success('Stock adjustment recorded successfully');
             queryClient.invalidateQueries({ queryKey: ['catalog'] });

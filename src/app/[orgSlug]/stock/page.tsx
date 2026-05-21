@@ -45,7 +45,7 @@ export default function StockPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/stock`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/stock`, p);
         },
         placeholderData: [],
     });

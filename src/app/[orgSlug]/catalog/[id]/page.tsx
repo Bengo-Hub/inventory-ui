@@ -52,20 +52,20 @@ export default function ItemDetailPage() {
 
     const { data: item, isLoading } = useQuery<ItemDetail>({
         queryKey: ['catalog', 'item', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}`),
         enabled: !!id,
     });
 
     const { data: history } = useQuery<StockHistoryEntry[]>({
         queryKey: ['catalog', 'history', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}/history`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/history`),
         enabled: !!id,
         placeholderData: [],
     });
 
     const { data: pricingTiers } = useQuery<PricingTier[]>({
         queryKey: ['catalog', 'pricing', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/items/${id}/pricing-tiers`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/pricing-tiers`),
         enabled: !!id,
         placeholderData: [],
     });

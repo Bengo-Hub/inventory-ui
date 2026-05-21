@@ -53,7 +53,7 @@ export default function SuppliersPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/suppliers`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/suppliers`, p);
         },
         placeholderData: [],
     });
@@ -61,8 +61,8 @@ export default function SuppliersPage() {
     const mutation = useMutation({
         mutationFn: (payload: SupplierPayload) =>
             editing
-                ? apiClient.put(`/api/v1/tenants/${orgSlug}/inventory/suppliers/${editing.id}`, payload)
-                : apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/suppliers`, payload),
+                ? apiClient.put(`/api/v1/${orgSlug}/inventory/suppliers/${editing.id}`, payload)
+                : apiClient.post(`/api/v1/${orgSlug}/inventory/suppliers`, payload),
         onSuccess: () => {
             toast.success(editing ? 'Supplier updated' : 'Supplier created');
             queryClient.invalidateQueries({ queryKey: ['suppliers'] });

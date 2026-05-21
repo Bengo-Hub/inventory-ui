@@ -67,20 +67,20 @@ export default function TransfersPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/transfers`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/transfers`, p);
         },
         placeholderData: [],
     });
 
     const { data: warehouses } = useQuery<WarehouseOption[]>({
         queryKey: ['warehouses', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/warehouses`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/warehouses`),
         placeholderData: [],
     });
 
     const mutation = useMutation({
         mutationFn: (payload: TransferPayload) =>
-            apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/transfers`, payload),
+            apiClient.post(`/api/v1/${orgSlug}/inventory/transfers`, payload),
         onSuccess: () => {
             toast.success('Transfer created');
             queryClient.invalidateQueries({ queryKey: ['transfers'] });

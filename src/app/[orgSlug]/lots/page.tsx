@@ -53,7 +53,7 @@ export default function LotsPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/lots`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/lots`, p);
         },
         placeholderData: [],
     });

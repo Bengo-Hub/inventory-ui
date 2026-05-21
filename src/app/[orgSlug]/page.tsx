@@ -16,10 +16,11 @@ import {
 import { useParams } from 'next/navigation';
 
 interface StockSummary {
-    totalItems: number;
-    lowStockAlerts: number;
-    pendingReservations: number;
-    warehouseCount: number;
+    total_items: number;
+    low_stock_items: number;
+    out_of_stock_items: number;
+    pending_reservations: number;
+    warehouse_count: number;
 }
 
 interface ActivityItem {
@@ -33,18 +34,19 @@ interface ActivityItem {
 function useDashboardData(orgSlug: string) {
     const summary = useQuery<StockSummary>({
         queryKey: ['dashboard', 'summary', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/summary`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/summary`),
         placeholderData: {
-            totalItems: 0,
-            lowStockAlerts: 0,
-            pendingReservations: 0,
-            warehouseCount: 0,
+            total_items: 0,
+            low_stock_items: 0,
+            out_of_stock_items: 0,
+            pending_reservations: 0,
+            warehouse_count: 0,
         },
     });
 
     const activity = useQuery<ActivityItem[]>({
         queryKey: ['dashboard', 'activity', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/activity?limit=10`),
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/activity?limit=10`),
         placeholderData: [],
     });
 
@@ -68,28 +70,28 @@ export default function DashboardPage() {
     const cards = [
         {
             label: 'Total Items',
-            value: data?.totalItems ?? 0,
+            value: data?.total_items ?? 0,
             icon: Package,
             color: 'text-primary',
             bg: 'bg-primary/10',
         },
         {
             label: 'Low Stock Alerts',
-            value: data?.lowStockAlerts ?? 0,
+            value: data?.low_stock_items ?? 0,
             icon: AlertTriangle,
             color: 'text-amber-500',
             bg: 'bg-amber-500/10',
         },
         {
             label: 'Pending Reservations',
-            value: data?.pendingReservations ?? 0,
+            value: data?.pending_reservations ?? 0,
             icon: Clock,
             color: 'text-blue-500',
             bg: 'bg-blue-500/10',
         },
         {
             label: 'Warehouses',
-            value: data?.warehouseCount ?? 0,
+            value: data?.warehouse_count ?? 0,
             icon: Warehouse,
             color: 'text-purple-500',
             bg: 'bg-purple-500/10',

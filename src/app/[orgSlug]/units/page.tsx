@@ -43,7 +43,7 @@ export default function UnitsPage() {
         queryFn: () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/tenants/${orgSlug}/inventory/units`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/units`, p);
         },
         placeholderData: [],
     });
@@ -51,8 +51,8 @@ export default function UnitsPage() {
     const mutation = useMutation({
         mutationFn: (payload: UnitPayload) =>
             editing
-                ? apiClient.put(`/api/v1/tenants/${orgSlug}/inventory/units/${editing.id}`, payload)
-                : apiClient.post(`/api/v1/tenants/${orgSlug}/inventory/units`, payload),
+                ? apiClient.put(`/api/v1/${orgSlug}/inventory/units/${editing.id}`, payload)
+                : apiClient.post(`/api/v1/${orgSlug}/inventory/units`, payload),
         onSuccess: () => {
             toast.success(editing ? 'Unit updated' : 'Unit created');
             queryClient.invalidateQueries({ queryKey: ['units'] });
