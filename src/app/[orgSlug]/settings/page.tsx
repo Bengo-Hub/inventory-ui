@@ -344,7 +344,7 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
   const updateModules = useUpdateInventoryModules(orgSlug);
   const user = useAuthStore((s) => s.user);
-  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.manage']) || !!(user as any)?.isSuperUser;
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || !!(user as any)?.isSuperUser;
 
   const [modules, setModules] = useState({
     lots_module_enabled: false,

@@ -14,33 +14,31 @@ export interface SubscriptionInfo {
   currentPeriodEnd?: string;
 }
 
+/**
+ * Fetches subscription info via the local /api/subscription proxy route.
+ * The proxy uses INTERNAL_SERVICE_KEY (server-side only) to call pricing-api S2S
+ * so the browser never sends the service key directly.
+ */
 export async function fetchSubscriptionInfo(
   tenantId: string,
-  tenantSlug: string,
-  accessToken: string,
+  _tenantSlug: string,
+  _accessToken: string,
 ): Promise<SubscriptionInfo | null> {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SUBSCRIPTIONS_API_URL ||
-    "https://pricingapi.codevertexitsolutions.com";
-
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
 
-    const resp = await fetch(`${baseUrl}/api/v1/subscription`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "X-Tenant-ID": tenantId,
-        "X-Tenant-Slug": tenantSlug,
-        "Content-Type": "application/json",
-      },
+    const resp = await fetch(`/api/subscription?tenantId=${encodeURIComponent(tenantId)}`, {
       signal: controller.signal,
     });
 
     clearTimeout(timeout);
+
     if (!resp.ok) return null;
 
     const data = await resp.json();
+    if (!data) return null;
+
     const sub = data?.subscription ?? data;
 
     return {
