@@ -1,5 +1,6 @@
 'use client';
 
+import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
@@ -30,10 +31,26 @@ function AuthCallbackContent() {
                 ? localStorage.getItem('inventory-selected-outlet-id') : null;
             if (storedOutlet) {
                 router.replace(returnTo || `/${orgSlug}`);
-            } else {
-                const next = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
-                router.replace(`/${orgSlug}/auth/select-outlet${next}`);
+                return;
             }
+
+            // Auto-preselect outlet from JWT claims for non-HQ single-outlet users.
+            const authState = useAuthStore.getState();
+            const authUser = authState.user;
+            const jwtOutletId = (authUser as any)?.outlet_id || (authUser as any)?.outletId;
+            const isHqUser = (authUser as any)?.is_hq_user || (authUser as any)?.isHqUser;
+
+            if (jwtOutletId && !isHqUser) {
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem('inventory-selected-outlet-id', jwtOutletId);
+                }
+                apiClient.setOutletID(jwtOutletId);
+                router.replace(returnTo || `/${orgSlug}`);
+                return;
+            }
+
+            const next = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
+            router.replace(`/${orgSlug}/auth/select-outlet${next}`);
         }
     }, [status, orgSlug, router]);
 
