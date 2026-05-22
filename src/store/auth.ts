@@ -43,6 +43,7 @@ interface AuthState {
     initialize: () => Promise<void>;
     redirectToSSO: (orgSlug: string, returnTo?: string) => Promise<void>;
     handleSSOCallback: (orgSlug: string, code: string, callbackUrl: string) => Promise<void>;
+    hydrateFromWebAuthn: (tokens: { accessToken: string; refreshToken: string; expiresIn: number }, tenantSlug?: string) => Promise<void>;
     logout: () => Promise<void>;
     fetchUser: () => Promise<void>;
 }
@@ -150,6 +151,9 @@ export const useAuthStore = create<AuthState>()(
                         try {
                             const user = await fetchProfile();
                             apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
+                            if (typeof window !== 'undefined' && user?.email) {
+                                localStorage.setItem('sso_last_email', user.email);
+                            }
                             set({ user, status: 'authenticated', lastAuthenticatedAt: Date.now() });
                             return;
                         } catch {
@@ -161,6 +165,40 @@ export const useAuthStore = create<AuthState>()(
                     set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
                 } catch (error) {
                     set({ status: 'error', error: 'Sign-in failed' });
+                }
+            },
+
+            hydrateFromWebAuthn: async (tokens: { accessToken: string; refreshToken: string; expiresIn: number }, tenantSlug?: string) => {
+                set({ status: 'syncing', error: null });
+                try {
+                    const session: Session = {
+                        accessToken: tokens.accessToken,
+                        refreshToken: tokens.refreshToken || '',
+                        expiresAt: new Date(Date.now() + tokens.expiresIn * 1000).toISOString(),
+                    };
+
+                    apiClient.setAccessToken(session.accessToken);
+                    set({ session });
+
+                    let attempts = 0;
+                    while (attempts < 5) {
+                        try {
+                            const user = await fetchProfile();
+                            apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
+                            if (typeof window !== 'undefined' && user?.email) {
+                                localStorage.setItem('sso_last_email', user.email);
+                            }
+                            set({ user, status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                            return;
+                        } catch {
+                            attempts++;
+                            await new Promise(r => setTimeout(r, 1500));
+                        }
+                    }
+
+                    set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                } catch (error) {
+                    set({ status: 'error', error: 'Biometric sign-in failed' });
                 }
             },
 
