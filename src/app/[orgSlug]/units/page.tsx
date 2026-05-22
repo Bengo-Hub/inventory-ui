@@ -4,7 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Ruler, Search, X } from 'lucide-react';
+import { Plus, Ruler, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -62,6 +62,20 @@ export default function UnitsPage() {
             toast.error(editing ? 'Failed to update unit' : 'Failed to create unit');
         },
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => apiClient.delete(`/api/v1/${orgSlug}/inventory/units/${id}`),
+        onSuccess: () => {
+            toast.success('Unit deleted');
+            queryClient.invalidateQueries({ queryKey: ['units'] });
+        },
+        onError: () => toast.error('Failed to delete unit'),
+    });
+
+    function handleDelete(unit: Unit) {
+        if (!confirm(`Delete unit "${unit.name}"? This cannot be undone.`)) return;
+        deleteMutation.mutate(unit.id);
+    }
 
     const totalPages = Math.max(1, Math.ceil((units?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = units?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
@@ -166,9 +180,20 @@ export default function UnitsPage() {
                                                 {unit.itemCount.toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(unit)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(unit)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(unit)}
+                                                        disabled={deleteMutation.isPending}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

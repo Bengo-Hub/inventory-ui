@@ -1,10 +1,13 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
+import { useCreateItem } from '@/hooks/useItems';
+import { type CreateItemInput } from '@/lib/api/items';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { Filter, Package, Search, Upload } from 'lucide-react';
+import { Filter, Package, Plus, Search, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useRef, useMemo, useState } from 'react';
@@ -45,6 +48,9 @@ export default function CatalogPage() {
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('All');
     const [page, setPage] = useState(1);
+    const [createOpen, setCreateOpen] = useState(false);
+
+    const createItem = useCreateItem(orgSlug);
 
     const importMutation = useMutation({
         mutationFn: (file: File) => {
@@ -92,13 +98,14 @@ export default function CatalogPage() {
     useMemo(() => { setPage(1); }, [search, category]);
 
     return (
+        <>
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Stock Catalog</h1>
                     <p className="text-muted-foreground mt-1">Manage your inventory items</p>
                 </div>
-                <div>
+                <div className="flex items-center gap-2">
                     <input
                         ref={fileInputRef}
                         type="file"
@@ -113,6 +120,10 @@ export default function CatalogPage() {
                     >
                         <Upload className="h-4 w-4 mr-2" />
                         {importMutation.isPending ? 'Importing...' : 'Import CSV'}
+                    </Button>
+                    <Button onClick={() => setCreateOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Item
                     </Button>
                 </div>
             </div>
@@ -203,5 +214,25 @@ export default function CatalogPage() {
                 </CardContent>
             </Card>
         </div>
+
+        {createOpen && (
+            <ItemFormDialog
+                orgSlug={orgSlug}
+                item={null}
+                onClose={() => setCreateOpen(false)}
+                isPending={createItem.isPending}
+                onSubmit={(data: CreateItemInput) => {
+                    createItem.mutate(data, {
+                        onSuccess: () => {
+                            toast.success('Item created');
+                            setCreateOpen(false);
+                            queryClient.invalidateQueries({ queryKey: ['catalog'] });
+                        },
+                        onError: () => toast.error('Failed to create item'),
+                    });
+                }}
+            />
+        )}
+        </>
     );
 }

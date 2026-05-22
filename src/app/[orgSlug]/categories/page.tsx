@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Tag, X } from 'lucide-react';
+import { Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -64,6 +64,20 @@ export default function CategoriesPage() {
             toast.error(editing ? 'Failed to update category' : 'Failed to create category');
         },
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => apiClient.delete(`/api/v1/${orgSlug}/inventory/categories/${id}`),
+        onSuccess: () => {
+            toast.success('Category deleted');
+            queryClient.invalidateQueries({ queryKey: ['categories'] });
+        },
+        onError: () => toast.error('Failed to delete category'),
+    });
+
+    function handleDelete(cat: Category) {
+        if (!confirm(`Delete category "${cat.name}"? This cannot be undone.`)) return;
+        deleteMutation.mutate(cat.id);
+    }
 
     const totalPages = Math.max(1, Math.ceil((categories?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = categories?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
@@ -183,9 +197,20 @@ export default function CategoriesPage() {
                                                 {cat.itemCount.toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(cat)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(cat)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(cat)}
+                                                        disabled={deleteMutation.isPending}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

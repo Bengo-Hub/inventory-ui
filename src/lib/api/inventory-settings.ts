@@ -44,7 +44,7 @@ export interface UpdateInventoryModulesInput {
 }
 
 function settingsBase(orgSlug: string) {
-  return `/api/v1/tenants/${orgSlug}/inventory/settings`;
+  return `/api/v1/${orgSlug}/inventory/settings`;
 }
 
 export const inventorySettingsApi = {

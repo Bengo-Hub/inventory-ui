@@ -42,21 +42,21 @@ export interface ModifierGroupListParams {
 /* ── API Functions ─────────────────────────────────────────────────── */
 
 export function fetchModifierGroups(orgSlug: string, params?: ModifierGroupListParams) {
-    return apiClient.get<ModifierGroup[]>(`/api/v1/tenants/${orgSlug}/inventory/modifier-groups`, params);
+    return apiClient.get<ModifierGroup[]>(`/api/v1/${orgSlug}/inventory/modifier-groups`, params);
 }
 
 export function fetchModifierGroup(orgSlug: string, id: string) {
-    return apiClient.get<ModifierGroup>(`/api/v1/tenants/${orgSlug}/inventory/modifier-groups/${id}`);
+    return apiClient.get<ModifierGroup>(`/api/v1/${orgSlug}/inventory/modifier-groups/${id}`);
 }
 
 export function createModifierGroup(orgSlug: string, data: ModifierGroupPayload) {
-    return apiClient.post<ModifierGroup>(`/api/v1/tenants/${orgSlug}/inventory/modifier-groups`, data);
+    return apiClient.post<ModifierGroup>(`/api/v1/${orgSlug}/inventory/modifier-groups`, data);
 }
 
 export function updateModifierGroup(orgSlug: string, id: string, data: ModifierGroupPayload) {
-    return apiClient.put<ModifierGroup>(`/api/v1/tenants/${orgSlug}/inventory/modifier-groups/${id}`, data);
+    return apiClient.put<ModifierGroup>(`/api/v1/${orgSlug}/inventory/modifier-groups/${id}`, data);
 }
 
 export function deleteModifierGroup(orgSlug: string, id: string) {
-    return apiClient.delete<void>(`/api/v1/tenants/${orgSlug}/inventory/modifier-groups/${id}`);
+    return apiClient.delete<void>(`/api/v1/${orgSlug}/inventory/modifier-groups/${id}`);
 }

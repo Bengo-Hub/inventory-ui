@@ -2,11 +2,13 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, FileText, Plus, Search, X } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeft, FileText, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -17,6 +19,25 @@ interface PurchaseOrderLineItem {
     quantity: number;
     unitPrice: number;
     total: number;
+}
+
+interface Supplier {
+    id: string;
+    name: string;
+}
+
+interface POLine {
+    itemId: string;
+    itemName: string;
+    quantity: string;
+    unitPrice: string;
+}
+
+interface CreatePOPayload {
+    supplierId: string;
+    expectedDate?: string;
+    notes?: string;
+    lines: { itemId: string; quantity: number; unitPrice: number }[];
 }
 
 interface PurchaseOrder {
@@ -49,9 +70,38 @@ const STATUS_LABEL: Record<string, string> = {
 export default function PurchaseOrdersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
+    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+
+    // PO create form
+    const [supplierId, setSupplierId] = useState('');
+    const [expectedDate, setExpectedDate] = useState('');
+    const [poNotes, setPoNotes] = useState('');
+    const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+
+    const { data: suppliers } = useQuery<Supplier[]>({
+        queryKey: ['suppliers', orgSlug],
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/suppliers`),
+        placeholderData: [],
+    });
+
+    const createPOMutation = useMutation({
+        mutationFn: (payload: CreatePOPayload) =>
+            apiClient.post(`/api/v1/${orgSlug}/inventory/purchase-orders`, payload),
+        onSuccess: () => {
+            toast.success('Purchase order created');
+            queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
+            setCreateOpen(false);
+            setSupplierId('');
+            setExpectedDate('');
+            setPoNotes('');
+            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+        },
+        onError: () => toast.error('Failed to create purchase order'),
+    });
 
     const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
         queryKey: ['purchase-orders', orgSlug, search],
@@ -73,6 +123,39 @@ export default function PurchaseOrdersPage() {
     const paginatedItems = orders?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
     useMemo(() => { setPage(1); }, [search]);
+
+    function addPOLine() {
+        setPoLines([...poLines, { itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+    }
+
+    function removePOLine(idx: number) {
+        setPoLines(poLines.filter((_, i) => i !== idx));
+    }
+
+    function updatePOLine(idx: number, field: keyof POLine, value: string) {
+        const updated = [...poLines];
+        updated[idx] = { ...updated[idx], [field]: value };
+        setPoLines(updated);
+    }
+
+    function handlePOSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!supplierId) { toast.error('Select a supplier'); return; }
+        const lines = poLines
+            .filter((l) => l.itemId && parseInt(l.quantity, 10) > 0)
+            .map((l) => ({
+                itemId: l.itemId,
+                quantity: parseInt(l.quantity, 10),
+                unitPrice: parseFloat(l.unitPrice) || 0,
+            }));
+        if (lines.length === 0) { toast.error('Add at least one item'); return; }
+        createPOMutation.mutate({
+            supplierId,
+            expectedDate: expectedDate || undefined,
+            notes: poNotes.trim() || undefined,
+            lines,
+        });
+    }
 
     // Detail view
     if (selectedPO && poDetail) {
@@ -173,13 +256,14 @@ export default function PurchaseOrdersPage() {
 
     // List view
     return (
+        <>
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
                     <p className="text-muted-foreground mt-1">Track orders from your suppliers</p>
                 </div>
-                <Button onClick={() => { /* TODO: open create PO dialog */ }}>
+                <Button onClick={() => setCreateOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     New Order
                 </Button>
@@ -255,5 +339,140 @@ export default function PurchaseOrdersPage() {
                 </CardContent>
             </Card>
         </div>
+
+        {createOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCreateOpen(false)} />
+                <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold">New Purchase Order</h2>
+                                <button
+                                    onClick={() => setCreateOpen(false)}
+                                    className="p-1 rounded-lg hover:bg-accent transition-colors"
+                                >
+                                    <X className="h-5 w-5 text-muted-foreground" />
+                                </button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <form onSubmit={handlePOSubmit} className="space-y-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Supplier *</label>
+                                        <select
+                                            value={supplierId}
+                                            onChange={(e) => setSupplierId(e.target.value)}
+                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                            required
+                                        >
+                                            <option value="">Select supplier...</option>
+                                            {suppliers?.map((s) => (
+                                                <option key={s.id} value={s.id}>{s.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Expected Delivery</label>
+                                        <Input
+                                            type="date"
+                                            value={expectedDate}
+                                            onChange={(e) => setExpectedDate(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <label className="text-sm font-medium">Line Items *</label>
+                                        <Button type="button" variant="ghost" size="sm" onClick={addPOLine}>
+                                            <Plus className="h-3 w-3 mr-1" />
+                                            Add Line
+                                        </Button>
+                                    </div>
+                                    {poLines.map((line, idx) => (
+                                        <div key={idx} className="space-y-2 p-3 rounded-lg border border-border">
+                                            <ItemSearchInput
+                                                orgSlug={orgSlug}
+                                                value={line.itemName}
+                                                onSelect={(item) => {
+                                                    const updated = [...poLines];
+                                                    updated[idx] = { ...updated[idx], itemId: item.id, itemName: item.name };
+                                                    setPoLines(updated);
+                                                }}
+                                                placeholder="Search item..."
+                                            />
+                                            <div className="grid grid-cols-3 gap-2 items-center">
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground">Qty</label>
+                                                    <Input
+                                                        type="number"
+                                                        min="1"
+                                                        placeholder="1"
+                                                        value={line.quantity}
+                                                        onChange={(e) => updatePOLine(idx, 'quantity', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground">Unit Price</label>
+                                                    <Input
+                                                        type="number"
+                                                        min="0"
+                                                        step="0.01"
+                                                        placeholder="0.00"
+                                                        value={line.unitPrice}
+                                                        onChange={(e) => updatePOLine(idx, 'unitPrice', e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="flex items-end pb-0.5">
+                                                    {poLines.length > 1 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-destructive hover:text-destructive"
+                                                            onClick={() => removePOLine(idx)}
+                                                        >
+                                                            <Minus className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Notes</label>
+                                    <textarea
+                                        placeholder="Optional notes..."
+                                        value={poNotes}
+                                        onChange={(e) => setPoNotes(e.target.value)}
+                                        rows={2}
+                                        className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
+                                    />
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="flex-1"
+                                        onClick={() => setCreateOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button type="submit" className="flex-1" disabled={createPOMutation.isPending}>
+                                        {createPOMutation.isPending ? 'Creating...' : 'Create Order'}
+                                    </Button>
+                                </div>
+                            </form>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        )}
+        </>
     );
 }

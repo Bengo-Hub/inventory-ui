@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Package, Plus, Search, Truck, X } from 'lucide-react';
+import { Package, Plus, Search, Trash2, Truck, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -72,6 +72,20 @@ export default function SuppliersPage() {
             toast.error(editing ? 'Failed to update supplier' : 'Failed to create supplier');
         },
     });
+
+    const deleteMutation = useMutation({
+        mutationFn: (id: string) => apiClient.delete(`/api/v1/${orgSlug}/inventory/suppliers/${id}`),
+        onSuccess: () => {
+            toast.success('Supplier deleted');
+            queryClient.invalidateQueries({ queryKey: ['suppliers'] });
+        },
+        onError: () => toast.error('Failed to delete supplier'),
+    });
+
+    function handleDelete(supplier: Supplier) {
+        if (!confirm(`Delete supplier "${supplier.name}"? This cannot be undone.`)) return;
+        deleteMutation.mutate(supplier.id);
+    }
 
     const totalPages = Math.max(1, Math.ceil((suppliers?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = suppliers?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
@@ -187,9 +201,20 @@ export default function SuppliersPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(supplier)}
+                                                        disabled={deleteMutation.isPending}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))

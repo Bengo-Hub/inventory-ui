@@ -1,11 +1,16 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
+import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
+import { type Item } from '@/lib/api/items';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History } from 'lucide-react';
+import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface ItemDetail {
     id: string;
@@ -47,8 +52,13 @@ interface PricingTier {
 
 export default function ItemDetailPage() {
     const params = useParams();
+    const router = useRouter();
     const orgSlug = params?.orgSlug as string;
     const id = params?.id as string;
+    const [editOpen, setEditOpen] = useState(false);
+
+    const updateItem = useUpdateItem(orgSlug);
+    const deleteItem = useDeleteItem(orgSlug);
 
     const { data: item, isLoading } = useQuery<ItemDetail>({
         queryKey: ['catalog', 'item', orgSlug, id],
@@ -92,6 +102,7 @@ export default function ItemDetailPage() {
     const statusVariant = item.status === 'in_stock' ? 'success' : item.status === 'low_stock' ? 'warning' : 'error';
 
     return (
+        <>
         <div className="p-6 space-y-6">
             <div className="flex items-center gap-4">
                 <Link href={`/${orgSlug}/catalog`}>
@@ -111,6 +122,29 @@ export default function ItemDetailPage() {
                             View Recipe
                         </Button>
                     </Link>
+                    <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive border-destructive hover:bg-destructive/10"
+                        disabled={deleteItem.isPending}
+                        onClick={() => {
+                            if (!confirm(`Delete "${item.name}"? This cannot be undone.`)) return;
+                            deleteItem.mutate(item.sku, {
+                                onSuccess: () => {
+                                    toast.success('Item deleted');
+                                    router.push(`/${orgSlug}/catalog`);
+                                },
+                                onError: () => toast.error('Failed to delete item'),
+                            });
+                        }}
+                    >
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        Delete
+                    </Button>
                     <Badge variant={statusVariant}>
                         {item.status.replace('_', ' ')}
                     </Badge>
@@ -260,5 +294,24 @@ export default function ItemDetailPage() {
                 </CardContent>
             </Card>
         </div>
+
+        {editOpen && (
+            <ItemFormDialog
+                orgSlug={orgSlug}
+                item={item as unknown as Item}
+                onClose={() => setEditOpen(false)}
+                isPending={updateItem.isPending}
+                onSubmit={(data) => {
+                    updateItem.mutate({ sku: item.sku, data }, {
+                        onSuccess: () => {
+                            toast.success('Item updated');
+                            setEditOpen(false);
+                        },
+                        onError: () => toast.error('Failed to update item'),
+                    });
+                }}
+            />
+        )}
+        </>
     );
 }

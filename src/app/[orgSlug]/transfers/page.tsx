@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -58,8 +59,8 @@ export default function TransfersPage() {
     // Create form state
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
-    const [transferItems, setTransferItems] = useState<{ itemId: string; quantity: string }[]>([
-        { itemId: '', quantity: '' },
+    const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string }[]>([
+        { itemId: '', itemName: '', quantity: '' },
     ]);
 
     const { data: transfers, isLoading } = useQuery<StockTransfer[]>({
@@ -99,7 +100,7 @@ export default function TransfersPage() {
     function openCreate() {
         setFromWarehouse('');
         setToWarehouse('');
-        setTransferItems([{ itemId: '', quantity: '' }]);
+        setTransferItems([{ itemId: '', itemName: '', quantity: '' }]);
         setDialogOpen(true);
     }
 
@@ -108,14 +109,14 @@ export default function TransfersPage() {
     }
 
     function addItem() {
-        setTransferItems([...transferItems, { itemId: '', quantity: '' }]);
+        setTransferItems([...transferItems, { itemId: '', itemName: '', quantity: '' }]);
     }
 
     function removeItem(index: number) {
         setTransferItems(transferItems.filter((_, i) => i !== index));
     }
 
-    function updateItem(index: number, field: 'itemId' | 'quantity', value: string) {
+    function updateItem(index: number, field: 'itemId' | 'itemName' | 'quantity', value: string) {
         const updated = [...transferItems];
         updated[index] = { ...updated[index], [field]: value };
         setTransferItems(updated);
@@ -287,13 +288,18 @@ export default function TransfersPage() {
                                             </Button>
                                         </div>
                                         {transferItems.map((item, idx) => (
-                                            <div key={idx} className="flex gap-2 items-center">
-                                                <Input
-                                                    placeholder="Item ID / SKU"
-                                                    value={item.itemId}
-                                                    onChange={(e) => updateItem(idx, 'itemId', e.target.value)}
-                                                    className="flex-1"
-                                                />
+                                            <div key={idx} className="flex gap-2 items-end">
+                                                <div className="flex-1">
+                                                    <ItemSearchInput
+                                                        orgSlug={orgSlug}
+                                                        value={item.itemName}
+                                                        placeholder="Search item..."
+                                                        onSelect={(found) => {
+                                                            updateItem(idx, 'itemId', found.id);
+                                                            updateItem(idx, 'itemName', found.name);
+                                                        }}
+                                                    />
+                                                </div>
                                                 <Input
                                                     type="number"
                                                     placeholder="Qty"
@@ -306,7 +312,7 @@ export default function TransfersPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => removeItem(idx)}
-                                                        className="p-1 rounded hover:bg-accent text-muted-foreground"
+                                                        className="p-1 rounded hover:bg-accent text-muted-foreground mb-0.5"
                                                     >
                                                         <X className="h-4 w-4" />
                                                     </button>

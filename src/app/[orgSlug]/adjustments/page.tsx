@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Minus, Plus } from 'lucide-react';
@@ -23,6 +24,7 @@ export default function AdjustmentsPage() {
 
     const [type, setType] = useState<'add' | 'remove'>('add');
     const [itemId, setItemId] = useState('');
+    const [itemName, setItemName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [reason, setReason] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
@@ -35,6 +37,7 @@ export default function AdjustmentsPage() {
             queryClient.invalidateQueries({ queryKey: ['catalog'] });
             queryClient.invalidateQueries({ queryKey: ['dashboard'] });
             setItemId('');
+            setItemName('');
             setQuantity('');
             setReason('');
             setWarehouseId('');
@@ -95,15 +98,16 @@ export default function AdjustmentsPage() {
                             </Button>
                         </div>
 
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Item ID / SKU *</label>
-                            <Input
-                                placeholder="e.g. ITM-001 or SKU-FLOUR-50KG"
-                                value={itemId}
-                                onChange={(e) => setItemId(e.target.value)}
-                                required
-                            />
-                        </div>
+                        <ItemSearchInput
+                            orgSlug={orgSlug}
+                            value={itemName}
+                            label="Item *"
+                            placeholder="Search by name or SKU..."
+                            onSelect={(item) => {
+                                setItemId(item.id);
+                                setItemName(item.name);
+                            }}
+                        />
 
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-2">
