@@ -69,12 +69,22 @@ export const useAuthStore = create<AuthState>()(
                 if (user) {
                     apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
                 }
+
+                // Hydrate from storage if user profile exists and token hasn't expired.
+                if (user && session.expiresAt) {
+                    const expiresAt = new Date(session.expiresAt).getTime();
+                    if (Date.now() < expiresAt - 60_000) {
+                        set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                        return;
+                    }
+                }
+
                 set({ status: 'loading' });
 
                 try {
-                    const user = await fetchProfile();
-                    apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
-                    set({ user, status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                    const freshUser = await fetchProfile();
+                    apiClient.setTenantInfo(freshUser.tenant_id, freshUser.tenant_slug);
+                    set({ user: freshUser, status: 'authenticated', lastAuthenticatedAt: Date.now() });
                 } catch (error) {
                     console.error('Failed to initialize auth:', error);
                     set({ status: 'idle', session: null, user: null });

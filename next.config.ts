@@ -8,6 +8,10 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
+  workboxOptions: {
+    skipWaiting: false,
+    clientsClaim: true,
+  },
 });
 
 const nextConfig: NextConfig = {
