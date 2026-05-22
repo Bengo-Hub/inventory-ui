@@ -1,6 +1,6 @@
 # Inventory UI - MVP Plan
 
-**Last updated:** 2026-05-21
+**Last updated:** 2026-05-22
 **MVP deadline:** 2026-03-17
 **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
 **Styling:** Tailwind CSS + Shadcn UI
@@ -11,7 +11,7 @@
 
 ## Current State (2026-05-21)
 
-inventory-ui is **fully implemented** — Sprint 1 MVP plus Phase 15 post-MVP pages all shipped. All P0 and P1 tasks are complete.
+inventory-ui is **fully implemented** — Sprint 1 MVP plus Phase 15 post-MVP pages all shipped. All P0 and P1 tasks are complete. 2026-05-22 audit round added full CRUD: Items create/edit/delete (ItemFormDialog), Warehouses CRUD + location tree (replaced Coming Soon), PO creation dialog with ItemSearchInput, delete actions on categories/units/suppliers, ItemSearchInput autocomplete in adjustments and transfers. URL prefix bugs fixed in modifiers and settings APIs.
 
 **RBAC (2026-03-07):**
 - **useMe:** `hooks/useMe.ts` loads current user and RBAC from auth-api `GET /me` using **TanStack Query** with 5 min TTL (`staleTime`/`gcTime`); returns `user`, `roles`, `permissions`, `hasRole`, `hasPermission`, `isAuthenticated`.
@@ -58,17 +58,29 @@ Inventory-api uses auth-api as source of truth for roles/permissions; see invent
 | 15 | Suppliers (`suppliers/page.tsx`) | ✅ Done |
 | 16 | Stock Transfers (`transfers/page.tsx`) | ✅ Done |
 | 17 | Lots & Batches (`lots/page.tsx`) | ✅ Done |
-| 18 | Warehouse Locations (`warehouses/[id]/locations/page.tsx`) | ✅ Done (placeholder) |
+| 18 | Warehouse Locations (`warehouses/[id]/locations/page.tsx`) | ✅ Done (full CRUD tree — 2026-05-22) |
 | 19 | Pricing Tiers on item detail | ✅ Done |
 | 20 | Categories page (`categories/page.tsx`) | ✅ Done |
 | 21 | Units page (`units/page.tsx`) | ✅ Done |
 | 22 | Modifiers page (`modifiers/page.tsx`) | ✅ Done |
 | 23 | Recipes page (`recipes/page.tsx`, `recipes/[recipeId]/page.tsx`) | ✅ Done |
 
+### Added — 2026-05-22 Audit
+
+| # | Task | Status |
+|---|------|--------|
+| 24 | Item CRUD (create/edit/delete) in catalog — ItemFormDialog | ✅ Done |
+| 25 | Warehouse CRUD (create/edit/delete) | ✅ Done |
+| 26 | Warehouse location tree (replaced Coming Soon) | ✅ Done |
+| 27 | PO creation dialog with line items and ItemSearchInput | ✅ Done |
+| 28 | ItemSearchInput autocomplete in adjustments + transfers | ✅ Done |
+| 29 | Delete actions on categories, units, suppliers | ✅ Done |
+| 30 | Fix URL prefix bug in modifiers.ts + inventory-settings.ts | ✅ Done |
+| 31 | Standalone modifier-group list/get (modifiers page fix) | ✅ Done |
+
 ### Remaining
 
 - [ ] Superset embedded dashboards — not started
-- [ ] Warehouse locations: `Coming Soon` placeholder exists; full location tree management not implemented
 
 ---
 
