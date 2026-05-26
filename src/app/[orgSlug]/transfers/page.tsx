@@ -2,8 +2,8 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
-import { apiClient } from '@/lib/api/client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTransfers, useCreateTransfer } from '@/hooks/useTransfers';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -12,88 +12,49 @@ import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
-interface StockTransfer {
-    id: string;
-    fromWarehouseName: string;
-    fromWarehouseId: string;
-    toWarehouseName: string;
-    toWarehouseId: string;
-    status: 'pending' | 'in_transit' | 'completed' | 'cancelled';
-    itemsCount: number;
-    createdAt: string;
-}
-
-interface WarehouseOption {
-    id: string;
-    name: string;
-}
-
-interface TransferPayload {
-    fromWarehouseId: string;
-    toWarehouseId: string;
-    items: { itemId: string; quantity: number }[];
-}
-
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
+    draft: 'outline',
     pending: 'outline',
     in_transit: 'warning',
-    completed: 'success',
+    received: 'success',
     cancelled: 'error',
 };
 
 const STATUS_LABEL: Record<string, string> = {
+    draft: 'Draft',
     pending: 'Pending',
     in_transit: 'In Transit',
-    completed: 'Completed',
+    received: 'Received',
     cancelled: 'Cancelled',
 };
 
 export default function TransfersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    // Create form state
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
     const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string }[]>([
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
-    const { data: transfers, isLoading } = useQuery<StockTransfer[]>({
-        queryKey: ['transfers', orgSlug, search],
-        queryFn: () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/transfers`, p);
-        },
-        placeholderData: [],
-    });
+    const { data: transfers, isLoading } = useTransfers(orgSlug);
+    const { data: warehouses } = useWarehouses(orgSlug);
+    const createTransfer = useCreateTransfer(orgSlug);
 
-    const { data: warehouses } = useQuery<WarehouseOption[]>({
-        queryKey: ['warehouses', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/warehouses`),
-        placeholderData: [],
-    });
+    const filtered = search
+        ? transfers?.filter((t) =>
+            (t.from_warehouse_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+            (t.to_warehouse_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+            t.reference.toLowerCase().includes(search.toLowerCase())
+          )
+        : transfers;
 
-    const mutation = useMutation({
-        mutationFn: (payload: TransferPayload) =>
-            apiClient.post(`/api/v1/${orgSlug}/inventory/transfers`, payload),
-        onSuccess: () => {
-            toast.success('Transfer created');
-            queryClient.invalidateQueries({ queryKey: ['transfers'] });
-            closeDialog();
-        },
-        onError: () => {
-            toast.error('Failed to create transfer');
-        },
-    });
-
-    const totalPages = Math.max(1, Math.ceil((transfers?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = transfers?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
+    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -134,17 +95,25 @@ export default function TransfersPage() {
         }
         const validItems = transferItems
             .filter((i) => i.itemId.trim() && parseInt(i.quantity, 10) > 0)
-            .map((i) => ({ itemId: i.itemId.trim(), quantity: parseInt(i.quantity, 10) }));
+            .map((i) => ({ item_id: i.itemId.trim(), quantity: parseInt(i.quantity, 10) }));
 
         if (validItems.length === 0) {
             toast.error('Add at least one item with a valid quantity');
             return;
         }
 
-        mutation.mutate({
-            fromWarehouseId: fromWarehouse,
-            toWarehouseId: toWarehouse,
+        createTransfer.mutate({
+            from_warehouse_id: fromWarehouse,
+            to_warehouse_id: toWarehouse,
             items: validItems,
+        }, {
+            onSuccess: () => {
+                toast.success('Transfer created');
+                closeDialog();
+            },
+            onError: () => {
+                toast.error('Failed to create transfer');
+            },
         });
     }
 
@@ -178,7 +147,7 @@ export default function TransfersPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Transfer ID</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Reference</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">From</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">To</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
@@ -193,7 +162,7 @@ export default function TransfersPage() {
                                             Loading transfers...
                                         </td>
                                     </tr>
-                                ) : (transfers?.length ?? 0) === 0 ? (
+                                ) : (filtered?.length ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <ArrowRightLeft className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -203,9 +172,9 @@ export default function TransfersPage() {
                                 ) : (
                                     paginatedItems.map((transfer) => (
                                         <tr key={transfer.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-xs">{transfer.id.slice(0, 8)}</td>
-                                            <td className="px-6 py-4">{transfer.fromWarehouseName}</td>
-                                            <td className="px-6 py-4">{transfer.toWarehouseName}</td>
+                                            <td className="px-6 py-4 font-mono text-xs">{transfer.reference}</td>
+                                            <td className="px-6 py-4">{transfer.from_warehouse_name ?? '—'}</td>
+                                            <td className="px-6 py-4">{transfer.to_warehouse_name ?? '—'}</td>
                                             <td className="px-6 py-4">
                                                 <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
                                                     {STATUS_LABEL[transfer.status] ?? transfer.status}
@@ -214,11 +183,11 @@ export default function TransfersPage() {
                                             <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
                                                 <div className="flex items-center justify-end gap-1 text-muted-foreground">
                                                     <Package className="h-3 w-3" />
-                                                    {transfer.itemsCount}
+                                                    {transfer.items.length}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {new Date(transfer.createdAt).toLocaleDateString()}
+                                                {new Date(transfer.created_at).toLocaleDateString()}
                                             </td>
                                         </tr>
                                     ))
@@ -226,13 +195,12 @@ export default function TransfersPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (transfers?.length ?? 0) > 0 && (
+                    {!isLoading && (filtered?.length ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>
             </Card>
 
-            {/* Create Transfer Dialog */}
             {dialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDialog} />
@@ -325,8 +293,8 @@ export default function TransfersPage() {
                                         <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>
                                             Cancel
                                         </Button>
-                                        <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-                                            {mutation.isPending ? 'Creating...' : 'Create Transfer'}
+                                        <Button type="submit" className="flex-1" disabled={createTransfer.isPending}>
+                                            {createTransfer.isPending ? 'Creating...' : 'Create Transfer'}
                                         </Button>
                                     </div>
                                 </form>

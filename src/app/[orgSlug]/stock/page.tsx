@@ -2,35 +2,22 @@
 
 import { Badge, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
-import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
+import { useStock } from '@/hooks/useStock';
 import { AlertTriangle, BookOpen, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 const ITEMS_PER_PAGE = 25;
 
-interface StockLevel {
-    id: string;
-    itemName: string;
-    sku: string;
-    warehouseName: string;
-    warehouseId: string;
-    available: number;
-    reserved: number;
-    reorderPoint: number | null;
-    unit: string;
-}
-
-function stockStatus(available: number, reorderPoint: number | null): 'success' | 'warning' | 'error' | 'outline' {
+function stockStatus(available: number, reorderLevel?: number): 'success' | 'warning' | 'error' | 'outline' {
     if (available <= 0) return 'error';
-    if (reorderPoint != null && available <= reorderPoint) return 'warning';
+    if (reorderLevel != null && available <= reorderLevel) return 'warning';
     return 'success';
 }
 
-function stockLabel(available: number, reorderPoint: number | null): string {
+function stockLabel(available: number, reorderLevel?: number): string {
     if (available <= 0) return 'Out of Stock';
-    if (reorderPoint != null && available <= reorderPoint) return 'Low Stock';
+    if (reorderLevel != null && available <= reorderLevel) return 'Low Stock';
     return 'In Stock';
 }
 
@@ -40,21 +27,13 @@ export default function StockPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
 
-    const { data: stock, isLoading } = useQuery<StockLevel[]>({
-        queryKey: ['stock', orgSlug, search],
-        queryFn: () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/stock`, p);
-        },
-        placeholderData: [],
-    });
+    const { data: stock, isLoading } = useStock(orgSlug, { search: search || undefined });
 
     const totalPages = Math.max(1, Math.ceil((stock?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = stock?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
-    const lowStockCount = stock?.filter((s) => s.reorderPoint != null && s.available <= s.reorderPoint && s.available > 0).length ?? 0;
-    const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
+    const lowStockCount = stock?.filter((s) => s.reorderLevel != null && s.availableQty <= s.reorderLevel && s.availableQty > 0).length ?? 0;
+    const outOfStockCount = stock?.filter((s) => s.availableQty <= 0).length ?? 0;
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -125,30 +104,29 @@ export default function StockPage() {
                                     </tr>
                                 ) : (
                                     paginatedItems.map((item) => {
-                                        const status = stockStatus(item.available, item.reorderPoint);
+                                        const status = stockStatus(item.availableQty, item.reorderLevel);
                                         return (
                                             <tr
                                                 key={item.id}
                                                 className={`hover:bg-accent/30 transition-colors ${
-                                                    item.available <= 0 ? 'bg-red-500/5' :
-                                                    (item.reorderPoint != null && item.available <= item.reorderPoint) ? 'bg-yellow-500/5' : ''
+                                                    item.availableQty <= 0 ? 'bg-red-500/5' :
+                                                    (item.reorderLevel != null && item.availableQty <= item.reorderLevel) ? 'bg-yellow-500/5' : ''
                                                 }`}
                                             >
                                                 <td className="px-6 py-4 font-medium">{item.itemName}</td>
-                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.sku}</td>
+                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.itemSku}</td>
                                                 <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">{item.warehouseName}</td>
                                                 <td className="px-6 py-4 text-right font-semibold tabular-nums">
-                                                    {item.available.toLocaleString()}
-                                                    {item.unit && <span className="text-muted-foreground font-normal ml-1 text-xs">{item.unit}</span>}
+                                                    {item.availableQty.toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                    {item.reserved.toLocaleString()}
+                                                    {item.reservedQty.toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden md:table-cell">
-                                                    {item.reorderPoint != null ? item.reorderPoint.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
+                                                    {item.reorderLevel != null ? item.reorderLevel.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <Badge variant={status}>{stockLabel(item.available, item.reorderPoint)}</Badge>
+                                                    <Badge variant={status}>{stockLabel(item.availableQty, item.reorderLevel)}</Badge>
                                                 </td>
                                             </tr>
                                         );

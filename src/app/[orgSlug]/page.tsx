@@ -2,6 +2,7 @@
 
 import { Badge, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useAuthStore } from '@/store/auth';
+import { useInventorySummary } from '@/hooks/useStock';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -15,42 +16,12 @@ import {
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 
-interface StockSummary {
-    total_items: number;
-    low_stock_items: number;
-    out_of_stock_items: number;
-    pending_reservations: number;
-    warehouse_count: number;
-}
-
 interface ActivityItem {
     id: string;
     type: 'adjustment' | 'reservation' | 'receipt' | 'transfer';
     description: string;
     timestamp: string;
     delta?: number;
-}
-
-function useDashboardData(orgSlug: string) {
-    const summary = useQuery<StockSummary>({
-        queryKey: ['dashboard', 'summary', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/summary`),
-        placeholderData: {
-            total_items: 0,
-            low_stock_items: 0,
-            out_of_stock_items: 0,
-            pending_reservations: 0,
-            warehouse_count: 0,
-        },
-    });
-
-    const activity = useQuery<ActivityItem[]>({
-        queryKey: ['dashboard', 'activity', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/activity?limit=10`),
-        placeholderData: [],
-    });
-
-    return { summary, activity };
 }
 
 const ACTIVITY_ICONS: Record<string, typeof BoxIcon> = {
@@ -64,34 +35,39 @@ export default function DashboardPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const user = useAuthStore((s) => s.user);
-    const { summary, activity } = useDashboardData(orgSlug);
-    const data = summary.data;
+
+    const { data, isLoading: summaryLoading } = useInventorySummary(orgSlug);
+    const { data: activityData, isLoading: activityLoading } = useQuery<ActivityItem[]>({
+        queryKey: ['dashboard', 'activity', orgSlug],
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/activity?limit=10`),
+        placeholderData: [],
+    });
 
     const cards = [
         {
             label: 'Total Items',
-            value: data?.total_items ?? 0,
+            value: data?.totalItems ?? 0,
             icon: Package,
             color: 'text-primary',
             bg: 'bg-primary/10',
         },
         {
             label: 'Low Stock Alerts',
-            value: data?.low_stock_items ?? 0,
+            value: data?.lowStockCount ?? 0,
             icon: AlertTriangle,
             color: 'text-amber-500',
             bg: 'bg-amber-500/10',
         },
         {
-            label: 'Pending Reservations',
-            value: data?.pending_reservations ?? 0,
+            label: 'Out of Stock',
+            value: data?.outOfStockCount ?? 0,
             icon: Clock,
             color: 'text-blue-500',
             bg: 'bg-blue-500/10',
         },
         {
             label: 'Warehouses',
-            value: data?.warehouse_count ?? 0,
+            value: data?.totalWarehouses ?? 0,
             icon: Warehouse,
             color: 'text-purple-500',
             bg: 'bg-purple-500/10',
@@ -118,7 +94,9 @@ export default function DashboardPage() {
                             </div>
                             <div>
                                 <p className="text-sm text-muted-foreground">{card.label}</p>
-                                <p className="text-2xl font-bold tracking-tight">{card.value.toLocaleString()}</p>
+                                <p className="text-2xl font-bold tracking-tight">
+                                    {summaryLoading ? '—' : card.value.toLocaleString()}
+                                </p>
                             </div>
                         </CardContent>
                     </Card>
@@ -130,13 +108,13 @@ export default function DashboardPage() {
                     <h2 className="text-lg font-semibold">Recent Activity</h2>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {activity.isLoading ? (
+                    {activityLoading ? (
                         <div className="p-6 text-center text-muted-foreground">Loading activity...</div>
-                    ) : (activity.data?.length ?? 0) === 0 ? (
+                    ) : (activityData?.length ?? 0) === 0 ? (
                         <div className="p-6 text-center text-muted-foreground">No recent activity</div>
                     ) : (
                         <div className="divide-y divide-border">
-                            {activity.data?.map((item) => {
+                            {activityData?.map((item) => {
                                 const Icon = ACTIVITY_ICONS[item.type] || BoxIcon;
                                 return (
                                     <div key={item.id} className="flex items-center gap-4 px-6 py-4">

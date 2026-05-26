@@ -3,8 +3,9 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { apiClient } from '@/lib/api/client';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { usePurchaseOrders, usePurchaseOrder, useCreatePurchaseOrder } from '@/hooks/usePurchaseOrders';
+import { useSuppliers } from '@/hooks/useSuppliers';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { ArrowLeft, FileText, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -12,43 +13,11 @@ import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
-interface PurchaseOrderLineItem {
-    id: string;
-    itemName: string;
-    sku: string;
-    quantity: number;
-    unitPrice: number;
-    total: number;
-}
-
-interface Supplier {
-    id: string;
-    name: string;
-}
-
 interface POLine {
     itemId: string;
     itemName: string;
     quantity: string;
     unitPrice: string;
-}
-
-interface CreatePOPayload {
-    supplierId: string;
-    expectedDate?: string;
-    notes?: string;
-    lines: { itemId: string; quantity: number; unitPrice: number }[];
-}
-
-interface PurchaseOrder {
-    id: string;
-    poNumber: string;
-    supplierName: string;
-    supplierId: string;
-    status: 'draft' | 'sent' | 'partially_received' | 'received' | 'cancelled';
-    total: number;
-    createdAt: string;
-    lineItems?: PurchaseOrderLineItem[];
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
@@ -70,57 +39,32 @@ const STATUS_LABEL: Record<string, string> = {
 export default function PurchaseOrdersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
 
-    // PO create form
     const [supplierId, setSupplierId] = useState('');
+    const [warehouseId, setWarehouseId] = useState('');
     const [expectedDate, setExpectedDate] = useState('');
     const [poNotes, setPoNotes] = useState('');
     const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
 
-    const { data: suppliers } = useQuery<Supplier[]>({
-        queryKey: ['suppliers', orgSlug],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/suppliers`),
-        placeholderData: [],
-    });
+    const { data: suppliers } = useSuppliers(orgSlug);
+    const { data: warehouses } = useWarehouses(orgSlug);
+    const { data: orders, isLoading } = usePurchaseOrders(orgSlug);
+    const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
+    const createPO = useCreatePurchaseOrder(orgSlug);
 
-    const createPOMutation = useMutation({
-        mutationFn: (payload: CreatePOPayload) =>
-            apiClient.post(`/api/v1/${orgSlug}/inventory/purchase-orders`, payload),
-        onSuccess: () => {
-            toast.success('Purchase order created');
-            queryClient.invalidateQueries({ queryKey: ['purchase-orders'] });
-            setCreateOpen(false);
-            setSupplierId('');
-            setExpectedDate('');
-            setPoNotes('');
-            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
-        },
-        onError: () => toast.error('Failed to create purchase order'),
-    });
+    const filtered = search
+        ? orders?.filter((o) =>
+            o.po_number.toLowerCase().includes(search.toLowerCase()) ||
+            (o.supplier_name ?? '').toLowerCase().includes(search.toLowerCase())
+          )
+        : orders;
 
-    const { data: orders, isLoading } = useQuery<PurchaseOrder[]>({
-        queryKey: ['purchase-orders', orgSlug, search],
-        queryFn: () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/purchase-orders`, p);
-        },
-        placeholderData: [],
-    });
-
-    const { data: poDetail } = useQuery<PurchaseOrder>({
-        queryKey: ['purchase-orders', 'detail', orgSlug, selectedPO],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/purchase-orders/${selectedPO}`),
-        enabled: !!selectedPO,
-    });
-
-    const totalPages = Math.max(1, Math.ceil((orders?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = orders?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
+    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -141,23 +85,36 @@ export default function PurchaseOrdersPage() {
     function handlePOSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!supplierId) { toast.error('Select a supplier'); return; }
+        if (!warehouseId) { toast.error('Select a warehouse'); return; }
         const lines = poLines
             .filter((l) => l.itemId && parseInt(l.quantity, 10) > 0)
             .map((l) => ({
-                itemId: l.itemId,
+                item_id: l.itemId,
                 quantity: parseInt(l.quantity, 10),
-                unitPrice: parseFloat(l.unitPrice) || 0,
+                unit_cost: parseFloat(l.unitPrice) || 0,
             }));
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
-        createPOMutation.mutate({
-            supplierId,
-            expectedDate: expectedDate || undefined,
+
+        createPO.mutate({
+            supplier_id: supplierId,
+            warehouse_id: warehouseId,
+            expected_date: expectedDate || undefined,
             notes: poNotes.trim() || undefined,
-            lines,
+            line_items: lines,
+        }, {
+            onSuccess: () => {
+                toast.success('Purchase order created');
+                setCreateOpen(false);
+                setSupplierId('');
+                setWarehouseId('');
+                setExpectedDate('');
+                setPoNotes('');
+                setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+            },
+            onError: () => toast.error('Failed to create purchase order'),
         });
     }
 
-    // Detail view
     if (selectedPO && poDetail) {
         return (
             <div className="p-6 space-y-6">
@@ -167,8 +124,8 @@ export default function PurchaseOrdersPage() {
                         Back
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{poDetail.poNumber}</h1>
-                        <p className="text-muted-foreground text-sm">{poDetail.supplierName}</p>
+                        <h1 className="text-2xl font-bold tracking-tight">{poDetail.po_number}</h1>
+                        <p className="text-muted-foreground text-sm">{poDetail.supplier_name}</p>
                     </div>
                     <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'} className="ml-auto">
                         {STATUS_LABEL[poDetail.status] ?? poDetail.status}
@@ -188,34 +145,34 @@ export default function PurchaseOrdersPage() {
                                             <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
                                             <th className="text-left px-6 py-3 font-medium text-muted-foreground">SKU</th>
                                             <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Price</th>
+                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Cost</th>
                                             <th className="text-right px-6 py-3 font-medium text-muted-foreground">Total</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
-                                        {(poDetail.lineItems?.length ?? 0) === 0 ? (
+                                        {(poDetail.line_items?.length ?? 0) === 0 ? (
                                             <tr>
                                                 <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
                                                     No line items
                                                 </td>
                                             </tr>
                                         ) : (
-                                            poDetail.lineItems?.map((line) => (
+                                            poDetail.line_items?.map((line) => (
                                                 <tr key={line.id} className="hover:bg-accent/30 transition-colors">
-                                                    <td className="px-6 py-3 font-medium">{line.itemName}</td>
-                                                    <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{line.sku}</td>
+                                                    <td className="px-6 py-3 font-medium">{line.item_name ?? '—'}</td>
+                                                    <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{line.item_sku ?? '—'}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums">{line.quantity}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{line.unitPrice.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right font-semibold tabular-nums">{line.total.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
+                                                    <td className="px-6 py-3 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
                                                 </tr>
                                             ))
                                         )}
                                     </tbody>
-                                    {(poDetail.lineItems?.length ?? 0) > 0 && (
+                                    {(poDetail.line_items?.length ?? 0) > 0 && (
                                         <tfoot>
                                             <tr className="border-t-2 border-border bg-muted/30">
                                                 <td colSpan={4} className="px-6 py-3 text-right font-semibold">Grand Total</td>
-                                                <td className="px-6 py-3 text-right font-bold tabular-nums">{poDetail.total.toLocaleString()}</td>
+                                                <td className="px-6 py-3 text-right font-bold tabular-nums">{poDetail.total_amount.toLocaleString()}</td>
                                             </tr>
                                         </tfoot>
                                     )}
@@ -232,19 +189,23 @@ export default function PurchaseOrdersPage() {
                             <dl className="space-y-4 text-sm">
                                 <div>
                                     <dt className="text-muted-foreground">PO Number</dt>
-                                    <dd className="font-medium mt-1 font-mono">{poDetail.poNumber}</dd>
+                                    <dd className="font-medium mt-1 font-mono">{poDetail.po_number}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-muted-foreground">Supplier</dt>
-                                    <dd className="font-medium mt-1">{poDetail.supplierName}</dd>
+                                    <dd className="font-medium mt-1">{poDetail.supplier_name}</dd>
+                                </div>
+                                <div>
+                                    <dt className="text-muted-foreground">Warehouse</dt>
+                                    <dd className="font-medium mt-1">{poDetail.warehouse_name ?? '—'}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-muted-foreground">Date</dt>
-                                    <dd className="font-medium mt-1">{new Date(poDetail.createdAt).toLocaleDateString()}</dd>
+                                    <dd className="font-medium mt-1">{new Date(poDetail.created_at).toLocaleDateString()}</dd>
                                 </div>
                                 <div>
                                     <dt className="text-muted-foreground">Total</dt>
-                                    <dd className="font-bold text-lg mt-1">{poDetail.total.toLocaleString()}</dd>
+                                    <dd className="font-bold text-lg mt-1">{poDetail.total_amount.toLocaleString()}</dd>
                                 </div>
                             </dl>
                         </CardContent>
@@ -254,7 +215,6 @@ export default function PurchaseOrdersPage() {
         );
     }
 
-    // List view
     return (
         <>
         <div className="p-6 space-y-6">
@@ -300,7 +260,7 @@ export default function PurchaseOrdersPage() {
                                             Loading purchase orders...
                                         </td>
                                     </tr>
-                                ) : (orders?.length ?? 0) === 0 ? (
+                                ) : (filtered?.length ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center">
                                             <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -314,18 +274,18 @@ export default function PurchaseOrdersPage() {
                                             className="hover:bg-accent/30 transition-colors cursor-pointer"
                                             onClick={() => setSelectedPO(po.id)}
                                         >
-                                            <td className="px-6 py-4 font-mono text-xs font-medium">{po.poNumber}</td>
-                                            <td className="px-6 py-4">{po.supplierName}</td>
+                                            <td className="px-6 py-4 font-mono text-xs font-medium">{po.po_number}</td>
+                                            <td className="px-6 py-4">{po.supplier_name}</td>
                                             <td className="px-6 py-4">
                                                 <Badge variant={STATUS_VARIANT[po.status] ?? 'default'}>
                                                     {STATUS_LABEL[po.status] ?? po.status}
                                                 </Badge>
                                             </td>
                                             <td className="px-6 py-4 text-right font-semibold tabular-nums hidden sm:table-cell">
-                                                {po.total.toLocaleString()}
+                                                {po.total_amount.toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {new Date(po.createdAt).toLocaleDateString()}
+                                                {new Date(po.created_at).toLocaleDateString()}
                                             </td>
                                         </tr>
                                     ))
@@ -333,7 +293,7 @@ export default function PurchaseOrdersPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (orders?.length ?? 0) > 0 && (
+                    {!isLoading && (filtered?.length ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>
@@ -374,13 +334,28 @@ export default function PurchaseOrdersPage() {
                                         </select>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Expected Delivery</label>
-                                        <Input
-                                            type="date"
-                                            value={expectedDate}
-                                            onChange={(e) => setExpectedDate(e.target.value)}
-                                        />
+                                        <label className="text-sm font-medium">Warehouse *</label>
+                                        <select
+                                            value={warehouseId}
+                                            onChange={(e) => setWarehouseId(e.target.value)}
+                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                            required
+                                        >
+                                            <option value="">Select warehouse...</option>
+                                            {warehouses?.map((wh) => (
+                                                <option key={wh.id} value={wh.id}>{wh.name}</option>
+                                            ))}
+                                        </select>
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Expected Delivery</label>
+                                    <Input
+                                        type="date"
+                                        value={expectedDate}
+                                        onChange={(e) => setExpectedDate(e.target.value)}
+                                    />
                                 </div>
 
                                 <div className="space-y-3">
@@ -415,7 +390,7 @@ export default function PurchaseOrdersPage() {
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs text-muted-foreground">Unit Price</label>
+                                                    <label className="text-xs text-muted-foreground">Unit Cost</label>
                                                     <Input
                                                         type="number"
                                                         min="0"
@@ -463,8 +438,8 @@ export default function PurchaseOrdersPage() {
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit" className="flex-1" disabled={createPOMutation.isPending}>
-                                        {createPOMutation.isPending ? 'Creating...' : 'Create Order'}
+                                    <Button type="submit" className="flex-1" disabled={createPO.isPending}>
+                                        {createPO.isPending ? 'Creating...' : 'Create Order'}
                                     </Button>
                                 </div>
                             </form>

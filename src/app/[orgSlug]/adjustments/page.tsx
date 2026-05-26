@@ -2,25 +2,15 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { apiClient } from '@/lib/api/client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCreateAdjustment } from '@/hooks/useStock';
 import { Minus, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-interface AdjustmentPayload {
-    itemId: string;
-    type: 'add' | 'remove';
-    quantity: number;
-    reason: string;
-    warehouseId?: string;
-}
-
 export default function AdjustmentsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const queryClient = useQueryClient();
 
     const [type, setType] = useState<'add' | 'remove'>('add');
     const [itemId, setItemId] = useState('');
@@ -29,23 +19,7 @@ export default function AdjustmentsPage() {
     const [reason, setReason] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
 
-    const mutation = useMutation({
-        mutationFn: (payload: AdjustmentPayload) =>
-            apiClient.post(`/api/v1/${orgSlug}/inventory/adjustments`, payload),
-        onSuccess: () => {
-            toast.success('Stock adjustment recorded successfully');
-            queryClient.invalidateQueries({ queryKey: ['catalog'] });
-            queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-            setItemId('');
-            setItemName('');
-            setQuantity('');
-            setReason('');
-            setWarehouseId('');
-        },
-        onError: () => {
-            toast.error('Failed to record adjustment');
-        },
-    });
+    const mutation = useCreateAdjustment(orgSlug);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -56,11 +30,23 @@ export default function AdjustmentsPage() {
         }
 
         mutation.mutate({
-            itemId,
-            type,
+            item_id: itemId,
+            adjustment_type: type,
             quantity: qty,
             reason,
-            warehouseId: warehouseId || undefined,
+            warehouse_id: warehouseId || '',
+        }, {
+            onSuccess: () => {
+                toast.success('Stock adjustment recorded successfully');
+                setItemId('');
+                setItemName('');
+                setQuantity('');
+                setReason('');
+                setWarehouseId('');
+            },
+            onError: () => {
+                toast.error('Failed to record adjustment');
+            },
         });
     };
 

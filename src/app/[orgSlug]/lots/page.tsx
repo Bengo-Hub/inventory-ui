@@ -2,8 +2,7 @@
 
 import { Badge, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
-import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
+import { useLots } from '@/hooks/useLots';
 import { AlertTriangle, Layers, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -11,25 +10,7 @@ import { useMemo, useState } from 'react';
 const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
 
-interface Lot {
-    id: string;
-    lotNumber: string;
-    itemName: string;
-    itemId: string;
-    batchNumber: string;
-    expiryDate: string | null;
-    quantity: number;
-    status: 'available' | 'reserved' | 'expired' | 'quarantine';
-}
-
-const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'outline' | 'default'> = {
-    available: 'success',
-    reserved: 'default',
-    expired: 'error',
-    quarantine: 'warning',
-};
-
-function isExpiringSoon(expiryDate: string | null): boolean {
+function isExpiringSoon(expiryDate?: string): boolean {
     if (!expiryDate) return false;
     const expiry = new Date(expiryDate);
     const threshold = new Date();
@@ -37,7 +18,7 @@ function isExpiringSoon(expiryDate: string | null): boolean {
     return expiry <= threshold && expiry > new Date();
 }
 
-function isExpired(expiryDate: string | null): boolean {
+function isExpired(expiryDate?: string): boolean {
     if (!expiryDate) return false;
     return new Date(expiryDate) <= new Date();
 }
@@ -48,20 +29,20 @@ export default function LotsPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
 
-    const { data: lots, isLoading } = useQuery<Lot[]>({
-        queryKey: ['lots', orgSlug, search],
-        queryFn: () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/lots`, p);
-        },
-        placeholderData: [],
-    });
+    const { data: lots, isLoading } = useLots(orgSlug);
 
-    const totalPages = Math.max(1, Math.ceil((lots?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = lots?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const filtered = search
+        ? lots?.filter((l) =>
+            (l.lot_number ?? '').toLowerCase().includes(search.toLowerCase()) ||
+            (l.item_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
+            (l.item_sku ?? '').toLowerCase().includes(search.toLowerCase())
+          )
+        : lots;
 
-    const expiringSoonCount = lots?.filter((l) => isExpiringSoon(l.expiryDate)).length ?? 0;
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
+    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+
+    const expiringSoonCount = lots?.filter((l) => isExpiringSoon(l.expiry_date)).length ?? 0;
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -88,7 +69,7 @@ export default function LotsPage() {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
-                            placeholder="Search by lot number, item, or batch..."
+                            placeholder="Search by lot number, item, or SKU..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             className="pl-10"
@@ -102,7 +83,7 @@ export default function LotsPage() {
                                 <tr className="border-b border-border bg-muted/30">
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Lot Number</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Batch</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Warehouse</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Expiry Date</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Quantity</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
@@ -115,7 +96,7 @@ export default function LotsPage() {
                                             Loading lots...
                                         </td>
                                     </tr>
-                                ) : (lots?.length ?? 0) === 0 ? (
+                                ) : (filtered?.length ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <Layers className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -124,8 +105,10 @@ export default function LotsPage() {
                                     </tr>
                                 ) : (
                                     paginatedItems.map((lot) => {
-                                        const expiring = isExpiringSoon(lot.expiryDate);
-                                        const expired = isExpired(lot.expiryDate);
+                                        const expiring = isExpiringSoon(lot.expiry_date);
+                                        const expired = isExpired(lot.expiry_date);
+                                        const statusVariant: 'success' | 'warning' | 'error' | 'default' = expired ? 'error' : expiring ? 'warning' : 'success';
+                                        const statusLabel = expired ? 'Expired' : expiring ? 'Expiring Soon' : 'Active';
                                         return (
                                             <tr
                                                 key={lot.id}
@@ -133,15 +116,18 @@ export default function LotsPage() {
                                                     expiring ? 'bg-yellow-500/5' : expired ? 'bg-red-500/5' : ''
                                                 }`}
                                             >
-                                                <td className="px-6 py-4 font-mono text-xs font-medium">{lot.lotNumber}</td>
-                                                <td className="px-6 py-4">{lot.itemName}</td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{lot.batchNumber}</td>
+                                                <td className="px-6 py-4 font-mono text-xs font-medium">{lot.lot_number}</td>
+                                                <td className="px-6 py-4">
+                                                    <div>{lot.item_name ?? '—'}</div>
+                                                    {lot.item_sku && <div className="text-xs text-muted-foreground font-mono">{lot.item_sku}</div>}
+                                                </td>
+                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{lot.warehouse_name ?? '—'}</td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-2">
-                                                        {lot.expiryDate ? (
+                                                        {lot.expiry_date ? (
                                                             <>
                                                                 <span className={expired ? 'text-red-500 font-medium' : expiring ? 'text-yellow-500 font-medium' : ''}>
-                                                                    {new Date(lot.expiryDate).toLocaleDateString()}
+                                                                    {new Date(lot.expiry_date).toLocaleDateString()}
                                                                 </span>
                                                                 {(expiring || expired) && (
                                                                     <AlertTriangle className={`h-3.5 w-3.5 ${expired ? 'text-red-500' : 'text-yellow-500'}`} />
@@ -156,9 +142,7 @@ export default function LotsPage() {
                                                     {lot.quantity.toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <Badge variant={expired ? 'error' : STATUS_VARIANT[lot.status] ?? 'default'}>
-                                                        {expired && lot.status !== 'expired' ? 'expired' : lot.status}
-                                                    </Badge>
+                                                    <Badge variant={statusVariant}>{statusLabel}</Badge>
                                                 </td>
                                             </tr>
                                         );
@@ -167,7 +151,7 @@ export default function LotsPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (lots?.length ?? 0) > 0 && (
+                    {!isLoading && (filtered?.length ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

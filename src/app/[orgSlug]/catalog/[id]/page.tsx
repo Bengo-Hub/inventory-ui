@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/ba
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
+import { useItemPricing } from '@/hooks/usePricing';
 import { type Item } from '@/lib/api/items';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, Trash2 } from 'lucide-react';
@@ -43,13 +44,6 @@ interface StockHistoryEntry {
     createdBy: string;
 }
 
-interface PricingTier {
-    id: string;
-    minQty: number;
-    maxQty: number | null;
-    unitPrice: number;
-}
-
 export default function ItemDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -73,16 +67,11 @@ export default function ItemDetailPage() {
         placeholderData: [],
     });
 
-    const { data: pricingTiers } = useQuery<PricingTier[]>({
-        queryKey: ['catalog', 'pricing', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/pricing-tiers`),
-        enabled: !!id,
-        placeholderData: [],
-    });
+    const { data: itemPricing } = useItemPricing(orgSlug, id);
 
     if (isLoading) {
         return (
-            <div className="p-6 flex items-center justify-center min-h-[400px]">
+            <div className="p-6 flex items-center justify-center min-h-100">
                 <div className="animate-pulse text-muted-foreground">Loading item...</div>
             </div>
         );
@@ -211,37 +200,35 @@ export default function ItemDetailPage() {
                 )}
             </div>
 
-            {/* Pricing Tiers */}
+            {/* Item Pricing */}
             <Card>
                 <CardHeader>
                     <div className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-primary" />
-                        <h2 className="text-lg font-semibold">Pricing Tiers</h2>
+                        <h2 className="text-lg font-semibold">Pricing</h2>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {(pricingTiers?.length ?? 0) === 0 ? (
+                    {(itemPricing?.length ?? 0) === 0 ? (
                         <div className="p-6 text-center text-muted-foreground text-sm">
-                            No custom pricing tiers — standard price applies.
+                            No custom pricing configured — standard price applies.
                         </div>
                     ) : (
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Min Qty</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Max Qty</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Price</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Pricing Tier</th>
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Price</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Currency</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
-                                    {pricingTiers?.map((tier) => (
-                                        <tr key={tier.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-3 text-right tabular-nums">{tier.minQty.toLocaleString()}</td>
-                                            <td className="px-6 py-3 text-right tabular-nums">
-                                                {tier.maxQty != null ? tier.maxQty.toLocaleString() : '—'}
-                                            </td>
-                                            <td className="px-6 py-3 text-right font-semibold tabular-nums">{tier.unitPrice.toLocaleString()}</td>
+                                    {itemPricing?.map((p) => (
+                                        <tr key={p.tier_id} className="hover:bg-accent/30 transition-colors">
+                                            <td className="px-6 py-3 font-medium">{p.tier_name ?? p.tier_id}</td>
+                                            <td className="px-6 py-3 text-right font-semibold tabular-nums">{p.price.toLocaleString()}</td>
+                                            <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{p.currency ?? 'KES'}</td>
                                         </tr>
                                     ))}
                                 </tbody>
