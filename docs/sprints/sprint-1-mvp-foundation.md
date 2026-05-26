@@ -1,6 +1,6 @@
 # Sprint 1 - MVP Foundation (March 17, 2026)
 
-**Status:** ✅ Complete — SSO, multi-outlet, sidebar revamp, PWA, RBAC, all pages data-integrated including post-MVP Phase 15 pages (recipe viewer, POs, suppliers, transfers, lots, reservations, warehouse locations, pricing tiers)
+**Status:** ✅ Complete — SSO, multi-outlet, sidebar revamp, PWA, RBAC, all pages data-integrated including post-MVP Phase 15 pages (recipe viewer, POs, suppliers, transfers, lots, reservations, warehouse locations, pricing tiers); Phase 2 (2026-05-27): admin outlet handling, design overhaul (DM_Sans/Outfit fonts, micro-animations), analytics API + hooks, full dashboard revamp with recharts
 **Start:** 2026-03-06
 **Deadline:** 2026-03-17
 **Goal:** Ship a functional inventory-ui with SSO, stock visibility, and operational dashboard for Urban Loft Cafe (Busia outlet)
@@ -146,6 +146,45 @@ The following pages were added after Sprint 1 MVPcompletion as part of Phase 15:
 
 ### 15.8 Pricing Tiers on Item Detail
 - `catalog/[id]/page.tsx` updated: Pricing Tiers card (min qty, max qty, unit price). Shows "No custom pricing tiers" when empty.
+
+---
+
+## Phase 2 — Design Overhaul + Admin Outlet Handling + Dashboard Revamp (2026-05-27)
+
+### 2.1 Admin/Manager Outlet Handling
+
+- **Select-outlet page** (`auth/select-outlet/page.tsx`): HQ users (admin, inventory_admin, manager, store_manager, superuser, super_admin, isPlatformOwner, isSuperUser) see full outlet picker + "All Outlets" option at top. Non-HQ staff auto-select their assigned outlet (`user.outlet_id` fallback first active outlet) with no picker shown — mirrors pos-service pattern.
+- **Header** (`components/header.tsx`): All hardcoded `slate-*` colors replaced with semantic tokens (`text-foreground`, `bg-accent`, `hover:bg-accent`, `bg-primary/20`). `OutletFilter` component already handles HQ switching.
+- **Sidebar** (`components/sidebar.tsx`): Admin/manager users bypass `USE_CASE_MODULES` gating via `isAdmin` flag — all nav items (suppliers, purchase orders, lots, reservations, etc.) are always visible for admin roles.
+
+### 2.2 Design Polish
+
+- **Font upgrade** (`app/layout.tsx`): Replaced Geist/Geist_Mono with `DM_Sans` + `Outfit` + `JetBrains_Mono` (CSS vars `--font-dm-sans`, `--font-outfit`, `--font-jetbrains`). Matches pos-ui font stack.
+- **Micro-animations** (`app/globals.css`): Added `fade-up`, `scale-in`, `shimmer`, `slide-in-right` keyframes; `.animate-*` utilities; `.stagger-children` with 40 ms nth-child delays; `.skeleton` shimmer class using `hsl(var(--muted))`.
+
+### 2.3 Analytics API + Hooks
+
+- **`src/lib/api/analytics.ts`** (new): `analyticsApi` object with `getTopItems`, `getStockTrends`, `getDistribution`, `getReorderAlerts`, `getEnhancedSummary`. Interfaces: `TopItem`, `StockTrendPoint`, `CategoryDistribution`, `ReorderAlert`, `AnalyticsSummary`.
+- **`src/hooks/useAnalytics.ts`** (new): `useTopItems`, `useStockTrends`, `useInventoryDistribution`, `useReorderAlerts`, `useAnalyticsSummary` — all TanStack Query hooks with staleTime 2–5 min.
+
+### 2.4 Dashboard Charts Component
+
+- **`src/app/[orgSlug]/_components/DashboardCharts.tsx`** (new): Four exported components:
+  - `StockTrendsChart` — recharts `LineChart` with brand color `#F77F00`, semantic border/tooltip colors, `ResponsiveContainer` 220 px height
+  - `DistributionChart` — recharts donut `PieChart`, top 6 categories, `CHART_COLORS` array, `innerRadius=55`/`outerRadius=80`
+  - `ReorderAlertsTable` — top 5 reorder alerts, destructive/amber color coding, warehouse name column
+  - `TopItemsTable` — top 5 items by movement, relative progress bar per item using `units_moved / maxUnits`
+
+### 2.5 Dashboard Page Revamp
+
+- **`src/app/[orgSlug]/page.tsx`** (rewritten): Full dashboard with:
+  - Outlet-aware welcome message (name or "all outlets" per store)
+  - 4 quick action links: Adjust Stock, Purchase Order, Transfer, Stock Levels
+  - 4 KPI cards: Total Items, Low Stock, Out of Stock, Pending POs (from `useAnalyticsSummary`)
+  - Charts row: `StockTrendsChart` (2/3 width, `lg:col-span-2`) + `DistributionChart` (1/3 width)
+  - Tables row: `ReorderAlertsTable` + `TopItemsTable` (side by side)
+  - Recent activity feed with skeleton loaders, delta badges, type icons
+  - `animate-fade-up` on main container; `stagger-children` + `animate-scale-in` on KPI cards
 
 ---
 
