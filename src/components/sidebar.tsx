@@ -63,8 +63,11 @@ const USE_CASE_MODULES: Record<string, string[]> = {
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'settings'],
 };
 
-function hasModule(key: string | undefined, useCase: string | undefined): boolean {
+const ADMIN_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
+
+function hasModule(key: string | undefined, useCase: string | undefined, isAdmin: boolean): boolean {
   if (!key) return true; // no key = always visible
+  if (isAdmin) return true; // admins see all modules
   const modules = USE_CASE_MODULES[useCase ?? ''] ?? USE_CASE_MODULES.hospitality;
   return modules.includes(key);
 }
@@ -149,6 +152,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user);
   const { outlet, clearOutlet } = useOutletStore();
   const isPlatformOwner = orgSlug === 'codevertex';
+  const isAdmin =
+    !!user?.isPlatformOwner ||
+    !!user?.isSuperUser ||
+    !!(user?.roles ?? []).some((r) => ADMIN_ROLES.includes(r));
 
   async function handleLogout() {
     clearOutlet();
@@ -203,11 +210,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     },
   ];
 
-  // Filter groups and items by outlet use_case
+  // Filter groups and items by outlet use_case (admins bypass gating)
   const navGroups = allNavGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasModule(item.moduleKey, useCase)),
+      items: group.items.filter((item) => hasModule(item.moduleKey, useCase, isAdmin)),
     }))
     .filter((group) => group.items.length > 0);
 

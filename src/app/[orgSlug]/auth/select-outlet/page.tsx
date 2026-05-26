@@ -4,9 +4,11 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore, type OutletInfo, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
 import { useBranding } from '@/providers/branding-provider';
-import { Package, Warehouse, ChevronRight, CheckCircle } from 'lucide-react';
+import { Globe, Package, Warehouse, ChevronRight } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+
+const HQ_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
 
 const USE_CASE_LABELS: Record<string, string> = {
   hospitality: 'Hospitality',
@@ -43,32 +45,61 @@ function SelectOutletContent() {
 
   const [outlets, setOutlets] = useState<OutletInfo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selecting, setSelecting] = useState<string | null>(null);
+  const [selecting, setSelecting] = useState<string | 'all' | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const isHQUser =
+    user?.isPlatformOwner ||
+    user?.isSuperUser ||
+    (user?.roles ?? []).some((r) => HQ_ROLES.includes(r));
 
   const lastOutletId = typeof window !== 'undefined'
     ? localStorage.getItem(INVENTORY_SELECTED_OUTLET_KEY) : null;
 
-  // Use tenant UUID when available, otherwise fall back to orgSlug from URL (the router resolves both).
   const tenantRef = user?.tenant_id || orgSlug;
+
+  const destination = returnTo ? decodeURIComponent(returnTo) : `/${orgSlug}`;
 
   useEffect(() => {
     if (!tenantRef) return;
     apiClient
-      .get<OutletInfo[]>(`/api/v1/${tenantRef}/warehouses`)
+      .get<OutletInfo[]>(`/api/v1/${tenantRef}/inventory/warehouses`)
       .then((data) => {
-        // Sort: last-used outlet to top.
-        const sorted = [...data].sort((a, b) => {
+        const active = data.filter((o) => o.status !== 'inactive');
+
+        // Staff (non-HQ): auto-select their assigned outlet, no UI
+        if (!isHQUser) {
+          const assigned = active.find((o) => o.id === (user as any)?.outlet_id) ?? active[0];
+          if (assigned) {
+            handleSelect(assigned);
+          } else {
+            setOutlets(active);
+            setLoading(false);
+          }
+          return;
+        }
+
+        // HQ: sort last-used to top, then show picker
+        const sorted = [...active].sort((a, b) => {
           if (a.id === lastOutletId) return -1;
           if (b.id === lastOutletId) return 1;
           return 0;
         });
+
         setOutlets(sorted);
-        // Auto-select if only one outlet.
-        if (sorted.length === 1) handleSelect(sorted[0]);
+
+        // Auto-select if only one outlet even for HQ
+        if (sorted.length === 1) {
+          handleSelect(sorted[0]);
+          return;
+        }
+
+        setLoading(false);
       })
-      .catch(() => setError('Failed to load outlets. Please try again.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setError('Failed to load outlets. Please try again.');
+        setLoading(false);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantRef]);
 
@@ -77,7 +108,15 @@ function SelectOutletContent() {
     setOutlet(outlet);
     localStorage.setItem(INVENTORY_SELECTED_OUTLET_KEY, outlet.id);
     apiClient.setOutletID(outlet.id);
-    router.replace(returnTo ? decodeURIComponent(returnTo) : `/${orgSlug}`);
+    router.replace(destination);
+  }
+
+  function handleSelectAll() {
+    setSelecting('all');
+    setOutlet(null);
+    localStorage.removeItem(INVENTORY_SELECTED_OUTLET_KEY);
+    apiClient.setOutletID(null);
+    router.replace(destination);
   }
 
   if (loading) {
@@ -106,9 +145,13 @@ function SelectOutletContent() {
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-black text-foreground mb-2">Select Your Outlet</h1>
+          <h1 className="text-2xl font-black text-foreground mb-2">
+            {isHQUser ? 'Select View' : 'Select Your Outlet'}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Choose the outlet warehouse you&apos;re working in
+            {isHQUser
+              ? 'Choose a specific outlet or view data across all outlets'
+              : 'Choose the outlet warehouse you\'re working in'}
           </p>
         </div>
 
@@ -126,6 +169,29 @@ function SelectOutletContent() {
         )}
 
         <div className="space-y-3">
+          {/* All Outlets option — HQ users only */}
+          {isHQUser && outlets.length > 1 && (
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              disabled={!!selecting}
+              className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 hover:border-primary/50 transition-all duration-200 text-left group disabled:opacity-60"
+            >
+              <div className="h-12 w-12 rounded-xl bg-primary/15 flex items-center justify-center shrink-0 group-hover:bg-primary/25 transition-colors">
+                {selecting === 'all' ? (
+                  <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Globe className="h-5 w-5 text-primary" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-primary">All Outlets</p>
+                <p className="text-xs text-muted-foreground mt-0.5">View data across all warehouses & outlets</p>
+              </div>
+              <ChevronRight className="h-4 w-4 text-primary/50 group-hover:text-primary transition-colors shrink-0" />
+            </button>
+          )}
+
           {outlets.map((outlet) => {
             const isLastUsed = outlet.id === lastOutletId;
             const isSelecting = selecting === outlet.id;
@@ -178,7 +244,9 @@ function SelectOutletContent() {
 
         {outlets.length > 0 && (
           <p className="text-center text-xs text-muted-foreground mt-6">
-            You can switch outlets from the sidebar at any time.
+            {isHQUser
+              ? 'You can switch outlets from the header at any time.'
+              : 'You can switch outlets from the sidebar at any time.'}
           </p>
         )}
       </div>
