@@ -547,7 +547,7 @@ export default function SettingsPage() {
   const visibleTabs = TABS.filter((t) => t.id !== 'platform' || isPlatformOwner);
 
   return (
-    <div className="p-4 sm:p-8 max-w-5xl mx-auto space-y-6">
+    <div className="p-4 sm:p-8 space-y-6">
       <div>
         <h1 className="text-2xl font-black tracking-tight">Inventory Settings</h1>
         <p className="text-muted-foreground mt-1 text-sm">Manage stock thresholds, notifications, modules, and integrations.</p>
