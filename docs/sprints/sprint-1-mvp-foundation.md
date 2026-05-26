@@ -43,11 +43,8 @@ The inventory-ui repo is scaffolded (Next.js 16, React 19) with implemented page
   - Request interceptor: attach JWT Bearer token
   - Response interceptor: handle 401 (refresh), 403 (unauthorized page)
   - Base URL: `https://inventoryapi.codevertexitsolutions.com/v1/{tenantID}`
-- [ ] **F1-07:** Create typed API functions
-  - `getStockAvailability(sku)` -> `StockAvailability`
-  - `bulkAvailability(skus)` -> `StockAvailability[]`
-  - Define TypeScript interfaces matching API response shapes
 - [x] **F1-07:** Typed API functions per module (`lib/api/recipes.ts`, `lib/api/modifiers.ts`, etc.)
+  - _Note: original F1-07 placeholder (getStockAvailability/bulkAvailability) was superseded by per-module API files; those specific helpers were not implemented as standalone functions — all stock reads go through `lib/api/stock.ts` and the `useStock` hook instead._
 - [x] **F1-08:** TanStack Query client configured; `QueryClientProvider` in root layout; custom hooks (`useMe`, `use-recipes`, `use-modifiers`)
 
 ### Layout & Navigation
@@ -144,8 +141,60 @@ The following pages were added after Sprint 1 MVPcompletion as part of Phase 15:
 ### 15.6 Reservation Browser
 - `app/[orgSlug]/reservations/page.tsx` — Active reservations table with status filter (confirmed / consumed / released).
 
-### 15.7 Warehouse Locations Placeholder
-- `app/[orgSlug]/warehouses/[id]/locations/page.tsx` — "Coming Soon" placeholder for sub-warehouse bin/shelf/aisle/zone tracking.
+### 15.7 Warehouse Locations
+- `app/[orgSlug]/warehouses/[id]/locations/page.tsx` — Fully implemented (NOT a placeholder): hierarchical bin/shelf/aisle/zone tree using `useWarehouseLocations`, `useCreateLocation`, `useDeleteLocation` hooks. Supports add/delete with a create dialog, inline `LocationNode` recursive tree render, and empty state. _Doc previously said "Coming Soon placeholder" — this was outdated; the page is production-ready._
 
 ### 15.8 Pricing Tiers on Item Detail
 - `catalog/[id]/page.tsx` updated: Pricing Tiers card (min qty, max qty, unit price). Shows "No custom pricing tiers" when empty.
+
+---
+
+## Audit Notes (2026-05-26)
+
+**Audit performed against actual codebase. Corrections and undocumented work recorded below.**
+
+### Corrections to Sprint Doc
+
+| Task | Claimed Status | Actual Status | Notes |
+|------|---------------|---------------|-------|
+| F1-07 (original placeholder) | pending | outdated | superseded by per-module API files; `getStockAvailability`/`bulkAvailability` not implemented as standalone helpers — stock reads use `lib/api/stock.ts` + `useStock` |
+| 15.7 Warehouse Locations | placeholder/stub | done | Fully implemented with hierarchical tree, create/delete CRUD, and empty state — not a "Coming Soon" page |
+
+### Undocumented Work (in code, not in sprint doc)
+
+The following pages, hooks, and API modules exist in the codebase but were never listed in any sprint task:
+
+**Pages (all in `app/[orgSlug]/`):**
+- `categories/page.tsx` — Categories list with add/edit/delete CRUD
+- `units/page.tsx` — Units of measurement management
+- `modifiers/page.tsx` — Modifier groups list and management
+- `recipes/page.tsx` + `recipes/[recipeId]/page.tsx` — Standalone recipes list + recipe detail page (separate from the item-level `catalog/[id]/recipe` viewer)
+- `stock/page.tsx` — Stock levels/availability overview page
+
+**Hooks (all in `src/hooks/`):**
+- `useCategories.ts` — TanStack Query wrapper for categories API
+- `useUnits.ts` — TanStack Query wrapper for units API
+- `useInventorySettings.ts` — Inventory settings CRUD hook
+- `usePricing.ts` — Pricing tier management hook
+- `useStock.ts` — Stock availability queries
+- `useWarehouses.ts` (extended) — includes `useWarehouseLocations`, `useCreateLocation`, `useDeleteLocation`
+- `use-app-permissions.ts` — App-level permission resolution hook
+- `use-biometric.ts` — PWA biometric authentication hook
+- `use-pwa-update.ts` — Service worker update detection hook
+- `useRBAC.ts` — Full RBAC admin hooks (listRoles, listPermissions, listAssignments, assignRole, revokeRole, myRoles, myPermissions)
+- `use-subscription.ts` — Subscription gating hook with IndexedDB hydration, plan/feature/limit checks, grace period tracking
+
+**API modules (`src/lib/api/`):**
+- `categories.ts`, `units.ts`, `inventory-settings.ts`, `pricing.ts`, `stock.ts`, `rbac.ts`, `reservations.ts`, `lots.ts`, `transfers.ts`, `purchase-orders.ts`, `suppliers.ts`, `warehouses.ts` (with locations), `recipes.ts`, `modifiers.ts` — all present and typed
+
+**Components (`src/components/`):**
+- `inventory/ItemFormDialog.tsx` — Item add/edit form dialog (used on catalog detail)
+- `inventory/ItemSearchInput.tsx` — Debounced item search autocomplete (used in transfers and PO create dialogs)
+- `subscription/` directory — Subscription gate/wall components
+- `pwa-registration.tsx`, `pwa-update-banner.tsx` — PWA install and update UI
+- `outlet-filter.tsx` — Outlet filter selector component
+
+**Other:**
+- `store/outlet-filter.ts` — Outlet filter Zustand store (separate from `store/outlet.ts`)
+- `store/subscription.ts` — Subscription state store with IndexedDB persistence
+- `providers/branding-provider.tsx` — Tenant branding provider (fetches notifications-api branding)

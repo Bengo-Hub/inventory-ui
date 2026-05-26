@@ -105,11 +105,11 @@
   font-feature-settings: "liga" 1, "kern" 1;
   text-rendering: optimizeLegibility;
   --brand-primary: 107 42 27;
-  --brand-emphasis: 234 128 34;
+  --brand-emphasis: 243 106 12;
   --brand-contrast: 255 255 255;
   --brand-muted: 249 237 229;
-  --brand-surface: 245 241 236;
-  --brand-dark: 44 26 2;
+  --brand-surface: 244 230 220;
+  --brand-dark: 67 23 13;
 }
 
 * {

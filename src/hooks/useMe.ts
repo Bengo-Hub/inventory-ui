@@ -1,42 +1,56 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchProfile } from '@/lib/auth/api';
+import { fetchInventoryProfile } from '@/lib/auth/api';
 import { useAuthStore } from '@/store/auth';
+import { useParams } from 'next/navigation';
 
-/** Auth-api GET /me response: user profile with roles and permissions (source of truth for RBAC). */
+/** Inventory service profile with local RBAC roles and permissions. */
 export interface MeResponse {
   id: string;
   email?: string;
   fullName?: string;
-  organizationId?: string;
+  tenant_id?: string;
+  tenant_slug?: string;
   roles: string[];
   permissions: string[];
+  isPlatformOwner?: boolean;
+  isSuperUser?: boolean;
   [key: string]: unknown;
 }
 
-const ME_QUERY_KEY = ['auth', 'me'] as const;
 const ME_STALE_MS = 5 * 60 * 1000; // 5 min TTL
 
-/** Load current user and RBAC from SSO auth-api GET /me with TanStack Query and TTL. */
+/**
+ * Load current user profile and RBAC from inventory-api GET /{tenant}/auth/me.
+ * This gives service-level roles and permissions (not just SSO claims).
+ */
 export function useMe(enabled = true) {
   const accessToken = useAuthStore((s) => s.session?.accessToken);
+  const storedUser = useAuthStore((s) => s.user);
+  const params = useParams();
+
+  // Resolve tenant slug: URL param > stored user > localStorage
+  const orgSlug = (params?.orgSlug as string | undefined)
+    ?? storedUser?.tenant_slug
+    ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') ?? '' : '');
 
   const query = useQuery({
-    queryKey: ME_QUERY_KEY,
+    queryKey: ['auth', 'me', orgSlug],
     queryFn: async (): Promise<MeResponse> => {
-      const data = await fetchProfile(accessToken ?? undefined);
+      const data = await fetchInventoryProfile(orgSlug);
       return {
         ...data,
         roles: Array.isArray(data.roles) ? data.roles : [],
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
       };
     },
-    enabled,
+    enabled: enabled && !!accessToken && !!orgSlug,
     staleTime: ME_STALE_MS,
     gcTime: ME_STALE_MS * 2,
-    retry: (failureCount, error: any) => {
-      if (error?.response?.status === 401 || error?.response?.status === 403) return false;
+    retry: (failureCount, error: unknown) => {
+      const status = (error as { response?: { status?: number } })?.response?.status;
+      if (status === 401 || status === 403) return false;
       return failureCount < 2;
     },
   });
@@ -47,12 +61,12 @@ export function useMe(enabled = true) {
 
   const hasRole = (role: string) => {
     if (!roles.length) return false;
-    return roles.includes(role) || roles.includes('super_admin') || roles.includes('admin');
+    return roles.includes(role) || roles.includes('superuser') || roles.includes('inventory_admin');
   };
 
   const hasPermission = (permission: string) => {
     if (!user) return false;
-    if (roles.includes('super_admin') || roles.includes('admin')) return true;
+    if (roles.includes('superuser') || roles.includes('inventory_admin')) return true;
     return permissions.includes(permission);
   };
 
@@ -76,5 +90,5 @@ export function useHasPermission(permission: string): boolean {
 }
 
 export function useIsSuperAdmin(): boolean {
-  return useHasRole('super_admin');
+  return useHasRole('inventory_admin');
 }

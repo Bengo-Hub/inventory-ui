@@ -1,5 +1,5 @@
 import { apiClient } from '@/lib/api/client';
-import { buildAuthorizeUrl, buildLogoutUrl, exchangeCodeForTokens, fetchProfile } from '@/lib/auth/api';
+import { buildAuthorizeUrl, buildLogoutUrl, exchangeCodeForTokens, fetchInventoryProfile, fetchProfile } from '@/lib/auth/api';
 import {
     consumeVerifier,
     generateCodeChallenge,
@@ -82,8 +82,12 @@ export const useAuthStore = create<AuthState>()(
 
                 set({ status: 'loading' });
 
+                // Fetch fresh profile from inventory-api (syncs local RBAC roles and permissions).
+                const storedSlug = user?.tenant_slug
+                    ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') : null)
+                    ?? '';
                 try {
-                    const freshUser = await fetchProfile();
+                    const freshUser = await fetchInventoryProfile(storedSlug);
                     apiClient.setTenantInfo(freshUser.tenant_id, freshUser.tenant_slug);
                     set({ user: freshUser, status: 'authenticated', lastAuthenticatedAt: Date.now() });
                 } catch (error) {
@@ -146,23 +150,27 @@ export const useAuthStore = create<AuthState>()(
                     apiClient.setAccessToken(session.accessToken);
                     set({ session });
 
+                    // Call inventory-api /auth/me to sync local RBAC roles and permissions.
+                    // Retries on transient errors but stops immediately on 401/403.
                     let attempts = 0;
                     while (attempts < 5) {
                         try {
-                            const user = await fetchProfile();
+                            const user = await fetchInventoryProfile(orgSlug);
                             apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
                             if (typeof window !== 'undefined' && user?.email) {
                                 localStorage.setItem('sso_last_email', user.email);
                             }
                             set({ user, status: 'authenticated', lastAuthenticatedAt: Date.now() });
                             return;
-                        } catch {
+                        } catch (err: unknown) {
+                            const status = (err as { response?: { status?: number } })?.response?.status;
+                            if (status === 401 || status === 403) break;
                             attempts++;
-                            await new Promise(r => setTimeout(r, 1500));
+                            await new Promise(r => setTimeout(r, 1200));
                         }
                     }
 
-                    set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                    set({ status: 'error', error: 'Sign-in failed — could not verify identity' });
                 } catch (error) {
                     set({ status: 'error', error: 'Sign-in failed' });
                 }
@@ -180,23 +188,26 @@ export const useAuthStore = create<AuthState>()(
                     apiClient.setAccessToken(session.accessToken);
                     set({ session });
 
+                    const slug = tenantSlug ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') : null) ?? '';
                     let attempts = 0;
                     while (attempts < 5) {
                         try {
-                            const user = await fetchProfile();
+                            const user = await fetchInventoryProfile(slug);
                             apiClient.setTenantInfo(user.tenant_id, user.tenant_slug);
                             if (typeof window !== 'undefined' && user?.email) {
                                 localStorage.setItem('sso_last_email', user.email);
                             }
                             set({ user, status: 'authenticated', lastAuthenticatedAt: Date.now() });
                             return;
-                        } catch {
+                        } catch (err: unknown) {
+                            const status = (err as { response?: { status?: number } })?.response?.status;
+                            if (status === 401 || status === 403) break;
                             attempts++;
-                            await new Promise(r => setTimeout(r, 1500));
+                            await new Promise(r => setTimeout(r, 1200));
                         }
                     }
 
-                    set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                    set({ status: 'error', error: 'Biometric sign-in failed — could not verify identity' });
                 } catch (error) {
                     set({ status: 'error', error: 'Biometric sign-in failed' });
                 }
@@ -216,9 +227,13 @@ export const useAuthStore = create<AuthState>()(
             },
 
             fetchUser: async () => {
+                const { user } = get();
+                const slug = user?.tenant_slug
+                    ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') : null)
+                    ?? '';
                 try {
-                    const user = await fetchProfile();
-                    set({ user });
+                    const freshUser = await fetchInventoryProfile(slug);
+                    set({ user: freshUser });
                 } catch (error) {
                     console.error('Fetch user failed:', error);
                 }

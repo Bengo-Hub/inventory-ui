@@ -1,5 +1,46 @@
 import { apiClient } from '@/lib/api/client';
 
+/**
+ * Fetch user profile from inventory-api GET /api/v1/{tenantSlug}/auth/me.
+ * This syncs service-level RBAC roles and permissions after SSO login.
+ * Uses the shared apiClient so auth headers and tenant context are attached automatically.
+ */
+export async function fetchInventoryProfile(tenantSlug: string): Promise<{
+    id: string;
+    email: string;
+    fullName: string;
+    roles: string[];
+    permissions: string[];
+    tenant_id: string;
+    tenant_slug: string;
+    isPlatformOwner: boolean;
+    isSuperUser: boolean;
+}> {
+    const data = await apiClient.get<{
+        id: string;
+        email: string;
+        tenant_id: string;
+        tenant_slug: string;
+        roles: string[];
+        permissions: string[];
+        is_platform_owner: boolean;
+        is_superuser: boolean;
+    }>(`/api/v1/${tenantSlug}/auth/me`);
+
+    const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
+    return {
+        id: data.id ?? '',
+        email: data.email ?? '',
+        fullName: data.email ?? '',
+        roles,
+        permissions: Array.isArray(data.permissions) ? data.permissions : [],
+        tenant_id: data.tenant_id ?? '',
+        tenant_slug: data.tenant_slug ?? tenantSlug,
+        isPlatformOwner: data.is_platform_owner === true,
+        isSuperUser: roles.includes('superuser') || roles.includes('inventory_admin'),
+    };
+}
+
 const SSO_BASE_URL = process.env.NEXT_PUBLIC_SSO_URL || 'https://sso.codevertexitsolutions.com';
 const SSO_CLIENT_ID = process.env.NEXT_PUBLIC_SSO_CLIENT_ID || 'inventory-ui';
 

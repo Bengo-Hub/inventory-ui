@@ -49,10 +49,13 @@ function SelectOutletContent() {
   const lastOutletId = typeof window !== 'undefined'
     ? localStorage.getItem(INVENTORY_SELECTED_OUTLET_KEY) : null;
 
+  // Use tenant UUID when available, otherwise fall back to orgSlug from URL (the router resolves both).
+  const tenantRef = user?.tenant_id || orgSlug;
+
   useEffect(() => {
-    if (!user?.tenant_id) return;
+    if (!tenantRef) return;
     apiClient
-      .get<OutletInfo[]>(`/api/v1/${user.tenant_id}/warehouses`)
+      .get<OutletInfo[]>(`/api/v1/${tenantRef}/warehouses`)
       .then((data) => {
         // Sort: last-used outlet to top.
         const sorted = [...data].sort((a, b) => {
@@ -67,7 +70,7 @@ function SelectOutletContent() {
       .catch(() => setError('Failed to load outlets. Please try again.'))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.tenant_id]);
+  }, [tenantRef]);
 
   function handleSelect(outlet: OutletInfo) {
     setSelecting(outlet.id);
