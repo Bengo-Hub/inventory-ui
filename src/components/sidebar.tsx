@@ -228,14 +228,16 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
   const content = (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border">
-      {/* Logo / tenant — full-bleed image banner, or pill fallback */}
+      {/* Logo / tenant — proportional logo contained in 72px band, or pill fallback */}
       <div className="border-b border-sidebar-border shrink-0 overflow-hidden" style={{ height: '72px' }}>
         {tenant?.logoUrl ? (
-          <img
-            src={tenant.logoUrl}
-            alt={tenant.name ?? orgSlug}
-            className="w-full h-full object-cover"
-          />
+          <div className="flex items-center h-full px-3 py-2">
+            <img
+              src={tenant.logoUrl}
+              alt={tenant.name ?? orgSlug}
+              className="h-full w-auto max-w-full object-contain"
+            />
+          </div>
         ) : (
           <div className="flex items-center gap-3 h-full px-4">
             <div className="h-10 w-10 shrink-0 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
