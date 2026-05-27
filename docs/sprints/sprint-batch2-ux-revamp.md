@@ -1,8 +1,8 @@
 # Sprint: Batch 2 — UX Revamp & Feature Completeness
 
 **Created:** 2026-05-27  
-**Status:** ✅ Complete — `pnpm build` clean, pushed to `master` (commit `4f65b8f`)  
-**Goal:** Close 8 UX gaps and bugs identified after Batch 1 launch
+**Status:** ✅ Complete — `pnpm build` clean, pushed to `master` (commit `7f4b543`)  
+**Goal:** Close 8 UX gaps and bugs identified after Batch 1 launch; extended with catalog CRUD actions and adjustments crash fix
 
 ---
 
@@ -29,7 +29,8 @@
 | `src/app/[orgSlug]/stock/page.tsx` | Full revamp: `StockDrawer` component (Sheet) shows stats grid + toggleable inline adjustment form (uses `useCreateAdjustment`) + recent adjustments (uses `useAdjustments`). `SlidersHorizontal` action button per row. Out-of-stock / low-stock alert banners at top. |
 | `src/app/[orgSlug]/units/page.tsx` | Eye button per row opens `UnitDrawer` (Sheet) showing type label + linked items list (`useItems({ unit_id })`). `item_count` from backend displayed in table. |
 | `src/app/[orgSlug]/categories/page.tsx` | Parent select in create/edit modal (excludes self to prevent circular refs). "Parent" column in table. Hierarchical sort: roots first, children with `└─` prefix. Replaced `Tag` icon with `FolderTree`. |
-| `src/app/[orgSlug]/catalog/page.tsx` | Category filter pills: removed `CATEGORIES` constant; uses `useCategories(orgSlug)` for dynamic pills. Filter passes `category_id` (UUID) to `useItems`. |
+| `src/app/[orgSlug]/catalog/page.tsx` | Full revamp: search input in own row, category filter pills in separate scrollable row. Eye button → `ItemDrawer` (Sheet) with details/flags/tags. Edit button → `ItemFormDialog` pre-filled (wired to `useUpdateItem`). Delete button → inline confirmation dialog (wired to `useDeleteItem`). |
+| `src/lib/api/stock.ts` | `StockAdjustment` interface rewritten to snake_case matching backend fields (`item_id`, `item_name`, `quantity_change`, `adjusted_at`). `listAdjustments` made async to unwrap `{ data, total }` paginated envelope. |
 
 ---
 
@@ -67,13 +68,15 @@ Previously hardcoded `const CATEGORIES = ['All', 'Raw Materials', ...]`. Now:
 
 | Test | Result |
 |------|--------|
-| `pnpm build` | ✅ Zero TS errors, 27 routes compiled |
+| `pnpm build` | ✅ Zero TS errors, 27 routes compiled (commit `7f4b543`) |
 | Recipes CRUD | ✅ 201/200 (URL fixed) |
 | Adjustments modal | ✅ History visible by default, modal opens correctly |
+| Adjustments crash | ✅ `TypeError: N?.slice` fixed — snake_case interface + envelope unwrap |
 | Transfers dropdown | ✅ Dropdown visible above modal content |
 | Units drawer | ✅ Eye button → Sheet with type + items |
 | Categories parent | ✅ Parent select available, └─ hierarchy rendered |
 | Catalog filter | ✅ Pills from API, category_id passed to items query |
+| Catalog CRUD | ✅ Eye/Edit/Delete buttons per row; create/edit dialogs; delete confirm |
 
 ---
 
