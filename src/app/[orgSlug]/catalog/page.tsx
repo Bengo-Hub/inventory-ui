@@ -3,14 +3,14 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
-import { useCreateItem } from '@/hooks/useItems';
+import { useCreateItem, useItems } from '@/hooks/useItems';
 import { type CreateItemInput } from '@/lib/api/items';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
 import { Filter, Package, Plus, Search, Upload } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useRef, useMemo, useState } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
@@ -78,23 +78,15 @@ export default function CatalogPage() {
         if (fileInputRef.current) fileInputRef.current.value = '';
     }
 
-    const { data: items, isLoading } = useQuery<StockItem[]>({
-        queryKey: ['catalog', orgSlug, search, category],
-        queryFn: async () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            if (category !== 'All') p.category = category;
-            const res = await apiClient.get<{ data: StockItem[]; total: number } | StockItem[]>(`/api/v1/${orgSlug}/inventory/items`, p);
-            return Array.isArray(res) ? res : (res as { data: StockItem[] }).data ?? [];
-        },
-        placeholderData: [],
+    const { data: itemsPage, isLoading } = useItems(orgSlug, {
+        ...(search ? { search } : {}),
+        ...(category !== 'All' ? { type: category } : {}),
+        page,
+        limit: ITEMS_PER_PAGE,
     });
 
-    const totalPages = Math.max(1, Math.ceil((items?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = items?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
-
-    // Reset to page 1 when filters change
-    useMemo(() => { setPage(1); }, [search, category]);
+    const items = itemsPage?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((itemsPage?.total ?? 0) / ITEMS_PER_PAGE));
 
     return (
         <>
@@ -135,7 +127,7 @@ export default function CatalogPage() {
                             <Input
                                 placeholder="Search by SKU or name..."
                                 value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                                 className="pl-10"
                             />
                         </div>
@@ -146,7 +138,7 @@ export default function CatalogPage() {
                                     key={cat}
                                     variant={category === cat ? 'primary' : 'outline'}
                                     size="sm"
-                                    onClick={() => setCategory(cat)}
+                                    onClick={() => { setCategory(cat); setPage(1); }}
                                 >
                                     {cat}
                                 </Button>
@@ -174,7 +166,7 @@ export default function CatalogPage() {
                                             Loading items...
                                         </td>
                                     </tr>
-                                ) : (items?.length ?? 0) === 0 ? (
+                                ) : items.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -182,7 +174,7 @@ export default function CatalogPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedItems.map((item) => (
+                                    items.map((item) => (
                                         <tr key={item.id} className="hover:bg-accent/30 transition-colors">
                                             <td className="px-6 py-4 font-mono text-xs">{item.sku}</td>
                                             <td className="px-6 py-4">
@@ -207,7 +199,7 @@ export default function CatalogPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (items?.length ?? 0) > 0 && (
+                    {!isLoading && items.length > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

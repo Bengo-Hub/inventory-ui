@@ -1,16 +1,18 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { itemsApi, type CreateItemInput, type UpdateItemInput } from '@/lib/api/items';
+import { itemsApi, type CreateItemInput, type UpdateItemInput, type PaginatedItems } from '@/lib/api/items';
 
 const ITEMS_KEY = 'items';
 
-export function useItems(orgSlug: string, params?: { type?: string; search?: string }) {
+const EMPTY_PAGE: PaginatedItems = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
+
+export function useItems(orgSlug: string, params?: { type?: string; search?: string; page?: number; limit?: number }) {
   return useQuery({
     queryKey: [ITEMS_KEY, orgSlug, params],
     queryFn: () => itemsApi.list(orgSlug, params),
     enabled: !!orgSlug,
-    placeholderData: [],
+    placeholderData: EMPTY_PAGE,
     staleTime: 60_000,
   });
 }

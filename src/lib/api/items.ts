@@ -49,10 +49,21 @@ function itemsBase(orgSlug: string) {
   return `/api/v1/${orgSlug}/inventory/items`;
 }
 
+export interface PaginatedItems {
+  data: Item[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export const itemsApi = {
-  list: async (orgSlug: string, params?: { type?: string; search?: string }): Promise<Item[]> => {
-    const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(itemsBase(orgSlug), params);
-    return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
+  list: async (orgSlug: string, params?: { type?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedItems> => {
+    const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), params as Record<string, string | number | undefined>);
+    if (Array.isArray(res)) {
+      return { data: res, total: res.length, page: 1, limit: res.length, hasMore: false };
+    }
+    return res as PaginatedItems;
   },
 
   get: (orgSlug: string, sku: string) =>
