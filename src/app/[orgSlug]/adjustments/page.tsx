@@ -202,9 +202,9 @@ export default function AdjustmentsPage() {
         if (!search) return adjustments;
         const q = search.toLowerCase();
         return adjustments?.filter((a) =>
-            (a.itemName ?? '').toLowerCase().includes(q) ||
+            (a.item_name ?? '').toLowerCase().includes(q) ||
             (a.reason ?? '').toLowerCase().includes(q) ||
-            (a.warehouseName ?? '').toLowerCase().includes(q)
+            (a.warehouse_name ?? '').toLowerCase().includes(q)
         );
     }, [adjustments, search]);
 
@@ -274,16 +274,16 @@ export default function AdjustmentsPage() {
                                     paginated.map((adj) => (
                                         <tr key={adj.id} className="hover:bg-accent/30 transition-colors">
                                             <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
-                                                {new Date(adj.createdAt).toLocaleDateString()}
+                                                {new Date(adj.adjusted_at ?? adj.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="font-medium">{adj.itemName || '—'}</div>
+                                                <div className="font-medium">{adj.item_name || '—'}</div>
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {adj.warehouseName || '—'}
+                                                {adj.warehouse_name || '—'}
                                             </td>
-                                            <td className={`px-6 py-4 text-right tabular-nums font-semibold ${adj.quantity > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
-                                                {adj.quantity > 0 ? '+' : ''}{adj.quantity}
+                                            <td className={`px-6 py-4 text-right tabular-nums font-semibold ${adj.quantity_change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                                {adj.quantity_change > 0 ? '+' : ''}{adj.quantity_change}
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell capitalize">
                                                 {adj.reason}

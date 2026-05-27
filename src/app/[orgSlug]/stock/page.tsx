@@ -60,7 +60,7 @@ function StockDrawer({
     const createAdj = useCreateAdjustment(orgSlug);
 
     const itemAdj = useMemo(() =>
-        recentAdj?.filter((a) => a.itemId === item.id || a.itemName === item.item_name).slice(0, 5),
+        recentAdj?.filter((a) => a.item_id === item.id || a.item_name === item.item_name).slice(0, 5),
         [recentAdj, item]
     );
 
@@ -247,10 +247,10 @@ function StockDrawer({
                         <div className="space-y-1.5">
                             {itemAdj?.map((adj) => (
                                 <div key={adj.id} className="flex items-center justify-between text-xs py-1.5 px-2 rounded-lg bg-muted/30">
-                                    <span className="text-muted-foreground">{new Date(adj.createdAt).toLocaleDateString()}</span>
+                                    <span className="text-muted-foreground">{new Date(adj.adjusted_at ?? adj.created_at).toLocaleDateString()}</span>
                                     <span className="text-muted-foreground capitalize">{adj.reason}</span>
-                                    <span className={`font-semibold tabular-nums ${adj.quantity > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
-                                        {adj.quantity > 0 ? '+' : ''}{adj.quantity}
+                                    <span className={`font-semibold tabular-nums ${adj.quantity_change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                                        {adj.quantity_change > 0 ? '+' : ''}{adj.quantity_change}
                                     </span>
                                 </div>
                             ))}
