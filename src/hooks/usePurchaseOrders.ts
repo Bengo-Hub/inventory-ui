@@ -46,6 +46,17 @@ export function useReceivePurchaseOrder(orgSlug: string) {
   });
 }
 
+export function useSendPurchaseOrder(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => purchaseOrdersApi.send(orgSlug, id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug, id] });
+    },
+  });
+}
+
 export function useCancelPurchaseOrder(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -191,6 +191,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     purchaseOrderApprovalRequired: false,
     autoAdjustOnTransfer: true,
   });
+  const [unitDefaults, setUnitDefaults] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (settings) {
@@ -203,6 +204,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         purchaseOrderApprovalRequired: settings.purchase_order_approval_required,
         autoAdjustOnTransfer: settings.auto_adjust_on_transfer,
       });
+      setUnitDefaults(settings.unit_reorder_defaults ?? {});
     }
   }, [settings]);
 
@@ -211,6 +213,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       low_stock_threshold_pct: form.lowStockPct,
       critical_stock_threshold_pct: form.criticalStockPct,
       default_reorder_level: form.defaultReorderLevel,
+      unit_reorder_defaults: unitDefaults,
       enable_lot_tracking: form.enableLotTracking,
       enable_expiry_tracking: form.enableExpiryTracking,
       purchase_order_approval_required: form.purchaseOrderApprovalRequired,
@@ -262,7 +265,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
               <p className="text-xs text-muted-foreground">Below this % triggers a critical / urgent alert.</p>
             </div>
             <div className="space-y-2">
-              <label className={labelClass}>Default Reorder Level (units)</label>
+              <label className={labelClass}>Default Reorder Level (fallback)</label>
               <input
                 type="number"
                 min={0}
@@ -271,9 +274,36 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                 disabled={!canEdit}
                 className={`${inputClass} font-mono`}
               />
-              <p className="text-xs text-muted-foreground">Default reorder point applied to new items.</p>
+              <p className="text-xs text-muted-foreground">Global fallback when no unit-specific default applies.</p>
             </div>
           </div>
+
+          {/* Per-unit reorder defaults */}
+          {Object.keys(unitDefaults).length > 0 && (
+            <div className="space-y-3">
+              <div>
+                <label className={labelClass}>Reorder Defaults by Unit</label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Minimum quantity to reorder per unit type. Applied when an item has no explicit reorder level configured.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                {Object.entries(unitDefaults).map(([abbr, qty]) => (
+                  <div key={abbr} className="space-y-1">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">{abbr}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={qty}
+                      onChange={(e) => setUnitDefaults((prev) => ({ ...prev, [abbr]: parseInt(e.target.value) || 0 }))}
+                      disabled={!canEdit}
+                      className={`${inputClass} font-mono`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {[
             { key: 'enableLotTracking' as const, label: 'Lot / Batch Tracking', desc: 'Track inventory by lot/batch numbers for traceability.' },

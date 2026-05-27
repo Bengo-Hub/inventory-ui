@@ -2,9 +2,10 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
+import { ModifierGroupDialog } from '@/components/inventory/ModifierGroupDialog';
 import { useModifierGroups, useCreateModifierGroup, useUpdateModifierGroup, useDeleteModifierGroup } from '@/hooks/use-modifiers';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
-import { ChevronDown, ChevronRight, Layers, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Layers, Plus, Search, Trash2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,12 +21,6 @@ export default function ModifiersPage() {
     const [editing, setEditing] = useState<ModifierGroup | null>(null);
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
-    // Form state
-    const [formName, setFormName] = useState('');
-    const [formDisplayName, setFormDisplayName] = useState('');
-    const [formMinSelections, setFormMinSelections] = useState('0');
-    const [formMaxSelections, setFormMaxSelections] = useState('1');
-    const [formIsRequired, setFormIsRequired] = useState(false);
 
     const { data: groups, isLoading } = useModifierGroups(orgSlug, search ? { search } : undefined);
     const createMutation = useCreateModifierGroup(orgSlug);
@@ -41,21 +36,11 @@ export default function ModifiersPage() {
 
     function openCreate() {
         setEditing(null);
-        setFormName('');
-        setFormDisplayName('');
-        setFormMinSelections('0');
-        setFormMaxSelections('1');
-        setFormIsRequired(false);
         setDialogOpen(true);
     }
 
     function openEdit(group: ModifierGroup) {
         setEditing(group);
-        setFormName(group.name);
-        setFormDisplayName(group.display_name);
-        setFormMinSelections(String(group.min_selections));
-        setFormMaxSelections(String(group.max_selections));
-        setFormIsRequired(group.is_required);
         setDialogOpen(true);
     }
 
@@ -64,28 +49,7 @@ export default function ModifiersPage() {
         setEditing(null);
     }
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!formName.trim()) {
-            toast.error('Group name is required');
-            return;
-        }
-        const payload: ModifierGroupPayload = {
-            name: formName.trim(),
-            display_name: formDisplayName.trim() || formName.trim(),
-            min_selections: Number(formMinSelections) || 0,
-            max_selections: Number(formMaxSelections) || 1,
-            is_required: formIsRequired,
-            options: editing?.options?.map((opt) => ({
-                name: opt.name,
-                display_name: opt.display_name,
-                price_adjustment: opt.price_adjustment,
-                sort_order: opt.sort_order,
-                is_default: opt.is_default,
-                is_active: opt.is_active,
-            })) ?? [],
-        };
-
+    function handleSubmit(payload: ModifierGroupPayload) {
         if (editing) {
             updateMutation.mutate(
                 { id: editing.id, data: payload },
@@ -262,89 +226,13 @@ export default function ModifiersPage() {
                 </CardContent>
             </Card>
 
-            {/* Add/Edit Modifier Group Dialog */}
             {dialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDialog} />
-                    <div className="relative z-50 w-full max-w-lg mx-4">
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-semibold">
-                                        {editing ? 'Edit Modifier Group' : 'Add Modifier Group'}
-                                    </h2>
-                                    <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
-                                        <X className="h-5 w-5 text-muted-foreground" />
-                                    </button>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Internal Name *</label>
-                                        <Input
-                                            placeholder="e.g. pizza_size"
-                                            value={formName}
-                                            onChange={(e) => setFormName(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Display Name</label>
-                                        <Input
-                                            placeholder="e.g. Choose Your Size"
-                                            value={formDisplayName}
-                                            onChange={(e) => setFormDisplayName(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Min Selections</label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                value={formMinSelections}
-                                                onChange={(e) => setFormMinSelections(e.target.value)}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Max Selections</label>
-                                            <Input
-                                                type="number"
-                                                min="1"
-                                                value={formMaxSelections}
-                                                onChange={(e) => setFormMaxSelections(e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="checkbox"
-                                            id="isRequired"
-                                            checked={formIsRequired}
-                                            onChange={(e) => setFormIsRequired(e.target.checked)}
-                                            className="h-4 w-4 rounded border-border"
-                                        />
-                                        <label htmlFor="isRequired" className="text-sm font-medium">
-                                            Required selection
-                                        </label>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        Options can be managed after creating the group.
-                                    </p>
-                                    <div className="flex gap-3 pt-2">
-                                        <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>
-                                            Cancel
-                                        </Button>
-                                        <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-                                            {mutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
-                                        </Button>
-                                    </div>
-                                </form>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
+                <ModifierGroupDialog
+                    editing={editing}
+                    isPending={mutation.isPending}
+                    onSubmit={handleSubmit}
+                    onClose={closeDialog}
+                />
             )}
         </div>
     );

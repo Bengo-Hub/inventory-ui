@@ -5,6 +5,7 @@ export interface InventorySettings {
   low_stock_threshold_pct: number;
   critical_stock_threshold_pct: number;
   default_reorder_level: number;
+  unit_reorder_defaults: Record<string, number>;
   expiry_warning_days: number;
   enable_low_stock_notifications: boolean;
   enable_expiry_notifications: boolean;
@@ -25,6 +26,7 @@ export interface UpdateInventorySettingsInput {
   low_stock_threshold_pct?: number;
   critical_stock_threshold_pct?: number;
   default_reorder_level?: number;
+  unit_reorder_defaults?: Record<string, number>;
   expiry_warning_days?: number;
   enable_low_stock_notifications?: boolean;
   enable_expiry_notifications?: boolean;

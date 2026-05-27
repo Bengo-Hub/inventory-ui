@@ -4,7 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Ruler, Search, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -181,15 +181,24 @@ export default function UnitsPage() {
                                                 {(unit.itemCount ?? 0).toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-destructive hover:text-destructive"
-                                                    onClick={() => handleDelete(unit)}
-                                                    disabled={deleteMutation.isPending}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openEdit(unit)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-destructive hover:text-destructive"
+                                                        onClick={() => handleDelete(unit)}
+                                                        disabled={deleteMutation.isPending}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -210,7 +219,7 @@ export default function UnitsPage() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-semibold">Add Unit</h2>
+                                    <h2 className="text-lg font-semibold">{editing ? 'Edit Unit' : 'Add Unit'}</h2>
                                     <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
                                         <X className="h-5 w-5 text-muted-foreground" />
                                     </button>
@@ -259,7 +268,7 @@ export default function UnitsPage() {
                                             Cancel
                                         </Button>
                                         <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-                                            {mutation.isPending ? 'Saving...' : 'Create'}
+                                            {mutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
                                         </Button>
                                     </div>
                                 </form>

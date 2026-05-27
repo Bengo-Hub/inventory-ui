@@ -2,9 +2,11 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
-import { ChefHat, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChefHat, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -13,6 +15,7 @@ const ITEMS_PER_PAGE = 20;
 
 export default function RecipesPage() {
     const params = useParams();
+    const router = useRouter();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
@@ -23,6 +26,7 @@ export default function RecipesPage() {
     const [formName, setFormName] = useState('');
     const [formDescription, setFormDescription] = useState('');
     const [formItemId, setFormItemId] = useState('');
+    const [formItemName, setFormItemName] = useState('');
     const [formServings, setFormServings] = useState('1');
     const [formMargin, setFormMargin] = useState('30');
 
@@ -43,6 +47,7 @@ export default function RecipesPage() {
         setFormName('');
         setFormDescription('');
         setFormItemId('');
+        setFormItemName('');
         setFormServings('1');
         setFormMargin('30');
         setDialogOpen(true);
@@ -53,6 +58,7 @@ export default function RecipesPage() {
         setFormName(recipe.name);
         setFormDescription(recipe.description);
         setFormItemId(recipe.itemId);
+        setFormItemName(recipe.itemName ?? '');
         setFormServings(String(recipe.servings));
         setFormMargin(String(recipe.target_margin_percent));
         setDialogOpen(true);
@@ -183,6 +189,14 @@ export default function RecipesPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        title="Manage ingredients"
+                                                        onClick={() => router.push(`/${orgSlug}/recipes/${recipe.id}`)}
+                                                    >
+                                                        <FlaskConical className="h-4 w-4" />
+                                                    </Button>
                                                     <Button variant="ghost" size="sm" onClick={() => openEdit(recipe)}>
                                                         Edit
                                                     </Button>
@@ -238,14 +252,16 @@ export default function RecipesPage() {
                                             onChange={(e) => setFormDescription(e.target.value)}
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Produced Item ID</label>
-                                        <Input
-                                            placeholder="Item this recipe produces"
-                                            value={formItemId}
-                                            onChange={(e) => setFormItemId(e.target.value)}
-                                        />
-                                    </div>
+                                    <ItemSearchInput
+                                        orgSlug={orgSlug}
+                                        value={formItemName}
+                                        label="Produced Item"
+                                        placeholder="Search for produced item..."
+                                        onSelect={(item) => {
+                                            setFormItemId(item.id);
+                                            setFormItemName(item.name);
+                                        }}
+                                    />
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Servings</label>

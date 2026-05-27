@@ -60,6 +60,9 @@ export const purchaseOrdersApi = {
   receive: (orgSlug: string, id: string, receivedItems?: { item_id: string; received_qty: number }[]) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/receive`, { items: receivedItems }),
 
+  send: (orgSlug: string, id: string) =>
+    apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/send`, {}),
+
   cancel: (orgSlug: string, id: string) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/cancel`, {}),
 };

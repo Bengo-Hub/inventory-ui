@@ -3,7 +3,14 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { usePurchaseOrders, usePurchaseOrder, useCreatePurchaseOrder } from '@/hooks/usePurchaseOrders';
+import {
+    usePurchaseOrders,
+    usePurchaseOrder,
+    useCreatePurchaseOrder,
+    useSendPurchaseOrder,
+    useReceivePurchaseOrder,
+    useCancelPurchaseOrder,
+} from '@/hooks/usePurchaseOrders';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ArrowLeft, FileText, Minus, Plus, Search, X } from 'lucide-react';
@@ -55,6 +62,9 @@ export default function PurchaseOrdersPage() {
     const { data: orders, isLoading } = usePurchaseOrders(orgSlug);
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
     const createPO = useCreatePurchaseOrder(orgSlug);
+    const sendPO = useSendPurchaseOrder(orgSlug);
+    const receivePO = useReceivePurchaseOrder(orgSlug);
+    const cancelPO = useCancelPurchaseOrder(orgSlug);
 
     const filtered = search
         ? orders?.filter((o) =>
@@ -116,9 +126,14 @@ export default function PurchaseOrdersPage() {
     }
 
     if (selectedPO && poDetail) {
+        const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
+        const canSend = poDetail.status === 'draft';
+        const canReceive = poDetail.status === 'sent' || poDetail.status === 'partially_received' || poDetail.status === 'draft';
+        const canCancel = poDetail.status === 'draft' || poDetail.status === 'sent';
+
         return (
             <div className="p-6 space-y-6">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-wrap items-center gap-4">
                     <Button variant="ghost" size="sm" onClick={() => setSelectedPO(null)}>
                         <ArrowLeft className="h-4 w-4 mr-2" />
                         Back
@@ -127,9 +142,53 @@ export default function PurchaseOrdersPage() {
                         <h1 className="text-2xl font-bold tracking-tight">{poDetail.po_number}</h1>
                         <p className="text-muted-foreground text-sm">{poDetail.supplier_name}</p>
                     </div>
-                    <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'} className="ml-auto">
+                    <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'} className="ml-2">
                         {STATUS_LABEL[poDetail.status] ?? poDetail.status}
                     </Badge>
+                    <div className="ml-auto flex flex-wrap gap-2">
+                        {canSend && (
+                            <Button
+                                size="sm"
+                                disabled={isPOBusy}
+                                onClick={() => sendPO.mutate(poDetail.id, {
+                                    onSuccess: () => toast.success('PO sent to supplier'),
+                                    onError: () => toast.error('Failed to send PO'),
+                                })}
+                            >
+                                Send to Supplier
+                            </Button>
+                        )}
+                        {canReceive && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isPOBusy}
+                                onClick={() => receivePO.mutate({ id: poDetail.id }, {
+                                    onSuccess: () => toast.success('PO received — stock updated'),
+                                    onError: () => toast.error('Failed to receive PO'),
+                                })}
+                            >
+                                Mark Received
+                            </Button>
+                        )}
+                        {canCancel && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                disabled={isPOBusy}
+                                onClick={() => {
+                                    if (!confirm('Cancel this purchase order?')) return;
+                                    cancelPO.mutate(poDetail.id, {
+                                        onSuccess: () => { toast.success('PO cancelled'); setSelectedPO(null); },
+                                        onError: () => toast.error('Failed to cancel PO'),
+                                    });
+                                }}
+                            >
+                                Cancel Order
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

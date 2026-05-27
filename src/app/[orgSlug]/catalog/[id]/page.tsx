@@ -1,13 +1,14 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
 import { useItemPricing } from '@/hooks/usePricing';
+import { useSuppliers } from '@/hooks/useSuppliers';
 import { type Item } from '@/lib/api/items';
-import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, Trash2 } from 'lucide-react';
+import { useMutation, useQuery } from '@tanstack/react-query';
+import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, RefreshCw, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -68,6 +69,26 @@ export default function ItemDetailPage() {
     });
 
     const { data: itemPricing } = useItemPricing(orgSlug, id);
+    const { data: suppliers } = useSuppliers(orgSlug);
+
+    const [reorderEditMode, setReorderEditMode] = useState(false);
+    const [reorderLevel, setReorderLevel] = useState('');
+    const [reorderQty, setReorderQty] = useState('');
+    const [autoReorder, setAutoReorder] = useState(false);
+    const [preferredSupplierId, setPreferredSupplierId] = useState('');
+
+    const reorderConfigMutation = useMutation({
+        mutationFn: (data: { reorder_level: number; reorder_quantity: number; auto_reorder_enabled: boolean; preferred_supplier_id?: string }) =>
+            apiClient.put(`/api/v1/${orgSlug}/inventory/stock/${item?.sku}/reorder-config`, {
+                ...data,
+                warehouse_id: item?.warehouseId,
+            }),
+        onSuccess: () => {
+            toast.success('Reorder configuration saved');
+            setReorderEditMode(false);
+        },
+        onError: () => toast.error('Failed to save reorder configuration'),
+    });
 
     if (isLoading) {
         return (
@@ -234,6 +255,90 @@ export default function ItemDetailPage() {
                                 </tbody>
                             </table>
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Reorder Configuration */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <RefreshCw className="h-5 w-5 text-primary" />
+                            <h2 className="text-lg font-semibold">Reorder Configuration</h2>
+                        </div>
+                        {!reorderEditMode && (
+                            <Button variant="outline" size="sm" onClick={() => {
+                                setReorderLevel(String(item.reorderPoint));
+                                setReorderQty('');
+                                setAutoReorder(false);
+                                setPreferredSupplierId('');
+                                setReorderEditMode(true);
+                            }}>
+                                <Pencil className="h-4 w-4 mr-2" />
+                                Configure
+                            </Button>
+                        )}
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {reorderEditMode ? (
+                        <form onSubmit={(e) => {
+                            e.preventDefault();
+                            reorderConfigMutation.mutate({
+                                reorder_level: Number(reorderLevel) || 0,
+                                reorder_quantity: Number(reorderQty) || 0,
+                                auto_reorder_enabled: autoReorder,
+                                preferred_supplier_id: preferredSupplierId || undefined,
+                            });
+                        }} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Reorder Level ({item.unit})</label>
+                                    <Input type="number" min="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Reorder Quantity ({item.unit})</label>
+                                    <Input type="number" min="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Preferred Supplier</label>
+                                <select
+                                    value={preferredSupplierId}
+                                    onChange={(e) => setPreferredSupplierId(e.target.value)}
+                                    className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                >
+                                    <option value="">— None —</option>
+                                    {suppliers?.map((s) => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <label className="flex items-center gap-3 cursor-pointer">
+                                <input type="checkbox" checked={autoReorder} onChange={(e) => setAutoReorder(e.target.checked)} className="rounded" />
+                                <span className="text-sm font-medium">Enable auto-reorder when stock falls below reorder level</span>
+                            </label>
+                            <div className="flex gap-3 pt-2">
+                                <Button type="button" variant="outline" className="flex-1" onClick={() => setReorderEditMode(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" className="flex-1" disabled={reorderConfigMutation.isPending}>
+                                    {reorderConfigMutation.isPending ? 'Saving...' : 'Save Configuration'}
+                                </Button>
+                            </div>
+                        </form>
+                    ) : (
+                        <dl className="grid grid-cols-2 gap-4 text-sm">
+                            <div>
+                                <dt className="text-muted-foreground">Reorder Point</dt>
+                                <dd className="font-medium mt-1">{item.reorderPoint.toLocaleString()} {item.unit}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Auto Reorder</dt>
+                                <dd className="font-medium mt-1 text-muted-foreground italic">Click &quot;Configure&quot; to set up</dd>
+                            </div>
+                        </dl>
                     )}
                 </CardContent>
             </Card>

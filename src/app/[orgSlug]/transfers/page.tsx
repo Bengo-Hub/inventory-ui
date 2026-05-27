@@ -2,11 +2,18 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
-import { useTransfers, useCreateTransfer } from '@/hooks/useTransfers';
+import {
+    useTransfers,
+    useCreateTransfer,
+    useShipTransfer,
+    useReceiveTransfer,
+    useCancelTransfer,
+    useTransfer,
+} from '@/hooks/useTransfers';
 import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
+import { ArrowRightLeft, ChevronDown, ChevronUp, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,15 +36,119 @@ const STATUS_LABEL: Record<string, string> = {
     cancelled: 'Cancelled',
 };
 
+function TransferDetailRow({ orgSlug, transferId, onClose }: { orgSlug: string; transferId: string; onClose: () => void }) {
+    const { data: transfer, isLoading } = useTransfer(orgSlug, transferId);
+    const shipMutation = useShipTransfer(orgSlug);
+    const receiveMutation = useReceiveTransfer(orgSlug);
+    const cancelMutation = useCancelTransfer(orgSlug);
+
+    function handleShip() {
+        shipMutation.mutate(transferId, {
+            onSuccess: () => toast.success('Transfer shipped — status updated to In Transit'),
+            onError: () => toast.error('Failed to ship transfer'),
+        });
+    }
+
+    function handleReceive() {
+        receiveMutation.mutate({ id: transferId }, {
+            onSuccess: () => toast.success('Transfer received — stock levels updated'),
+            onError: () => toast.error('Failed to receive transfer'),
+        });
+    }
+
+    function handleCancel() {
+        if (!confirm('Cancel this transfer? This cannot be undone.')) return;
+        cancelMutation.mutate(transferId, {
+            onSuccess: () => toast.success('Transfer cancelled'),
+            onError: () => toast.error('Failed to cancel transfer'),
+        });
+    }
+
+    if (isLoading) {
+        return (
+            <tr>
+                <td colSpan={6} className="px-6 py-4 bg-muted/20 text-center text-sm text-muted-foreground">
+                    Loading transfer details...
+                </td>
+            </tr>
+        );
+    }
+
+    if (!transfer) return null;
+
+    const canShip = transfer.status === 'draft';
+    const canReceive = transfer.status === 'in_transit';
+    const canCancel = transfer.status === 'draft' || transfer.status === 'in_transit';
+    const isBusy = shipMutation.isPending || receiveMutation.isPending || cancelMutation.isPending;
+
+    return (
+        <tr>
+            <td colSpan={6} className="px-6 py-4 bg-muted/10 border-b border-border">
+                <div className="space-y-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                        {canShip && (
+                            <Button size="sm" onClick={handleShip} disabled={isBusy}>
+                                Ship Transfer
+                            </Button>
+                        )}
+                        {canReceive && (
+                            <Button size="sm" onClick={handleReceive} disabled={isBusy}>
+                                Mark Received
+                            </Button>
+                        )}
+                        {canCancel && (
+                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleCancel} disabled={isBusy}>
+                                Cancel Transfer
+                            </Button>
+                        )}
+                        {transfer.note && (
+                            <span className="text-xs text-muted-foreground ml-2">Note: {transfer.note}</span>
+                        )}
+                    </div>
+
+                    {(transfer.items?.length ?? 0) > 0 && (
+                        <table className="w-full text-xs border border-border rounded-lg overflow-hidden">
+                            <thead>
+                                <tr className="bg-muted/30">
+                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Item</th>
+                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">SKU</th>
+                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty Ordered</th>
+                                    {transfer.status === 'received' && (
+                                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty Received</th>
+                                    )}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border">
+                                {transfer.items.map((line) => (
+                                    <tr key={line.id}>
+                                        <td className="px-4 py-2">{line.item_name || '—'}</td>
+                                        <td className="px-4 py-2 font-mono text-muted-foreground">{line.item_sku || '—'}</td>
+                                        <td className="px-4 py-2 text-right tabular-nums">{line.quantity}</td>
+                                        {transfer.status === 'received' && (
+                                            <td className="px-4 py-2 text-right tabular-nums">{line.received_qty ?? line.quantity}</td>
+                                        )}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            </td>
+        </tr>
+    );
+}
+
 export default function TransfersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
+    const [note, setNote] = useState('');
     const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string }[]>([
         { itemId: '', itemName: '', quantity: '' },
     ]);
@@ -62,12 +173,17 @@ export default function TransfersPage() {
     function openCreate() {
         setFromWarehouse('');
         setToWarehouse('');
+        setNote('');
         setTransferItems([{ itemId: '', itemName: '', quantity: '' }]);
         setDialogOpen(true);
     }
 
     function closeDialog() {
         setDialogOpen(false);
+    }
+
+    function toggleExpand(id: string) {
+        setExpandedId((prev) => (prev === id ? null : id));
     }
 
     function addItem() {
@@ -106,6 +222,7 @@ export default function TransfersPage() {
         createTransfer.mutate({
             from_warehouse_id: fromWarehouse,
             to_warehouse_id: toWarehouse,
+            note: note.trim() || undefined,
             items: validItems,
         }, {
             onSuccess: () => {
@@ -148,11 +265,11 @@ export default function TransfersPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-muted/30">
+                                    <th className="w-8 px-3 py-3" />
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Reference</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">From</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">To</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Items</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Date</th>
                                 </tr>
                             </thead>
@@ -171,27 +288,42 @@ export default function TransfersPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedItems.map((transfer: TransferSummary) => (
-                                        <tr key={transfer.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
-                                            <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
-                                            <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
-                                            <td className="px-6 py-4">
-                                                <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
-                                                    {STATUS_LABEL[transfer.status] ?? transfer.status}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                <div className="flex items-center justify-end gap-1 text-muted-foreground">
-                                                    <Package className="h-3 w-3" />
-                                                    {transfer.line_count}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {new Date(transfer.created_at).toLocaleDateString()}
-                                            </td>
-                                        </tr>
-                                    ))
+                                    paginatedItems.flatMap((transfer: TransferSummary) => {
+                                        const isExpanded = expandedId === transfer.id;
+                                        return [
+                                            <tr
+                                                key={transfer.id}
+                                                className="hover:bg-accent/30 transition-colors cursor-pointer"
+                                                onClick={() => toggleExpand(transfer.id)}
+                                            >
+                                                <td className="px-3 py-4 text-muted-foreground">
+                                                    {isExpanded
+                                                        ? <ChevronUp className="h-4 w-4" />
+                                                        : <ChevronDown className="h-4 w-4" />}
+                                                </td>
+                                                <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
+                                                <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
+                                                <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
+                                                            {STATUS_LABEL[transfer.status] ?? transfer.status}
+                                                        </Badge>
+                                                        <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                                                            <Package className="h-3 w-3" />
+                                                            {transfer.line_count}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
+                                                    {new Date(transfer.created_at).toLocaleDateString()}
+                                                </td>
+                                            </tr>,
+                                            ...(isExpanded
+                                                ? [<TransferDetailRow key={`detail-${transfer.id}`} orgSlug={orgSlug} transferId={transfer.id} onClose={() => setExpandedId(null)} />]
+                                                : []),
+                                        ];
+                                    })
                                 )}
                             </tbody>
                         </table>
@@ -246,6 +378,15 @@ export default function TransfersPage() {
                                                 ))}
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Note</label>
+                                        <Input
+                                            placeholder="Optional note for this transfer..."
+                                            value={note}
+                                            onChange={(e) => setNote(e.target.value)}
+                                        />
                                     </div>
 
                                     <div className="space-y-3">

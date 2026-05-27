@@ -1,5 +1,7 @@
 import { apiClient } from './client';
 
+export type PaymentMethodType = 'mpesa' | 'mpesa_b2b' | 'bank_transfer' | 'cash' | 'cheque' | '';
+
 export interface Supplier {
   id: string;
   name: string;
@@ -10,6 +12,18 @@ export interface Supplier {
   tax_number?: string;
   notes?: string;
   is_active: boolean;
+  // Payment config
+  payment_method_type?: PaymentMethodType;
+  mpesa_phone?: string;
+  mpesa_business_name?: string;
+  bank_account_number?: string;
+  bank_name?: string;
+  bank_branch?: string;
+  tax_pin?: string;
+  requires_invoice_before_payment?: boolean;
+  auto_pay_enabled?: boolean;
+  payment_terms_days?: number;
+  credit_limit?: number;
   created_at: string;
   updated_at: string;
 }
@@ -22,6 +36,18 @@ export interface CreateSupplierInput {
   contact_person?: string;
   tax_number?: string;
   notes?: string;
+  // Payment config
+  payment_method_type?: PaymentMethodType;
+  mpesa_phone?: string;
+  mpesa_business_name?: string;
+  bank_account_number?: string;
+  bank_name?: string;
+  bank_branch?: string;
+  tax_pin?: string;
+  requires_invoice_before_payment?: boolean;
+  auto_pay_enabled?: boolean;
+  payment_terms_days?: number;
+  credit_limit?: number;
 }
 
 export type UpdateSupplierInput = Partial<CreateSupplierInput>;
