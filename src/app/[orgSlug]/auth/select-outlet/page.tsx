@@ -79,7 +79,13 @@ function SelectOutletContent() {
           return;
         }
 
-        // HQ: sort last-used to top, then show picker
+        // Auto-select "All Outlets" if that was last choice
+        if (lastOutletId === 'all') {
+          handleSelectAll();
+          return;
+        }
+
+        // HQ: sort last-used to top
         const sorted = [...active].sort((a, b) => {
           if (a.id === lastOutletId) return -1;
           if (b.id === lastOutletId) return 1;
@@ -92,6 +98,15 @@ function SelectOutletContent() {
         if (sorted.length === 1) {
           handleSelect(sorted[0]);
           return;
+        }
+
+        // Auto-select last-used outlet for returning HQ users
+        if (lastOutletId) {
+          const lastOutlet = sorted.find((o) => o.id === lastOutletId);
+          if (lastOutlet) {
+            handleSelect(lastOutlet);
+            return;
+          }
         }
 
         setLoading(false);
@@ -114,7 +129,7 @@ function SelectOutletContent() {
   function handleSelectAll() {
     setSelecting('all');
     setOutlet(null);
-    localStorage.removeItem(INVENTORY_SELECTED_OUTLET_KEY);
+    localStorage.setItem(INVENTORY_SELECTED_OUTLET_KEY, 'all');
     apiClient.setOutletID(null);
     router.replace(destination);
   }
