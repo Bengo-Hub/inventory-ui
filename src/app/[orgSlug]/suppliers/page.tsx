@@ -28,15 +28,15 @@ export default function SuppliersPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Supplier | null>(null);
 
-    const { data: suppliers, isLoading } = useSuppliers(orgSlug, { search: search || undefined });
+    const { data, isLoading } = useSuppliers(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createSupplier = useCreateSupplier(orgSlug);
     const updateSupplier = useUpdateSupplier(orgSlug);
     const deleteSupplier = useDeleteSupplier(orgSlug);
 
     const isPending = createSupplier.isPending || updateSupplier.isPending;
 
-    const totalPages = Math.max(1, Math.ceil((suppliers?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = suppliers?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const paginatedItems = data?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -123,7 +123,7 @@ export default function SuppliersPage() {
                                             Loading suppliers...
                                         </td>
                                     </tr>
-                                ) : (suppliers?.length ?? 0) === 0 ? (
+                                ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center">
                                             <Truck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -174,7 +174,7 @@ export default function SuppliersPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (suppliers?.length ?? 0) > 0 && (
+                    {!isLoading && (data?.total ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

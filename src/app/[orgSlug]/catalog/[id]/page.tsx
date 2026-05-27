@@ -69,7 +69,8 @@ export default function ItemDetailPage() {
     });
 
     const { data: itemPricing } = useItemPricing(orgSlug, id);
-    const { data: suppliers } = useSuppliers(orgSlug);
+    const { data: suppliersPage } = useSuppliers(orgSlug);
+    const suppliers = suppliersPage?.data;
 
     const [reorderEditMode, setReorderEditMode] = useState(false);
     const [reorderLevel, setReorderLevel] = useState('');

@@ -10,16 +10,19 @@ import {
     type ModifierGroup,
     type ModifierGroupPayload,
     type ModifierGroupListParams,
+    type PaginatedModifierGroups,
 } from '@/lib/api/modifiers';
 
 const MODIFIERS_KEY = 'modifier-groups';
 
+const EMPTY_MODIFIER_GROUPS: PaginatedModifierGroups = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
+
 export function useModifierGroups(orgSlug: string, params?: ModifierGroupListParams) {
-    return useQuery<ModifierGroup[]>({
+    return useQuery<PaginatedModifierGroups>({
         queryKey: [MODIFIERS_KEY, orgSlug, params],
         queryFn: () => fetchModifierGroups(orgSlug, params),
         enabled: !!orgSlug,
-        placeholderData: [],
+        placeholderData: EMPTY_MODIFIER_GROUPS,
     });
 }
 

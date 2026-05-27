@@ -41,13 +41,21 @@ export interface RecipePayload {
 export interface RecipeListParams {
     search?: string;
     page?: number;
-    per_page?: number;
+    limit?: number;
+}
+
+export interface PaginatedRecipes {
+    data: Recipe[];
+    total: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
 }
 
 /* ── API Functions ─────────────────────────────────────────────────── */
 
-export function fetchRecipes(orgSlug: string, params?: RecipeListParams) {
-    return apiClient.get<Recipe[]>(`/api/v1/${orgSlug}/inventory/recipes`, params);
+export function fetchRecipes(orgSlug: string, params?: RecipeListParams): Promise<PaginatedRecipes> {
+    return apiClient.get<PaginatedRecipes>(`/api/v1/${orgSlug}/inventory/recipes`, params);
 }
 
 export function fetchRecipe(orgSlug: string, id: string) {

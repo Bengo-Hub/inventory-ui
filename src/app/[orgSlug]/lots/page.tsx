@@ -28,12 +28,13 @@ function SupplierRefCombobox({
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
-    const { data: suppliers } = useSuppliers(orgSlug);
+    const { data: suppliersPage } = useSuppliers(orgSlug);
+    const suppliers = suppliersPage?.data ?? [];
 
     const filtered = useMemo(() => {
         if (query.length < 2) return [];
         const q = query.toLowerCase();
-        return (suppliers ?? []).filter((s) =>
+        return suppliers.filter((s) =>
             s.name.toLowerCase().includes(q) ||
             (s.email ?? '').toLowerCase().includes(q) ||
             (s.phone ?? '').toLowerCase().includes(q)

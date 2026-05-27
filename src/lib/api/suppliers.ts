@@ -58,9 +58,17 @@ export interface SupplierListParams {
   limit?: number;
 }
 
+export interface PaginatedSuppliers {
+  data: Supplier[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
 export const suppliersApi = {
-  list: (orgSlug: string, params?: SupplierListParams) =>
-    apiClient.get<Supplier[]>(`/api/v1/${orgSlug}/inventory/suppliers`, params),
+  list: (orgSlug: string, params?: SupplierListParams): Promise<PaginatedSuppliers> =>
+    apiClient.get<PaginatedSuppliers>(`/api/v1/${orgSlug}/inventory/suppliers`, params),
 
   get: (orgSlug: string, id: string) =>
     apiClient.get<Supplier>(`/api/v1/${orgSlug}/inventory/suppliers/${id}`),

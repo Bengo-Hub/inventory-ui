@@ -22,15 +22,15 @@ export default function ModifiersPage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
 
 
-    const { data: groups, isLoading } = useModifierGroups(orgSlug, search ? { search } : undefined);
+    const { data, isLoading } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createMutation = useCreateModifierGroup(orgSlug);
     const updateMutation = useUpdateModifierGroup(orgSlug);
     const deleteMutation = useDeleteModifierGroup(orgSlug);
 
     const mutation = editing ? updateMutation : createMutation;
 
-    const totalPages = Math.max(1, Math.ceil((groups?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = groups?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const paginatedItems = data?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -128,7 +128,7 @@ export default function ModifiersPage() {
                                             Loading modifier groups...
                                         </td>
                                     </tr>
-                                ) : (groups?.length ?? 0) === 0 ? (
+                                ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center">
                                             <Layers className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -220,7 +220,7 @@ export default function ModifiersPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (groups?.length ?? 0) > 0 && (
+                    {!isLoading && (data?.total ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

@@ -30,15 +30,15 @@ export default function RecipesPage() {
     const [formServings, setFormServings] = useState('1');
     const [formMargin, setFormMargin] = useState('30');
 
-    const { data: recipes, isLoading } = useRecipes(orgSlug, search ? { search } : undefined);
+    const { data, isLoading } = useRecipes(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createMutation = useCreateRecipe(orgSlug);
     const updateMutation = useUpdateRecipe(orgSlug);
     const deleteMutation = useDeleteRecipe(orgSlug);
 
     const mutation = editing ? updateMutation : createMutation;
 
-    const totalPages = Math.max(1, Math.ceil((recipes?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = recipes?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const paginatedItems = data?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -162,7 +162,7 @@ export default function RecipesPage() {
                                             Loading recipes...
                                         </td>
                                     </tr>
-                                ) : (recipes?.length ?? 0) === 0 ? (
+                                ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -211,7 +211,7 @@ export default function RecipesPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (recipes?.length ?? 0) > 0 && (
+                    {!isLoading && (data?.total ?? 0) > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

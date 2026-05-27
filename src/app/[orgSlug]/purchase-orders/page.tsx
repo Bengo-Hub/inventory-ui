@@ -57,7 +57,8 @@ export default function PurchaseOrdersPage() {
     const [poNotes, setPoNotes] = useState('');
     const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
 
-    const { data: suppliers } = useSuppliers(orgSlug);
+    const { data: suppliersPage } = useSuppliers(orgSlug);
+    const suppliers = suppliersPage?.data;
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: orders, isLoading } = usePurchaseOrders(orgSlug);
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');

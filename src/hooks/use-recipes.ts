@@ -10,16 +10,19 @@ import {
     type Recipe,
     type RecipePayload,
     type RecipeListParams,
+    type PaginatedRecipes,
 } from '@/lib/api/recipes';
 
 const RECIPES_KEY = 'recipes';
 
+const EMPTY_RECIPES: PaginatedRecipes = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
+
 export function useRecipes(orgSlug: string, params?: RecipeListParams) {
-    return useQuery<Recipe[]>({
+    return useQuery<PaginatedRecipes>({
         queryKey: [RECIPES_KEY, orgSlug, params],
         queryFn: () => fetchRecipes(orgSlug, params),
         enabled: !!orgSlug,
-        placeholderData: [],
+        placeholderData: EMPTY_RECIPES,
     });
 }
 

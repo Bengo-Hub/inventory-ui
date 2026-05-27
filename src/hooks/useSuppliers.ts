@@ -1,16 +1,18 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { suppliersApi, type CreateSupplierInput, type UpdateSupplierInput, type SupplierListParams } from '@/lib/api/suppliers';
+import { suppliersApi, type CreateSupplierInput, type UpdateSupplierInput, type SupplierListParams, type PaginatedSuppliers } from '@/lib/api/suppliers';
 
 const SUPPLIERS_KEY = 'suppliers';
 
+const EMPTY_SUPPLIERS: PaginatedSuppliers = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
+
 export function useSuppliers(orgSlug: string, params?: SupplierListParams) {
-  return useQuery({
+  return useQuery<PaginatedSuppliers>({
     queryKey: [SUPPLIERS_KEY, orgSlug, params],
     queryFn: () => suppliersApi.list(orgSlug, params),
     enabled: !!orgSlug,
-    placeholderData: [],
+    placeholderData: EMPTY_SUPPLIERS,
     staleTime: 60_000,
   });
 }

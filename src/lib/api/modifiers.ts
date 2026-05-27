@@ -36,13 +36,21 @@ export interface ModifierGroupPayload {
 export interface ModifierGroupListParams {
     search?: string;
     page?: number;
-    per_page?: number;
+    limit?: number;
+}
+
+export interface PaginatedModifierGroups {
+    data: ModifierGroup[];
+    total: number;
+    page: number;
+    limit: number;
+    hasMore: boolean;
 }
 
 /* ── API Functions ─────────────────────────────────────────────────── */
 
-export function fetchModifierGroups(orgSlug: string, params?: ModifierGroupListParams) {
-    return apiClient.get<ModifierGroup[]>(`/api/v1/${orgSlug}/inventory/modifier-groups`, params);
+export function fetchModifierGroups(orgSlug: string, params?: ModifierGroupListParams): Promise<PaginatedModifierGroups> {
+    return apiClient.get<PaginatedModifierGroups>(`/api/v1/${orgSlug}/inventory/modifier-groups`, params);
 }
 
 export function fetchModifierGroup(orgSlug: string, id: string) {

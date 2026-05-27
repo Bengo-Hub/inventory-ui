@@ -106,16 +106,8 @@ export default function CategoriesPage() {
         return result;
     }, [categories]);
 
-    const filtered = useMemo(() => {
-        if (!search) return sorted;
-        const q = search.toLowerCase();
-        return sorted.filter(
-            (c) => c.name.toLowerCase().includes(q) || (c.code ?? '').toLowerCase().includes(q),
-        );
-    }, [sorted, search]);
-
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const paginatedItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
+    const paginatedItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -257,7 +249,7 @@ export default function CategoriesPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && filtered.length > 0 && (
+                    {!isLoading && sorted.length > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

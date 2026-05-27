@@ -56,13 +56,8 @@ function StockDrawer({
     const [showAdjForm, setShowAdjForm] = useState(false);
 
     const { data: warehouses } = useWarehouses(orgSlug);
-    const { data: recentAdj } = useAdjustments(orgSlug);
+    const { data: itemAdj } = useAdjustments(orgSlug, { item_id: item.id, limit: 5 });
     const createAdj = useCreateAdjustment(orgSlug);
-
-    const itemAdj = useMemo(() =>
-        recentAdj?.filter((a) => a.item_id === item.id || a.item_name === item.item_name).slice(0, 5),
-        [recentAdj, item]
-    );
 
     const status = stockStatus(item.available, item.reorder_point);
 
