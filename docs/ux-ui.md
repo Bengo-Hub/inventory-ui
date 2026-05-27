@@ -174,4 +174,47 @@ Sidebar:
 - ARIA labels on icon-only buttons
 - Color is never the sole indicator (badges include text labels)
 - Focus rings on all focusable elements
+
+---
+
+## Batch 2 Revisions (2026-05-27)
+
+### Pattern: Side Sheet Drawer
+All detail views now open as a right-side `Sheet` (`src/components/ui/sheet.tsx`) rather than navigating to a new page. The Sheet slides in from the right with `animate-in slide-in-from-right`, closes on Escape or backdrop click, and scrolls internally.
+
+### Stock Levels (`/[tenant]/stock`)
+- Row click or `SlidersHorizontal` button opens `StockDrawer` (Sheet):
+  - Stats grid: Available / Reserved / Reorder At
+  - Toggleable inline adjustment form (Add/Remove type, item search, qty, warehouse, reason)
+  - Recent adjustments list for this item (last 5)
+- Alert banners at top for out-of-stock and low-stock counts
+
+### Stock Adjustments (`/[tenant]/adjustments`)
+- **Revamped:** Landing page is now the adjustments history table (previously on tab 2)
+- `+ New Adjustment` button opens a centered modal form (previously tab 1)
+- Both pages (stock and adjustments) share the same adjustment form logic
+
+### Stock Transfers (`/[tenant]/transfers`)
+- Modal expanded to `max-w-3xl`
+- Item search dropdown uses `fixedDropdown` prop to escape `overflow:hidden` modal boundaries
+- Available qty shown below each item row to inform transfer quantities
+
+### Lots & Batches (`/[tenant]/lots`)
+- Supplier Reference field replaced with searchable `SupplierRefCombobox` (searches `/inventory/suppliers`)
+- Helper texts added to: Lot Number, Cost Per Unit, Expiry Date, Manufacture Date
+
+### Units (`/[tenant]/units`)
+- Eye icon button (per row) opens `UnitDrawer` (Sheet):
+  - Abbreviation and type label (Weight/Volume/Count/Length/Area/Other)
+  - List of items using this unit (fetched via `?unit_id=`)
+- Type column now shows human-readable label; item count from backend `item_count` field
+
+### Categories (`/[tenant]/categories`)
+- Create/Edit modal has "Parent Category" select dropdown (prevents circular refs)
+- Table shows "Parent" column (root categories show "Root")
+- Categories sorted hierarchically: roots first, children nested below with `└─` prefix
+
+### Catalog / Items (`/[tenant]/catalog`)
+- Category filter pills are now dynamic (from `useCategories()`) instead of hardcoded
+- Filter passes `category_id` to backend for server-side filtering
 - Minimum contrast ratio: 4.5:1
