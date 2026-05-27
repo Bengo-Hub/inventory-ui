@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { useTransfers, useCreateTransfer } from '@/hooks/useTransfers';
+import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
@@ -46,10 +47,10 @@ export default function TransfersPage() {
     const createTransfer = useCreateTransfer(orgSlug);
 
     const filtered = search
-        ? transfers?.filter((t) =>
-            (t.from_warehouse_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-            (t.to_warehouse_name ?? '').toLowerCase().includes(search.toLowerCase()) ||
-            t.reference.toLowerCase().includes(search.toLowerCase())
+        ? transfers?.filter((t: TransferSummary) =>
+            t.source_warehouse_name.toLowerCase().includes(search.toLowerCase()) ||
+            t.destination_warehouse_name.toLowerCase().includes(search.toLowerCase()) ||
+            t.transfer_number.toLowerCase().includes(search.toLowerCase())
           )
         : transfers;
 
@@ -170,11 +171,11 @@ export default function TransfersPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedItems.map((transfer) => (
+                                    paginatedItems.map((transfer: TransferSummary) => (
                                         <tr key={transfer.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-xs">{transfer.reference}</td>
-                                            <td className="px-6 py-4">{transfer.from_warehouse_name ?? '—'}</td>
-                                            <td className="px-6 py-4">{transfer.to_warehouse_name ?? '—'}</td>
+                                            <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
+                                            <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
+                                            <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
                                             <td className="px-6 py-4">
                                                 <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
                                                     {STATUS_LABEL[transfer.status] ?? transfer.status}
@@ -183,7 +184,7 @@ export default function TransfersPage() {
                                             <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
                                                 <div className="flex items-center justify-end gap-1 text-muted-foreground">
                                                     <Package className="h-3 w-3" />
-                                                    {transfer.items.length}
+                                                    {transfer.line_count}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">

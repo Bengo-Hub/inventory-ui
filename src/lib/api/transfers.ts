@@ -2,6 +2,18 @@ import { apiClient } from './client';
 
 export type TransferStatus = 'draft' | 'pending' | 'in_transit' | 'received' | 'cancelled';
 
+export interface TransferSummary {
+  id: string;
+  transfer_number: string;
+  status: TransferStatus;
+  source_warehouse_name: string;
+  destination_warehouse_name: string;
+  line_count: number;
+  shipped_at?: string;
+  received_at?: string;
+  created_at: string;
+}
+
 export interface TransferItem {
   id: string;
   item_id: string;
@@ -40,8 +52,10 @@ export interface TransferListParams {
 }
 
 export const transfersApi = {
-  list: (orgSlug: string, params?: TransferListParams) =>
-    apiClient.get<Transfer[]>(`/api/v1/${orgSlug}/inventory/transfers`, params),
+  list: async (orgSlug: string, params?: TransferListParams): Promise<TransferSummary[]> => {
+    const res = await apiClient.get<{ items: TransferSummary[]; total: number }>(`/api/v1/${orgSlug}/inventory/transfers`, params);
+    return res.items ?? [];
+  },
 
   get: (orgSlug: string, id: string) =>
     apiClient.get<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}`),

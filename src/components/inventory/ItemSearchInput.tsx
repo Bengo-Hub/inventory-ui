@@ -27,7 +27,10 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
 
   const { data: results } = useQuery<ItemResult[]>({
     queryKey: ['item-search', orgSlug, query],
-    queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items`, { search: query }),
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(`/api/v1/${orgSlug}/inventory/items`, { search: query });
+      return Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
+    },
     enabled: !!orgSlug && query.length >= 2,
     placeholderData: [],
     staleTime: 30_000,

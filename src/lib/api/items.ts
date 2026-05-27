@@ -50,8 +50,10 @@ function itemsBase(orgSlug: string) {
 }
 
 export const itemsApi = {
-  list: (orgSlug: string, params?: { type?: string; search?: string }) =>
-    apiClient.get<Item[]>(itemsBase(orgSlug), params),
+  list: async (orgSlug: string, params?: { type?: string; search?: string }): Promise<Item[]> => {
+    const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(itemsBase(orgSlug), params);
+    return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
+  },
 
   get: (orgSlug: string, sku: string) =>
     apiClient.get<Item>(`${itemsBase(orgSlug)}/${sku}`),

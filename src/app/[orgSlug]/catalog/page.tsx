@@ -19,11 +19,9 @@ interface StockItem {
     id: string;
     sku: string;
     name: string;
-    category: string;
-    quantity: number;
-    unit: string;
-    reorderPoint: number;
-    status: 'in_stock' | 'low_stock' | 'out_of_stock';
+    category_name?: string;
+    type: string;
+    is_active: boolean;
 }
 
 const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error'> = {
@@ -82,11 +80,12 @@ export default function CatalogPage() {
 
     const { data: items, isLoading } = useQuery<StockItem[]>({
         queryKey: ['catalog', orgSlug, search, category],
-        queryFn: () => {
-            const params: Record<string, string> = {};
-            if (search) params.search = search;
-            if (category !== 'All') params.category = category;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/items`, params);
+        queryFn: async () => {
+            const p: Record<string, string> = {};
+            if (search) p.search = search;
+            if (category !== 'All') p.category = category;
+            const res = await apiClient.get<{ data: StockItem[]; total: number } | StockItem[]>(`/api/v1/${orgSlug}/inventory/items`, p);
+            return Array.isArray(res) ? res : (res as { data: StockItem[] }).data ?? [];
         },
         placeholderData: [],
     });
@@ -163,8 +162,8 @@ export default function CatalogPage() {
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">SKU</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Category</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Unit</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Type</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Kind</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                                 </tr>
                             </thead>
@@ -194,12 +193,12 @@ export default function CatalogPage() {
                                                     {item.name}
                                                 </Link>
                                             </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{item.category}</td>
-                                            <td className="px-6 py-4 text-right font-semibold tabular-nums">{item.quantity.toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell">{item.unit}</td>
+                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{item.category_name ?? '—'}</td>
+                                            <td className="px-6 py-4 text-right font-semibold tabular-nums capitalize">{item.type?.toLowerCase() ?? '—'}</td>
+                                            <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell capitalize">{item.type?.toLowerCase() ?? '—'}</td>
                                             <td className="px-6 py-4">
-                                                <Badge variant={STATUS_VARIANT[item.status] ?? 'default'}>
-                                                    {STATUS_LABEL[item.status] ?? item.status}
+                                                <Badge variant={item.is_active ? 'success' : 'outline'}>
+                                                    {item.is_active ? 'Active' : 'Inactive'}
                                                 </Badge>
                                             </td>
                                         </tr>

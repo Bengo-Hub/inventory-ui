@@ -2,15 +2,14 @@ import { apiClient } from './client';
 
 export interface StockLevel {
   id: string;
-  itemName: string;
-  itemSku: string;
-  warehouseId: string;
-  warehouseName: string;
-  quantity: number;
-  reservedQty: number;
-  availableQty: number;
-  reorderLevel?: number;
-  updatedAt: string;
+  item_name: string;
+  sku: string;
+  warehouse_id: string;
+  warehouse_name: string;
+  available: number;
+  reserved: number;
+  reorder_point?: number;
+  unit?: string;
 }
 
 export interface StockAdjustment {
@@ -28,13 +27,12 @@ export interface StockAdjustment {
 }
 
 export interface CreateAdjustmentInput {
-  item_id: string;
-  warehouse_id: string;
-  adjustment_type: 'add' | 'remove' | 'set';
-  quantity: number;
+  sku: string;
+  adjustment: number;
   reason: string;
-  note?: string;
-  lot_id?: string;
+  reference?: string;
+  notes?: string;
+  warehouse_id?: string;
 }
 
 export interface StockListParams {

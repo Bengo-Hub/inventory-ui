@@ -61,13 +61,16 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
 
   const { data: categories } = useQuery<Category[]>({
     queryKey: ['categories', orgSlug],
-    queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/categories`),
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`);
+      return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
+    },
     placeholderData: [],
   });
 
   const { data: units } = useQuery<Unit[]>({
     queryKey: ['units', orgSlug],
-    queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/units`),
+    queryFn: () => apiClient.get<Unit[]>(`/api/v1/${orgSlug}/inventory/units`),
     placeholderData: [],
   });
 

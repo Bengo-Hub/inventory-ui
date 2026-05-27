@@ -1,12 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { transfersApi, type CreateTransferInput, type TransferListParams } from '@/lib/api/transfers';
+import { transfersApi, type CreateTransferInput, type TransferListParams, type TransferSummary } from '@/lib/api/transfers';
 
 const TRANSFERS_KEY = 'transfers';
 
 export function useTransfers(orgSlug: string, params?: TransferListParams) {
-  return useQuery({
+  return useQuery<TransferSummary[]>({
     queryKey: [TRANSFERS_KEY, orgSlug, params],
     queryFn: () => transfersApi.list(orgSlug, params),
     enabled: !!orgSlug,

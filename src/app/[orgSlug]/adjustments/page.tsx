@@ -13,7 +13,7 @@ export default function AdjustmentsPage() {
     const orgSlug = params?.orgSlug as string;
 
     const [type, setType] = useState<'add' | 'remove'>('add');
-    const [itemId, setItemId] = useState('');
+    const [itemSku, setItemSku] = useState('');
     const [itemName, setItemName] = useState('');
     const [quantity, setQuantity] = useState('');
     const [reason, setReason] = useState('');
@@ -24,21 +24,20 @@ export default function AdjustmentsPage() {
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const qty = parseInt(quantity, 10);
-        if (!itemId || isNaN(qty) || qty <= 0 || !reason) {
+        if (!itemSku || isNaN(qty) || qty <= 0 || !reason) {
             toast.error('Please fill in all required fields');
             return;
         }
 
         mutation.mutate({
-            item_id: itemId,
-            adjustment_type: type,
-            quantity: qty,
+            sku: itemSku,
+            adjustment: type === 'add' ? qty : -qty,
             reason,
-            warehouse_id: warehouseId || '',
+            warehouse_id: warehouseId || undefined,
         }, {
             onSuccess: () => {
                 toast.success('Stock adjustment recorded successfully');
-                setItemId('');
+                setItemSku('');
                 setItemName('');
                 setQuantity('');
                 setReason('');
@@ -90,7 +89,7 @@ export default function AdjustmentsPage() {
                             label="Item *"
                             placeholder="Search by name or SKU..."
                             onSelect={(item) => {
-                                setItemId(item.id);
+                                setItemSku(item.sku);
                                 setItemName(item.name);
                             }}
                         />

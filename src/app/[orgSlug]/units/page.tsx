@@ -15,8 +15,9 @@ interface Unit {
     id: string;
     name: string;
     abbreviation: string;
-    type: string;
-    itemCount: number;
+    type?: string;
+    itemCount?: number;
+    is_active?: boolean;
 }
 
 interface UnitPayload {
@@ -94,7 +95,7 @@ export default function UnitsPage() {
         setEditing(unit);
         setFormName(unit.name);
         setFormAbbreviation(unit.abbreviation);
-        setFormType(unit.type);
+        setFormType(unit.type ?? '');
         setDialogOpen(true);
     }
 
@@ -177,23 +178,18 @@ export default function UnitsPage() {
                                                 {unit.type || <span className="text-muted-foreground/40">—</span>}
                                             </td>
                                             <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                {unit.itemCount.toLocaleString()}
+                                                {(unit.itemCount ?? 0).toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(unit)}>
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDelete(unit)}
-                                                        disabled={deleteMutation.isPending}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-destructive hover:text-destructive"
+                                                    onClick={() => handleDelete(unit)}
+                                                    disabled={deleteMutation.isPending}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
                                             </td>
                                         </tr>
                                     ))
@@ -214,9 +210,7 @@ export default function UnitsPage() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-semibold">
-                                        {editing ? 'Edit Unit' : 'Add Unit'}
-                                    </h2>
+                                    <h2 className="text-lg font-semibold">Add Unit</h2>
                                     <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
                                         <X className="h-5 w-5 text-muted-foreground" />
                                     </button>
@@ -265,7 +259,7 @@ export default function UnitsPage() {
                                             Cancel
                                         </Button>
                                         <Button type="submit" className="flex-1" disabled={mutation.isPending}>
-                                            {mutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
+                                            {mutation.isPending ? 'Saving...' : 'Create'}
                                         </Button>
                                     </div>
                                 </form>

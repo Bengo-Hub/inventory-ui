@@ -9,15 +9,15 @@ import { useMemo, useState } from 'react';
 
 const ITEMS_PER_PAGE = 25;
 
-function stockStatus(available: number, reorderLevel?: number): 'success' | 'warning' | 'error' | 'outline' {
+function stockStatus(available: number, reorderPoint?: number): 'success' | 'warning' | 'error' | 'outline' {
     if (available <= 0) return 'error';
-    if (reorderLevel != null && available <= reorderLevel) return 'warning';
+    if (reorderPoint != null && available <= reorderPoint) return 'warning';
     return 'success';
 }
 
-function stockLabel(available: number, reorderLevel?: number): string {
+function stockLabel(available: number, reorderPoint?: number): string {
     if (available <= 0) return 'Out of Stock';
-    if (reorderLevel != null && available <= reorderLevel) return 'Low Stock';
+    if (reorderPoint != null && available <= reorderPoint) return 'Low Stock';
     return 'In Stock';
 }
 
@@ -32,8 +32,8 @@ export default function StockPage() {
     const totalPages = Math.max(1, Math.ceil((stock?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = stock?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
-    const lowStockCount = stock?.filter((s) => s.reorderLevel != null && s.availableQty <= s.reorderLevel && s.availableQty > 0).length ?? 0;
-    const outOfStockCount = stock?.filter((s) => s.availableQty <= 0).length ?? 0;
+    const lowStockCount = stock?.filter((s) => s.reorder_point != null && s.available <= s.reorder_point && s.available > 0).length ?? 0;
+    const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -104,29 +104,29 @@ export default function StockPage() {
                                     </tr>
                                 ) : (
                                     paginatedItems.map((item) => {
-                                        const status = stockStatus(item.availableQty, item.reorderLevel);
+                                        const status = stockStatus(item.available, item.reorder_point);
                                         return (
                                             <tr
                                                 key={item.id}
                                                 className={`hover:bg-accent/30 transition-colors ${
-                                                    item.availableQty <= 0 ? 'bg-red-500/5' :
-                                                    (item.reorderLevel != null && item.availableQty <= item.reorderLevel) ? 'bg-yellow-500/5' : ''
+                                                    item.available <= 0 ? 'bg-red-500/5' :
+                                                    (item.reorder_point != null && item.available <= item.reorder_point) ? 'bg-yellow-500/5' : ''
                                                 }`}
                                             >
-                                                <td className="px-6 py-4 font-medium">{item.itemName}</td>
-                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.itemSku}</td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">{item.warehouseName}</td>
+                                                <td className="px-6 py-4 font-medium">{item.item_name}</td>
+                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.sku}</td>
+                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">{item.warehouse_name}</td>
                                                 <td className="px-6 py-4 text-right font-semibold tabular-nums">
-                                                    {item.availableQty.toLocaleString()}
+                                                    {item.available.toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                    {item.reservedQty.toLocaleString()}
+                                                    {item.reserved.toLocaleString()}
                                                 </td>
                                                 <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden md:table-cell">
-                                                    {item.reorderLevel != null ? item.reorderLevel.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
+                                                    {item.reorder_point != null ? item.reorder_point.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <Badge variant={status}>{stockLabel(item.availableQty, item.reorderLevel)}</Badge>
+                                                    <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
                                                 </td>
                                             </tr>
                                         );

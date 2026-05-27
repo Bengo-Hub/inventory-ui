@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { Pencil, Plus, Search, Tag, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -14,17 +14,16 @@ const ITEMS_PER_PAGE = 20;
 interface Category {
     id: string;
     name: string;
-    slug: string;
-    parentId: string | null;
-    parentName: string | null;
-    depth: number;
-    itemCount: number;
+    code?: string;
+    description?: string;
+    icon?: string;
+    is_active: boolean;
 }
 
 interface CategoryPayload {
     name: string;
-    slug: string;
-    parentId: string | null;
+    code: string;
+    description: string;
 }
 
 export default function CategoriesPage() {
@@ -37,15 +36,16 @@ export default function CategoriesPage() {
     const [editing, setEditing] = useState<Category | null>(null);
 
     const [formName, setFormName] = useState('');
-    const [formSlug, setFormSlug] = useState('');
-    const [formParentId, setFormParentId] = useState('');
+    const [formCode, setFormCode] = useState('');
+    const [formDescription, setFormDescription] = useState('');
 
     const { data: categories, isLoading } = useQuery<Category[]>({
         queryKey: ['categories', orgSlug, search],
-        queryFn: () => {
+        queryFn: async () => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/categories`, p);
+            const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`, p);
+            return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
         },
         placeholderData: [],
     });
@@ -84,23 +84,19 @@ export default function CategoriesPage() {
 
     useMemo(() => { setPage(1); }, [search]);
 
-    function slugify(value: string) {
-        return value.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    }
-
     function openCreate() {
         setEditing(null);
         setFormName('');
-        setFormSlug('');
-        setFormParentId('');
+        setFormCode('');
+        setFormDescription('');
         setDialogOpen(true);
     }
 
     function openEdit(cat: Category) {
         setEditing(cat);
         setFormName(cat.name);
-        setFormSlug(cat.slug);
-        setFormParentId(cat.parentId ?? '');
+        setFormCode(cat.code ?? '');
+        setFormDescription(cat.description ?? '');
         setDialogOpen(true);
     }
 
@@ -112,13 +108,13 @@ export default function CategoriesPage() {
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!formName.trim()) {
-            toast.error('Category name is required');
+            toast.error('Name is required');
             return;
         }
         mutation.mutate({
             name: formName.trim(),
-            slug: formSlug.trim() || slugify(formName.trim()),
-            parentId: formParentId || null,
+            code: formCode.trim(),
+            description: formDescription.trim(),
         });
     }
 
@@ -127,7 +123,7 @@ export default function CategoriesPage() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
-                    <p className="text-muted-foreground mt-1">Organize items into a hierarchy of categories</p>
+                    <p className="text-muted-foreground mt-1">Organise items into categories for easy filtering</p>
                 </div>
                 <Button onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -153,53 +149,50 @@ export default function CategoriesPage() {
                             <thead>
                                 <tr className="border-b border-border bg-muted/30">
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Slug</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Parent</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Depth</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Items</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Code</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Description</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Status</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading categories...
                                         </td>
                                     </tr>
                                 ) : (categories?.length ?? 0) === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                        <td colSpan={5} className="px-6 py-12 text-center">
                                             <Tag className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No categories yet</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Create categories to organize your items</p>
+                                            <p className="text-muted-foreground">No categories defined yet</p>
+                                            <p className="text-xs text-muted-foreground/70 mt-1">Add categories to organise your inventory items</p>
                                         </td>
                                     </tr>
                                 ) : (
                                     paginatedItems.map((cat) => (
                                         <tr key={cat.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-medium">
-                                                <div className="flex items-center gap-2">
-                                                    {cat.depth > 0 && (
-                                                        <span className="text-muted-foreground/50">{'└'.padStart(cat.depth * 2)}</span>
-                                                    )}
-                                                    {cat.name}
-                                                </div>
+                                            <td className="px-6 py-4 font-medium">{cat.name}</td>
+                                            <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">
+                                                {cat.code ?? <span className="text-muted-foreground/40">—</span>}
                                             </td>
-                                            <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{cat.slug}</td>
                                             <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
-                                                {cat.parentName ?? <span className="text-muted-foreground/40">—</span>}
+                                                {cat.description ?? <span className="text-muted-foreground/40">—</span>}
                                             </td>
                                             <td className="px-6 py-4 text-right hidden sm:table-cell">
-                                                <Badge variant="outline">{cat.depth}</Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                {cat.itemCount.toLocaleString()}
+                                                <Badge variant={cat.is_active ? 'success' : 'outline'}>
+                                                    {cat.is_active ? 'Active' : 'Inactive'}
+                                                </Badge>
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(cat)}>
-                                                        Edit
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openEdit(cat)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
                                                     </Button>
                                                     <Button
                                                         variant="ghost"
@@ -231,9 +224,7 @@ export default function CategoriesPage() {
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center justify-between">
-                                    <h2 className="text-lg font-semibold">
-                                        {editing ? 'Edit Category' : 'Add Category'}
-                                    </h2>
+                                    <h2 className="text-lg font-semibold">{editing ? 'Edit Category' : 'Add Category'}</h2>
                                     <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
                                         <X className="h-5 w-5 text-muted-foreground" />
                                     </button>
@@ -241,38 +232,34 @@ export default function CategoriesPage() {
                             </CardHeader>
                             <CardContent>
                                 <form onSubmit={handleSubmit} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Name *</label>
-                                        <Input
-                                            placeholder="e.g. Beverages"
-                                            value={formName}
-                                            onChange={(e) => {
-                                                setFormName(e.target.value);
-                                                if (!editing) setFormSlug(slugify(e.target.value));
-                                            }}
-                                            required
-                                        />
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Name *</label>
+                                            <Input
+                                                placeholder="e.g. Beverages"
+                                                value={formName}
+                                                onChange={(e) => setFormName(e.target.value)}
+                                                required
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Code</label>
+                                            <Input
+                                                placeholder="e.g. BEV"
+                                                value={formCode}
+                                                onChange={(e) => setFormCode(e.target.value)}
+                                            />
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Slug</label>
-                                        <Input
-                                            placeholder="auto-generated from name"
-                                            value={formSlug}
-                                            onChange={(e) => setFormSlug(slugify(e.target.value))}
+                                        <label className="text-sm font-medium">Description</label>
+                                        <textarea
+                                            placeholder="Optional description..."
+                                            value={formDescription}
+                                            onChange={(e) => setFormDescription(e.target.value)}
+                                            rows={3}
+                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
                                         />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Parent Category</label>
-                                        <select
-                                            value={formParentId}
-                                            onChange={(e) => setFormParentId(e.target.value)}
-                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                        >
-                                            <option value="">None (top-level)</option>
-                                            {categories?.filter((c) => c.id !== editing?.id).map((c) => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
                                     </div>
                                     <div className="flex gap-3 pt-2">
                                         <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>
