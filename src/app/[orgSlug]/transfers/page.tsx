@@ -149,7 +149,7 @@ export default function TransfersPage() {
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
     const [note, setNote] = useState('');
-    const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string }[]>([
+    const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string; availableQty?: number }[]>([
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
@@ -174,7 +174,7 @@ export default function TransfersPage() {
         setFromWarehouse('');
         setToWarehouse('');
         setNote('');
-        setTransferItems([{ itemId: '', itemName: '', quantity: '' }]);
+        setTransferItems([{ itemId: '', itemName: '', quantity: '', availableQty: undefined }]);
         setDialogOpen(true);
     }
 
@@ -335,11 +335,11 @@ export default function TransfersPage() {
             </Card>
 
             {dialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closeDialog} />
-                    <div className="relative z-50 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-                        <Card>
-                            <CardHeader>
+                    <div className="relative z-50 w-full max-w-3xl max-h-[90vh] flex flex-col">
+                        <Card className="flex flex-col overflow-hidden max-h-[90vh]">
+                            <CardHeader className="shrink-0">
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-lg font-semibold">New Stock Transfer</h2>
                                     <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
@@ -347,7 +347,7 @@ export default function TransfersPage() {
                                     </button>
                                 </div>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="overflow-y-auto flex-1">
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
@@ -372,7 +372,7 @@ export default function TransfersPage() {
                                                 className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                                 required
                                             >
-                                                <option value="">Select dest...</option>
+                                                <option value="">Select destination...</option>
                                                 {warehouses?.map((wh) => (
                                                     <option key={wh.id} value={wh.id}>{wh.name}</option>
                                                 ))}
@@ -391,41 +391,60 @@ export default function TransfersPage() {
 
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-sm font-medium">Items *</label>
+                                            <div>
+                                                <label className="text-sm font-medium">Items *</label>
+                                                <p className="text-xs text-muted-foreground mt-0.5">Search and select items to transfer, then enter quantities</p>
+                                            </div>
                                             <Button type="button" variant="ghost" size="sm" onClick={addItem}>
                                                 <Plus className="h-3 w-3 mr-1" />
                                                 Add Item
                                             </Button>
                                         </div>
                                         {transferItems.map((item, idx) => (
-                                            <div key={idx} className="flex gap-2 items-end">
-                                                <div className="flex-1">
-                                                    <ItemSearchInput
-                                                        orgSlug={orgSlug}
-                                                        value={item.itemName}
-                                                        placeholder="Search item..."
-                                                        onSelect={(found) => {
-                                                            updateItem(idx, 'itemId', found.id);
-                                                            updateItem(idx, 'itemName', found.name);
-                                                        }}
-                                                    />
+                                            <div key={idx} className="space-y-1">
+                                                <div className="flex gap-2 items-start">
+                                                    <div className="flex-1">
+                                                        <ItemSearchInput
+                                                            orgSlug={orgSlug}
+                                                            value={item.itemName}
+                                                            placeholder="Search item by name or SKU..."
+                                                            fixedDropdown
+                                                            onSelect={(found) => {
+                                                                const updated = [...transferItems];
+                                                                updated[idx] = {
+                                                                    ...updated[idx],
+                                                                    itemId: found.id,
+                                                                    itemName: found.name,
+                                                                    availableQty: found.available,
+                                                                };
+                                                                setTransferItems(updated);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2 w-28 shrink-0">
+                                                        <label className="text-sm font-medium">Qty</label>
+                                                        <Input
+                                                            type="number"
+                                                            placeholder="0"
+                                                            min="1"
+                                                            value={item.quantity}
+                                                            onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
+                                                        />
+                                                    </div>
+                                                    {transferItems.length > 1 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeItem(idx)}
+                                                            className="p-1 rounded hover:bg-accent text-muted-foreground mt-7"
+                                                        >
+                                                            <X className="h-4 w-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
-                                                <Input
-                                                    type="number"
-                                                    placeholder="Qty"
-                                                    min="1"
-                                                    value={item.quantity}
-                                                    onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
-                                                    className="w-24"
-                                                />
-                                                {transferItems.length > 1 && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => removeItem(idx)}
-                                                        className="p-1 rounded hover:bg-accent text-muted-foreground mb-0.5"
-                                                    >
-                                                        <X className="h-4 w-4" />
-                                                    </button>
+                                                {item.availableQty !== undefined && (
+                                                    <p className="text-xs text-muted-foreground pl-1">
+                                                        Available in source warehouse: <span className="font-semibold text-foreground">{item.availableQty.toLocaleString()}</span>
+                                                    </p>
                                                 )}
                                             </div>
                                         ))}

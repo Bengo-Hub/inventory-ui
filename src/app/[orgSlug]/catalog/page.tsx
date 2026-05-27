@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
 import { useCreateItem, useItems } from '@/hooks/useItems';
+import { useCategories } from '@/hooks/useCategories';
 import { type CreateItemInput } from '@/lib/api/items';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
@@ -36,19 +37,18 @@ const STATUS_LABEL: Record<string, string> = {
     out_of_stock: 'Out of Stock',
 };
 
-const CATEGORIES = ['All', 'Raw Materials', 'Finished Goods', 'Packaging', 'Supplies', 'Equipment'];
-
 export default function CatalogPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const queryClient = useQueryClient();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [search, setSearch] = useState('');
-    const [category, setCategory] = useState('All');
+    const [categoryId, setCategoryId] = useState('');
     const [page, setPage] = useState(1);
     const [createOpen, setCreateOpen] = useState(false);
 
     const createItem = useCreateItem(orgSlug);
+    const { data: categories } = useCategories(orgSlug);
 
     const importMutation = useMutation({
         mutationFn: (file: File) => {
@@ -80,7 +80,7 @@ export default function CatalogPage() {
 
     const { data: itemsPage, isLoading } = useItems(orgSlug, {
         ...(search ? { search } : {}),
-        ...(category !== 'All' ? { type: category } : {}),
+        ...(categoryId ? { category_id: categoryId } : {}),
         page,
         limit: ITEMS_PER_PAGE,
     });
@@ -133,14 +133,21 @@ export default function CatalogPage() {
                         </div>
                         <div className="flex items-center gap-2 flex-wrap">
                             <Filter className="h-4 w-4 text-muted-foreground" />
-                            {CATEGORIES.map((cat) => (
+                            <Button
+                                variant={categoryId === '' ? 'primary' : 'outline'}
+                                size="sm"
+                                onClick={() => { setCategoryId(''); setPage(1); }}
+                            >
+                                All
+                            </Button>
+                            {(categories ?? []).map((cat) => (
                                 <Button
-                                    key={cat}
-                                    variant={category === cat ? 'primary' : 'outline'}
+                                    key={cat.id}
+                                    variant={categoryId === cat.id ? 'primary' : 'outline'}
                                     size="sm"
-                                    onClick={() => { setCategory(cat); setPage(1); }}
+                                    onClick={() => { setCategoryId(cat.id); setPage(1); }}
                                 >
-                                    {cat}
+                                    {cat.name}
                                 </Button>
                             ))}
                         </div>

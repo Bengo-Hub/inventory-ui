@@ -5,14 +5,91 @@ import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLots';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useSuppliers } from '@/hooks/useSuppliers';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
-import { AlertTriangle, Layers, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
+
+function SupplierRefCombobox({
+    orgSlug,
+    value,
+    onChange,
+}: {
+    orgSlug: string;
+    value: string;
+    onChange: (v: string) => void;
+}) {
+    const [query, setQuery] = useState('');
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    const { data: suppliers } = useSuppliers(orgSlug);
+
+    const filtered = useMemo(() => {
+        if (query.length < 2) return [];
+        const q = query.toLowerCase();
+        return (suppliers ?? []).filter((s) =>
+            s.name.toLowerCase().includes(q) ||
+            (s.email ?? '').toLowerCase().includes(q) ||
+            (s.phone ?? '').toLowerCase().includes(q)
+        ).slice(0, 8);
+    }, [suppliers, query]);
+
+    useEffect(() => {
+        function handler(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        }
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    return (
+        <div className="relative" ref={ref}>
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                    value={query || value}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        onChange(e.target.value);
+                        setOpen(true);
+                    }}
+                    onFocus={() => setOpen(true)}
+                    placeholder="Search supplier or type PO / invoice number..."
+                    className="pl-10 pr-8"
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            </div>
+            {open && filtered.length > 0 && (
+                <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
+                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/30 border-b border-border">
+                        Suppliers
+                    </div>
+                    {filtered.map((s) => (
+                        <button
+                            key={s.id}
+                            type="button"
+                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+                            onMouseDown={() => {
+                                onChange(s.name);
+                                setQuery('');
+                                setOpen(false);
+                            }}
+                        >
+                            <span className="font-medium">{s.name}</span>
+                            {s.phone && <span className="ml-2 text-xs text-muted-foreground">{s.phone}</span>}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+}
 
 function isExpiringSoon(expiryDate?: string): boolean {
     if (!expiryDate) return false;
@@ -55,6 +132,7 @@ export default function LotsPage() {
 
     const { data: lots, isLoading } = useLots(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
+    useSuppliers(orgSlug); // preload suppliers for combobox
     const createLot = useCreateLot(orgSlug);
     const updateLot = useUpdateLot(orgSlug);
     const deleteLot = useDeleteLot(orgSlug);
@@ -330,14 +408,15 @@ export default function LotsPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Lot Number *</label>
-                                            <div className="flex gap-2">
-                                                <Input
-                                                    value={formLotNumber}
-                                                    onChange={(e) => setFormLotNumber(e.target.value)}
-                                                    required
-                                                    readOnly={!!editing}
-                                                />
-                                            </div>
+                                            <Input
+                                                value={formLotNumber}
+                                                onChange={(e) => setFormLotNumber(e.target.value)}
+                                                required
+                                                readOnly={!!editing}
+                                            />
+                                            {!editing && (
+                                                <p className="text-xs text-muted-foreground">Auto-generated. Edit only if you have a supplier-assigned batch number.</p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Warehouse *</label>
@@ -377,6 +456,7 @@ export default function LotsPage() {
                                                 value={formCostPerUnit}
                                                 onChange={(e) => setFormCostPerUnit(e.target.value)}
                                             />
+                                            <p className="text-xs text-muted-foreground">Used for COGS tracking. Leave 0 if unknown.</p>
                                         </div>
                                     </div>
 
@@ -388,6 +468,7 @@ export default function LotsPage() {
                                                 value={formExpiryDate}
                                                 onChange={(e) => setFormExpiryDate(e.target.value)}
                                             />
+                                            <p className="text-xs text-muted-foreground">Leave blank for non-perishable items.</p>
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Manufacture Date</label>
@@ -396,16 +477,18 @@ export default function LotsPage() {
                                                 value={formMfgDate}
                                                 onChange={(e) => setFormMfgDate(e.target.value)}
                                             />
+                                            <p className="text-xs text-muted-foreground">Optional. Used for traceability reporting.</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Supplier Reference</label>
-                                        <Input
-                                            placeholder="e.g. PO-2025-001 or invoice number"
+                                        <label className="text-sm font-medium">Supplier / Reference</label>
+                                        <SupplierRefCombobox
+                                            orgSlug={orgSlug}
                                             value={formSupplierRef}
-                                            onChange={(e) => setFormSupplierRef(e.target.value)}
+                                            onChange={setFormSupplierRef}
                                         />
+                                        <p className="text-xs text-muted-foreground">Search a supplier or type a PO number / invoice reference manually.</p>
                                     </div>
 
                                     <div className="space-y-2">

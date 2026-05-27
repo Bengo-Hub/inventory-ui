@@ -47,21 +47,21 @@ export interface RecipeListParams {
 /* ── API Functions ─────────────────────────────────────────────────── */
 
 export function fetchRecipes(orgSlug: string, params?: RecipeListParams) {
-    return apiClient.get<Recipe[]>(`/api/v1/tenants/${orgSlug}/inventory/recipes`, params);
+    return apiClient.get<Recipe[]>(`/api/v1/${orgSlug}/inventory/recipes`, params);
 }
 
 export function fetchRecipe(orgSlug: string, id: string) {
-    return apiClient.get<Recipe>(`/api/v1/tenants/${orgSlug}/inventory/recipes/${id}`);
+    return apiClient.get<Recipe>(`/api/v1/${orgSlug}/inventory/recipes/${id}`);
 }
 
 export function createRecipe(orgSlug: string, data: RecipePayload) {
-    return apiClient.post<Recipe>(`/api/v1/tenants/${orgSlug}/inventory/recipes`, data);
+    return apiClient.post<Recipe>(`/api/v1/${orgSlug}/inventory/recipes`, data);
 }
 
 export function updateRecipe(orgSlug: string, id: string, data: RecipePayload) {
-    return apiClient.put<Recipe>(`/api/v1/tenants/${orgSlug}/inventory/recipes/${id}`, data);
+    return apiClient.put<Recipe>(`/api/v1/${orgSlug}/inventory/recipes/${id}`, data);
 }
 
 export function deleteRecipe(orgSlug: string, id: string) {
-    return apiClient.delete<void>(`/api/v1/tenants/${orgSlug}/inventory/recipes/${id}`);
+    return apiClient.delete<void>(`/api/v1/${orgSlug}/inventory/recipes/${id}`);
 }

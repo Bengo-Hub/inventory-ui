@@ -5,6 +5,7 @@ export interface Unit {
   name: string;
   abbreviation: string;
   type?: string;
+  item_count?: number;
   is_base: boolean;
   base_unit_id?: string;
   conversion_factor?: number;

@@ -2,21 +2,32 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { apiClient } from '@/lib/api/client';
+import { useItems } from '@/hooks/useItems';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
+import { Eye, Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
+const TYPE_LABELS: Record<string, string> = {
+    weight: 'Weight',
+    volume: 'Volume',
+    count: 'Count',
+    length: 'Length',
+    area: 'Area',
+    other: 'Other',
+};
+
 interface Unit {
     id: string;
     name: string;
     abbreviation: string;
     type?: string;
-    itemCount?: number;
+    item_count?: number;
     is_active?: boolean;
 }
 
@@ -24,6 +35,62 @@ interface UnitPayload {
     name: string;
     abbreviation: string;
     type: string;
+}
+
+function UnitDrawer({ unit, orgSlug, onClose }: { unit: Unit; orgSlug: string; onClose: () => void }) {
+    const { data: itemsData } = useItems(orgSlug, { unit_id: unit.id, limit: 20 });
+    const items = itemsData?.data ?? [];
+
+    return (
+        <Sheet open onClose={onClose} width="md">
+            <SheetHeader>
+                <SheetTitle>{unit.name}</SheetTitle>
+                <button type="button" onClick={onClose} className="p-1 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
+                    <X className="h-5 w-5" />
+                </button>
+            </SheetHeader>
+            <SheetContent>
+                <div className="space-y-5">
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-1">
+                            <p className="text-xs text-muted-foreground">Abbreviation</p>
+                            <p className="text-xl font-bold font-mono text-primary">{unit.abbreviation || '—'}</p>
+                        </div>
+                        <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-1">
+                            <p className="text-xs text-muted-foreground">Type</p>
+                            <p className="text-base font-semibold capitalize">{TYPE_LABELS[unit.type ?? ''] ?? (unit.type || '—')}</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="flex items-center justify-between mb-3">
+                            <h3 className="text-sm font-semibold">Items Using This Unit</h3>
+                            <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                {unit.item_count ?? items.length}
+                            </span>
+                        </div>
+                        {items.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No items linked to this unit</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {items.map((item) => (
+                                    <div key={item.sku} className="flex items-center justify-between rounded-lg border border-border p-3 bg-muted/10">
+                                        <div>
+                                            <p className="text-sm font-medium">{item.name}</p>
+                                            <p className="text-xs text-muted-foreground font-mono">{item.sku}</p>
+                                        </div>
+                                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${item.is_active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-muted text-muted-foreground'}`}>
+                                            {item.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </SheetContent>
+        </Sheet>
+    );
 }
 
 export default function UnitsPage() {
@@ -34,6 +101,7 @@ export default function UnitsPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Unit | null>(null);
+    const [viewUnit, setViewUnit] = useState<Unit | null>(null);
 
     const [formName, setFormName] = useState('');
     const [formAbbreviation, setFormAbbreviation] = useState('');
@@ -175,13 +243,21 @@ export default function UnitsPage() {
                                             <td className="px-6 py-4 font-medium">{unit.name}</td>
                                             <td className="px-6 py-4 font-mono text-xs font-semibold text-primary">{unit.abbreviation}</td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell capitalize">
-                                                {unit.type || <span className="text-muted-foreground/40">—</span>}
+                                                {TYPE_LABELS[unit.type ?? ''] ?? (unit.type || <span className="text-muted-foreground/40">—</span>)}
                                             </td>
                                             <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                {(unit.itemCount ?? 0).toLocaleString()}
+                                                {(unit.item_count ?? 0).toLocaleString()}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => setViewUnit(unit)}
+                                                        title="View details"
+                                                    >
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
@@ -211,6 +287,10 @@ export default function UnitsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {viewUnit && (
+                <UnitDrawer unit={viewUnit} orgSlug={orgSlug} onClose={() => setViewUnit(null)} />
+            )}
 
             {dialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">

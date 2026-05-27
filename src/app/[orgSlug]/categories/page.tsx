@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Pencil, Plus, Search, Tag, Trash2, X } from 'lucide-react';
+import { FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ interface Category {
     code?: string;
     description?: string;
     icon?: string;
+    parent_id?: string | null;
+    parent_name?: string | null;
     is_active: boolean;
 }
 
@@ -24,6 +26,7 @@ interface CategoryPayload {
     name: string;
     code: string;
     description: string;
+    parent_id?: string | null;
 }
 
 export default function CategoriesPage() {
@@ -38,6 +41,7 @@ export default function CategoriesPage() {
     const [formName, setFormName] = useState('');
     const [formCode, setFormCode] = useState('');
     const [formDescription, setFormDescription] = useState('');
+    const [formParentId, setFormParentId] = useState('');
 
     const { data: categories, isLoading } = useQuery<Category[]>({
         queryKey: ['categories', orgSlug, search],
@@ -79,8 +83,39 @@ export default function CategoriesPage() {
         deleteMutation.mutate(cat.id);
     }
 
-    const totalPages = Math.max(1, Math.ceil((categories?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = categories?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    // Sort: root categories first, then children nested under parents
+    const sorted = useMemo(() => {
+        if (!categories) return [];
+        const roots = categories.filter((c) => !c.parent_id);
+        const children = categories.filter((c) => !!c.parent_id);
+        const result: Array<Category & { indent?: boolean }> = [];
+        for (const root of roots) {
+            result.push(root);
+            for (const child of children) {
+                if (child.parent_id === root.id) {
+                    result.push({ ...child, indent: true });
+                }
+            }
+        }
+        // Any orphaned children (parent deleted) appended at end
+        for (const child of children) {
+            if (!result.find((r) => r.id === child.id)) {
+                result.push({ ...child, indent: true });
+            }
+        }
+        return result;
+    }, [categories]);
+
+    const filtered = useMemo(() => {
+        if (!search) return sorted;
+        const q = search.toLowerCase();
+        return sorted.filter(
+            (c) => c.name.toLowerCase().includes(q) || (c.code ?? '').toLowerCase().includes(q),
+        );
+    }, [sorted, search]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+    const paginatedItems = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -89,6 +124,7 @@ export default function CategoriesPage() {
         setFormName('');
         setFormCode('');
         setFormDescription('');
+        setFormParentId('');
         setDialogOpen(true);
     }
 
@@ -97,6 +133,7 @@ export default function CategoriesPage() {
         setFormName(cat.name);
         setFormCode(cat.code ?? '');
         setFormDescription(cat.description ?? '');
+        setFormParentId(cat.parent_id ?? '');
         setDialogOpen(true);
     }
 
@@ -115,8 +152,12 @@ export default function CategoriesPage() {
             name: formName.trim(),
             code: formCode.trim(),
             description: formDescription.trim(),
+            parent_id: formParentId || null,
         });
     }
+
+    // For parent select: exclude the category being edited (can't be its own parent)
+    const parentOptions = (categories ?? []).filter((c) => !editing || c.id !== editing.id);
 
     return (
         <div className="p-6 space-y-6">
@@ -150,7 +191,7 @@ export default function CategoriesPage() {
                                 <tr className="border-b border-border bg-muted/30">
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Code</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Description</th>
+                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Parent</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Status</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
@@ -162,10 +203,10 @@ export default function CategoriesPage() {
                                             Loading categories...
                                         </td>
                                     </tr>
-                                ) : (categories?.length ?? 0) === 0 ? (
+                                ) : paginatedItems.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center">
-                                            <Tag className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <FolderTree className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                                             <p className="text-muted-foreground">No categories defined yet</p>
                                             <p className="text-xs text-muted-foreground/70 mt-1">Add categories to organise your inventory items</p>
                                         </td>
@@ -173,12 +214,17 @@ export default function CategoriesPage() {
                                 ) : (
                                     paginatedItems.map((cat) => (
                                         <tr key={cat.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-medium">{cat.name}</td>
+                                            <td className="px-6 py-4 font-medium">
+                                                {(cat as Category & { indent?: boolean }).indent && (
+                                                    <span className="text-muted-foreground mr-2">└─</span>
+                                                )}
+                                                {cat.name}
+                                            </td>
                                             <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">
                                                 {cat.code ?? <span className="text-muted-foreground/40">—</span>}
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
-                                                {cat.description ?? <span className="text-muted-foreground/40">—</span>}
+                                                {cat.parent_name ?? <span className="text-muted-foreground/40">Root</span>}
                                             </td>
                                             <td className="px-6 py-4 text-right hidden sm:table-cell">
                                                 <Badge variant={cat.is_active ? 'success' : 'outline'}>
@@ -211,7 +257,7 @@ export default function CategoriesPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (categories?.length ?? 0) > 0 && (
+                    {!isLoading && filtered.length > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>
@@ -250,6 +296,20 @@ export default function CategoriesPage() {
                                                 onChange={(e) => setFormCode(e.target.value)}
                                             />
                                         </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Parent Category</label>
+                                        <select
+                                            value={formParentId}
+                                            onChange={(e) => setFormParentId(e.target.value)}
+                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                        >
+                                            <option value="">None (root category)</option>
+                                            {parentOptions.map((c) => (
+                                                <option key={c.id} value={c.id}>{c.name}</option>
+                                            ))}
+                                        </select>
+                                        <p className="text-xs text-muted-foreground">Optional. Assign a parent to create a subcategory.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Description</label>
