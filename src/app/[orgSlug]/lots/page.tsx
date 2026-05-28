@@ -7,6 +7,7 @@ import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLo
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -119,6 +120,7 @@ export default function LotsPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Lot | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<Lot | null>(null);
 
     const [formItemId, setFormItemId] = useState('');
     const [formItemName, setFormItemName] = useState('');
@@ -188,10 +190,14 @@ export default function LotsPage() {
     }
 
     function handleDelete(lot: Lot) {
-        if (!confirm(`Delete lot "${lot.lot_number}"? This cannot be undone.`)) return;
-        deleteLot.mutate(lot.id, {
-            onSuccess: () => toast.success('Lot deleted'),
-            onError: () => toast.error('Failed to delete lot'),
+        setPendingDelete(lot);
+    }
+
+    function executeDelete() {
+        if (!pendingDelete) return;
+        deleteLot.mutate(pendingDelete.id, {
+            onSuccess: () => { toast.success('Lot deleted'); setPendingDelete(null); },
+            onError: () => { toast.error('Failed to delete lot'); setPendingDelete(null); },
         });
     }
 
@@ -371,6 +377,16 @@ export default function LotsPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <ConfirmDialog
+                open={!!pendingDelete}
+                title="Delete Lot"
+                description={`Delete lot "${pendingDelete?.lot_number}"? This action cannot be undone.`}
+                variant="danger"
+                confirmLabel="Delete"
+                onConfirm={executeDelete}
+                onCancel={() => setPendingDelete(null)}
+            />
 
             {dialogOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">

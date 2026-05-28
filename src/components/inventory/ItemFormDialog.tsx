@@ -42,6 +42,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
   const [trackLots, setTrackLots] = useState(item?.track_lots ?? false);
+  const [isActive, setIsActive] = useState(item?.is_active !== false);
 
   useEffect(() => {
     if (item) {
@@ -58,6 +59,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
       setRequiresAge(item.requires_age_verification);
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
+      setIsActive(item.is_active !== false);
     }
   }, [item]);
 
@@ -93,6 +95,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
       requires_age_verification: requiresAge,
       is_perishable: isPerishable,
       track_lots: trackLots,
+      is_active: isActive,
     });
   }
 
