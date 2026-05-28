@@ -10,6 +10,7 @@ import { type CreateItemInput, type Item } from '@/lib/api/items';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
 import { Edit2, Eye, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { useOutletStore } from '@/store/outlet';
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -56,6 +57,14 @@ function ItemDrawer({ item, onClose, onEdit }: { item: Item; onClose: () => void
               <p className="text-xs text-muted-foreground mb-1">Cost Price</p>
               <p className="text-sm font-semibold text-primary">
                 {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(item.cost_price)}
+              </p>
+            </div>
+          )}
+          {item.suggested_price != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Suggested Price</p>
+              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(item.suggested_price)}
               </p>
             </div>
           )}
@@ -141,6 +150,7 @@ export default function CatalogPage() {
   const params = useParams();
   const orgSlug = params?.orgSlug as string;
   const queryClient = useQueryClient();
+  const { outlet } = useOutletStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [search, setSearch] = useState('');
@@ -210,7 +220,13 @@ export default function CatalogPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Stock Catalog</h1>
-            <p className="text-muted-foreground mt-1">Manage your inventory items</p>
+            <p className="text-muted-foreground mt-1">
+              {outlet ? (
+                <>Showing items for <span className="font-medium text-foreground">{outlet.name}</span></>
+              ) : (
+                'Manage your inventory items'
+              )}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />

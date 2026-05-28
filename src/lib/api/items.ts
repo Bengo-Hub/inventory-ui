@@ -21,6 +21,7 @@ export interface Item {
   reorder_level?: number;
   reorder_quantity?: number;
   cost_price?: number | null;
+  suggested_price?: number | null;
   tags?: string[];
   // Event capacity fields — SERVICE type only
   total_capacity?: number | null;
