@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
@@ -13,6 +14,16 @@ import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
+function generateSKU(name: string): string {
+    const slug = name.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return `RCP-${slug}-${Date.now().toString(36).toUpperCase()}`;
+}
+
+function formatCurrency(value?: number | null): string {
+    if (value == null || isNaN(value)) return '—';
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
+}
+
 export default function RecipesPage() {
     const params = useParams();
     const router = useRouter();
@@ -21,10 +32,11 @@ export default function RecipesPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Recipe | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Recipe | null>(null);
 
     // Form state
     const [formName, setFormName] = useState('');
-    const [formDescription, setFormDescription] = useState('');
+    const [formSKU, setFormSKU] = useState('');
     const [formItemId, setFormItemId] = useState('');
     const [formItemName, setFormItemName] = useState('');
     const [formServings, setFormServings] = useState('1');
@@ -45,7 +57,7 @@ export default function RecipesPage() {
     function openCreate() {
         setEditing(null);
         setFormName('');
-        setFormDescription('');
+        setFormSKU('');
         setFormItemId('');
         setFormItemName('');
         setFormServings('1');
@@ -56,11 +68,11 @@ export default function RecipesPage() {
     function openEdit(recipe: Recipe) {
         setEditing(recipe);
         setFormName(recipe.name);
-        setFormDescription(recipe.description);
-        setFormItemId(recipe.itemId);
-        setFormItemName(recipe.itemName ?? '');
-        setFormServings(String(recipe.servings));
-        setFormMargin(String(recipe.target_margin_percent));
+        setFormSKU(recipe.sku);
+        setFormItemId(recipe.item_id ?? '');
+        setFormItemName(recipe.item_name ?? '');
+        setFormServings(String(recipe.output_qty ?? 1));
+        setFormMargin(String(recipe.target_margin_percent ?? 30));
         setDialogOpen(true);
     }
 
@@ -75,17 +87,23 @@ export default function RecipesPage() {
             toast.error('Recipe name is required');
             return;
         }
+        const sku = formSKU.trim() || generateSKU(formName.trim());
         const payload: RecipePayload = {
+            sku,
             name: formName.trim(),
-            description: formDescription.trim(),
-            itemId: formItemId.trim(),
-            servings: Number(formServings) || 1,
-            target_margin_percent: Number(formMargin) || 0,
+            item_id: formItemId.trim() || undefined,
+            output_qty: Number(formServings) || 1,
+            unit_of_measure: 'PORTION',
+            is_active: true,
+            target_margin_percent: Number(formMargin) || null,
             ingredients: editing?.ingredients?.map((ing) => ({
                 item_id: ing.item_id,
+                item_sku: ing.item_sku,
                 quantity: ing.quantity,
                 unit_id: ing.unit_id,
+                unit_of_measure: ing.unit_of_measure ?? '',
                 waste_percent: ing.waste_percent,
+                notes: ing.notes,
             })) ?? [],
         };
 
@@ -105,16 +123,12 @@ export default function RecipesPage() {
         }
     }
 
-    function handleDelete(recipe: Recipe) {
-        if (!confirm(`Delete recipe "${recipe.name}"?`)) return;
-        deleteMutation.mutate(recipe.id, {
-            onSuccess: () => toast.success('Recipe deleted'),
-            onError: () => toast.error('Failed to delete recipe'),
+    function handleDeleteConfirm() {
+        if (!deleteTarget) return;
+        deleteMutation.mutate(deleteTarget.id, {
+            onSuccess: () => { toast.success('Recipe deleted'); setDeleteTarget(null); },
+            onError: () => { toast.error('Failed to delete recipe'); setDeleteTarget(null); },
         });
-    }
-
-    function formatCurrency(value: number) {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
     }
 
     return (
@@ -174,7 +188,7 @@ export default function RecipesPage() {
                                         <tr key={recipe.id} className="hover:bg-accent/30 transition-colors">
                                             <td className="px-6 py-4 font-medium">{recipe.name}</td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {recipe.itemName || recipe.itemId || '-'}
+                                                {recipe.item_name || recipe.sku || '—'}
                                             </td>
                                             <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
                                                 <Badge variant="outline">
@@ -200,7 +214,7 @@ export default function RecipesPage() {
                                                     <Button variant="ghost" size="sm" onClick={() => openEdit(recipe)}>
                                                         Edit
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => handleDelete(recipe)}>
+                                                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(recipe)}>
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
                                                 </div>
@@ -245,11 +259,11 @@ export default function RecipesPage() {
                                         />
                                     </div>
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Description</label>
+                                        <label className="text-sm font-medium">SKU</label>
                                         <Input
-                                            placeholder="Brief description"
-                                            value={formDescription}
-                                            onChange={(e) => setFormDescription(e.target.value)}
+                                            placeholder="Auto-generated if blank"
+                                            value={formSKU}
+                                            onChange={(e) => setFormSKU(e.target.value)}
                                         />
                                     </div>
                                     <ItemSearchInput
@@ -300,6 +314,16 @@ export default function RecipesPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                title="Delete Recipe"
+                description={`Delete recipe "${deleteTarget?.name}"? This cannot be undone.`}
+                variant="danger"
+                confirmLabel="Delete"
+                onConfirm={handleDeleteConfirm}
+                onCancel={() => setDeleteTarget(null)}
+            />
         </div>
     );
 }

@@ -22,6 +22,11 @@ function emptyRow(): IngredientRow {
     return { item_id: '', item_name: '', quantity: '', unit_id: '', waste_percent: '0' };
 }
 
+function formatCurrency(value?: number | null): string {
+    if (value == null || isNaN(value)) return '—';
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
+}
+
 export default function RecipeDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -42,7 +47,7 @@ export default function RecipeDetailPage() {
                     item_id: ing.item_id,
                     item_name: ing.item_name ?? '',
                     quantity: String(ing.quantity),
-                    unit_id: ing.unit_id,
+                    unit_id: ing.unit_id ?? '',
                     waste_percent: String(ing.waste_percent ?? 0),
                 }))
             );
@@ -74,28 +79,28 @@ export default function RecipeDetailPage() {
             .map((r) => ({
                 item_id: r.item_id,
                 quantity: Number(r.quantity),
-                unit_id: r.unit_id,
+                unit_id: r.unit_id || undefined,
                 waste_percent: Number(r.waste_percent) || 0,
+                unit_of_measure: '',
+                notes: '',
             }));
 
         updateRecipe.mutate({
             id: recipe.id,
             data: {
+                sku: recipe.sku,
                 name: recipe.name,
-                description: recipe.description,
-                itemId: recipe.itemId,
+                item_id: recipe.item_id,
+                output_qty: recipe.output_qty,
+                unit_of_measure: recipe.unit_of_measure,
+                is_active: recipe.is_active,
                 target_margin_percent: recipe.target_margin_percent,
-                servings: recipe.servings,
                 ingredients: validIngredients,
             },
         }, {
             onSuccess: () => toast.success('Recipe ingredients saved'),
             onError: () => toast.error('Failed to save ingredients'),
         });
-    }
-
-    function formatCurrency(value: number) {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
     }
 
     if (isLoading) {
@@ -127,7 +132,6 @@ export default function RecipeDetailPage() {
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">{recipe.name}</h1>
-                    {recipe.description && <p className="text-muted-foreground text-sm">{recipe.description}</p>}
                 </div>
             </div>
 
@@ -180,7 +184,7 @@ export default function RecipeDetailPage() {
                                         >
                                             <option value="">—</option>
                                             {units?.map((u) => (
-                                                <option key={u.id} value={u.id}>{u.abbreviation}</option>
+                                                <option key={u.id} value={u.id}>{u.abbreviation ?? u.name}</option>
                                             ))}
                                         </select>
                                     </div>
@@ -222,11 +226,11 @@ export default function RecipeDetailPage() {
                         <dl className="space-y-4 text-sm">
                             <div>
                                 <dt className="text-muted-foreground">Produces</dt>
-                                <dd className="font-medium mt-1">{recipe.itemName || '—'}</dd>
+                                <dd className="font-medium mt-1">{recipe.item_name || '—'}</dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground">Servings</dt>
-                                <dd className="font-medium mt-1">{recipe.servings}</dd>
+                                <dd className="font-medium mt-1">{recipe.servings ?? recipe.output_qty}</dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground">Total Cost</dt>
@@ -238,7 +242,9 @@ export default function RecipeDetailPage() {
                             </div>
                             <div className="pt-2 border-t border-border">
                                 <dt className="text-muted-foreground">Target Margin</dt>
-                                <dd className="font-medium mt-1">{recipe.target_margin_percent}%</dd>
+                                <dd className="font-medium mt-1">
+                                    {recipe.target_margin_percent != null ? `${recipe.target_margin_percent}%` : '—'}
+                                </dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground">Suggested Price</dt>

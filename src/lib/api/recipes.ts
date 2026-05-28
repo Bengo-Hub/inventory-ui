@@ -5,37 +5,46 @@ import { apiClient } from './client';
 export interface RecipeIngredient {
     id?: string;
     item_id: string;
-    item_name?: string;
+    item_sku?: string;
+    item_name: string;
     quantity: number;
-    unit_id: string;
-    unit_name?: string;
+    unit_of_measure?: string;
+    unit_id?: string;
     waste_percent: number;
-    cost?: number;
+    notes?: string;
+    display_order?: number;
 }
 
 export interface Recipe {
     id: string;
+    tenant_id?: string;
+    sku: string;
     name: string;
-    description: string;
-    itemId: string;
-    itemName?: string;
-    total_cost: number;
-    cost_per_portion: number;
-    target_margin_percent: number;
-    suggested_price: number;
+    item_name: string;
+    item_id?: string;
+    output_qty: number;
     servings: number;
+    unit_of_measure: string;
+    is_active: boolean;
+    total_cost?: number | null;
+    cost_per_portion?: number | null;
+    target_margin_percent?: number | null;
+    suggested_price?: number | null;
+    prep_time_minutes?: number | null;
+    allergens?: string[];
     ingredients: RecipeIngredient[];
-    createdAt?: string;
-    updatedAt?: string;
 }
 
 export interface RecipePayload {
+    sku: string;
     name: string;
-    description: string;
-    itemId: string;
-    target_margin_percent: number;
-    servings: number;
-    ingredients: Omit<RecipeIngredient, 'id' | 'item_name' | 'unit_name' | 'cost'>[];
+    item_id?: string;
+    output_qty: number;
+    unit_of_measure: string;
+    is_active: boolean;
+    target_margin_percent?: number | null;
+    prep_time_minutes?: number | null;
+    ingredients: Pick<RecipeIngredient, 'item_id' | 'item_sku' | 'quantity' | 'unit_of_measure' | 'unit_id' | 'waste_percent' | 'notes'>[];
 }
 
 export interface RecipeListParams {
