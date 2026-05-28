@@ -7,7 +7,7 @@ const ITEMS_KEY = 'items';
 
 const EMPTY_PAGE: PaginatedItems = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
 
-export function useItems(orgSlug: string, params?: { type?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string }) {
+export function useItems(orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string }) {
   return useQuery({
     queryKey: [ITEMS_KEY, orgSlug, params],
     queryFn: () => itemsApi.list(orgSlug, params),

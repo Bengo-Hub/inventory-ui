@@ -14,6 +14,8 @@ export interface ModifierOption {
 
 export interface ModifierGroup {
     id: string;
+    item_id: string;
+    item_name?: string;
     name: string;
     display_name: string;
     min_selections: number;
@@ -25,6 +27,7 @@ export interface ModifierGroup {
 }
 
 export interface ModifierGroupPayload {
+    item_id: string;
     name: string;
     display_name: string;
     min_selections: number;

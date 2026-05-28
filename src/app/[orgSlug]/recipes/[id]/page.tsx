@@ -13,13 +13,14 @@ import { toast } from 'sonner';
 type IngredientRow = {
     item_id: string;
     item_name: string;
+    item_cost_price: number | null;
     quantity: string;
     unit_id: string;
     waste_percent: string;
 };
 
 function emptyRow(): IngredientRow {
-    return { item_id: '', item_name: '', quantity: '', unit_id: '', waste_percent: '0' };
+    return { item_id: '', item_name: '', item_cost_price: null, quantity: '', unit_id: '', waste_percent: '0' };
 }
 
 function formatCurrency(value?: number | null): string {
@@ -46,6 +47,7 @@ export default function RecipeDetailPage() {
                 (recipe.ingredients ?? []).map((ing: RecipeIngredient) => ({
                     item_id: ing.item_id,
                     item_name: ing.item_name ?? '',
+                    item_cost_price: ing.item_cost_price ?? null,
                     quantity: String(ing.quantity),
                     unit_id: ing.unit_id ?? '',
                     waste_percent: String(ing.waste_percent ?? 0),
@@ -153,61 +155,84 @@ export default function RecipeDetailPage() {
                                     No ingredients yet. Click &quot;Add Ingredient&quot; to start.
                                 </p>
                             )}
-                            {rows.map((row, idx) => (
-                                <div key={idx} className="grid grid-cols-[1fr_80px_120px_80px_36px] gap-2 items-end">
-                                    <ItemSearchInput
-                                        orgSlug={orgSlug}
-                                        value={row.item_name}
-                                        placeholder="Search ingredient..."
-                                        onSelect={(item) => {
-                                            updateRow(idx, 'item_id', item.id);
-                                            updateRow(idx, 'item_name', item.name);
-                                        }}
-                                    />
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-muted-foreground">Qty</label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            step="0.001"
-                                            placeholder="0"
-                                            value={row.quantity}
-                                            onChange={(e) => updateRow(idx, 'quantity', e.target.value)}
-                                        />
+                            {rows.map((row, idx) => {
+                                const qty = parseFloat(row.quantity) || 0;
+                                const waste = parseFloat(row.waste_percent) || 0;
+                                const lineCost = row.item_cost_price != null
+                                    ? row.item_cost_price * qty * (1 + waste / 100)
+                                    : null;
+                                return (
+                                    <div key={idx} className="rounded-lg border border-border/50 p-3 space-y-2">
+                                        <div className="grid grid-cols-[1fr_80px_120px_80px_36px] gap-2 items-end">
+                                            <div>
+                                                <ItemSearchInput
+                                                    orgSlug={orgSlug}
+                                                    value={row.item_name}
+                                                    placeholder="Search ingredient..."
+                                                    onSelect={(item) => {
+                                                        updateRow(idx, 'item_id', item.id);
+                                                        updateRow(idx, 'item_name', item.name);
+                                                    }}
+                                                />
+                                                {row.item_cost_price != null && (
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Unit cost: {formatCurrency(row.item_cost_price)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground">Qty</label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    step="0.001"
+                                                    placeholder="0"
+                                                    value={row.quantity}
+                                                    onChange={(e) => updateRow(idx, 'quantity', e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground">Unit</label>
+                                                <select
+                                                    value={row.unit_id}
+                                                    onChange={(e) => updateRow(idx, 'unit_id', e.target.value)}
+                                                    className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                                >
+                                                    <option value="">—</option>
+                                                    {units?.map((u) => (
+                                                        <option key={u.id} value={u.id}>{u.abbreviation ?? u.name}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground">Waste %</label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    placeholder="0"
+                                                    value={row.waste_percent}
+                                                    onChange={(e) => updateRow(idx, 'waste_percent', e.target.value)}
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeRow(idx)}
+                                                className="p-2 rounded hover:bg-destructive/10 text-destructive mb-0.5"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                        {lineCost != null && (
+                                            <div className="flex justify-end">
+                                                <span className="text-xs font-medium text-muted-foreground">
+                                                    Line cost: <span className="text-foreground">{formatCurrency(lineCost)}</span>
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-muted-foreground">Unit</label>
-                                        <select
-                                            value={row.unit_id}
-                                            onChange={(e) => updateRow(idx, 'unit_id', e.target.value)}
-                                            className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                        >
-                                            <option value="">—</option>
-                                            {units?.map((u) => (
-                                                <option key={u.id} value={u.id}>{u.abbreviation ?? u.name}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-muted-foreground">Waste %</label>
-                                        <Input
-                                            type="number"
-                                            min="0"
-                                            max="100"
-                                            placeholder="0"
-                                            value={row.waste_percent}
-                                            onChange={(e) => updateRow(idx, 'waste_percent', e.target.value)}
-                                        />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => removeRow(idx)}
-                                        className="p-2 rounded hover:bg-destructive/10 text-destructive mb-0.5"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
 
                         <div className="mt-4 pt-4 border-t border-border">

@@ -51,6 +51,14 @@ function ItemDrawer({ item, onClose, onEdit }: { item: Item; onClose: () => void
               <p className="text-sm font-mono">{item.barcode}</p>
             </div>
           )}
+          {item.cost_price != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Cost Price</p>
+              <p className="text-sm font-semibold text-primary">
+                {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(item.cost_price)}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-muted-foreground mb-1">Reorder Level</p>
             <p className="text-sm font-medium">{item.reorder_level ?? '—'}</p>
@@ -137,6 +145,8 @@ export default function CatalogPage() {
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
   const [viewItem, setViewItem] = useState<Item | null>(null);
@@ -185,6 +195,8 @@ export default function CatalogPage() {
   const { data: itemsPage, isLoading } = useItems(orgSlug, {
     ...(search ? { search } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
+    ...(typeFilter ? { type: typeFilter } : {}),
+    status: statusFilter,
     page,
     limit: ITEMS_PER_PAGE,
   });
@@ -224,6 +236,40 @@ export default function CatalogPage() {
                 className="pl-10"
               />
             </div>
+            {/* Status + Type filter row */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Status tabs */}
+              <div className="flex items-center gap-1 rounded-lg border border-border p-0.5 bg-muted/30">
+                {(['active', 'inactive', 'all'] as const).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setStatusFilter(s); setPage(1); }}
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-colors capitalize ${
+                      statusFilter === s
+                        ? 'bg-background shadow-sm text-foreground'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {s === 'all' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}
+                  </button>
+                ))}
+              </div>
+              {/* Type filter */}
+              <div className="flex items-center gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+                {(['', 'GOODS', 'INGREDIENT', 'RECIPE', 'SERVICE', 'VOUCHER', 'EQUIPMENT'] as const).map((t) => (
+                  <Button
+                    key={t || 'all'}
+                    variant={typeFilter === t ? 'primary' : 'outline'}
+                    size="sm"
+                    className="shrink-0 text-xs"
+                    onClick={() => { setTypeFilter(t); setPage(1); }}
+                  >
+                    {t || 'All Types'}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
             {/* Category filter pills row */}
             <div className="flex items-center gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
               <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -274,10 +320,10 @@ export default function CatalogPage() {
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                         <p className="text-muted-foreground">No items found</p>
-                        {(search || categoryId) && (
+                        {(search || categoryId || typeFilter || statusFilter !== 'active') && (
                           <button
                             className="text-sm text-primary hover:underline mt-1"
-                            onClick={() => { setSearch(''); setCategoryId(''); setPage(1); }}
+                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setStatusFilter('active'); setPage(1); }}
                           >
                             Clear filters
                           </button>

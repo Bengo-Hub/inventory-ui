@@ -38,6 +38,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
+  const [costPrice, setCostPrice] = useState(item?.cost_price != null ? String(item.cost_price) : '');
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
   const [trackLots, setTrackLots] = useState(item?.track_lots ?? false);
@@ -53,6 +54,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
       setBarcode(item.barcode ?? '');
       setReorderLevel(String(item.reorder_level ?? ''));
       setReorderQty(String(item.reorder_quantity ?? ''));
+      setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
       setRequiresAge(item.requires_age_verification);
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
@@ -87,6 +89,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
       barcode: barcode.trim() || undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
+      cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
       requires_age_verification: requiresAge,
       is_perishable: isPerishable,
       track_lots: trackLots,
@@ -190,6 +193,21 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
                   className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
                 />
               </div>
+
+              {['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type) && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Cost Price (KES)</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Unit cost from supplier"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

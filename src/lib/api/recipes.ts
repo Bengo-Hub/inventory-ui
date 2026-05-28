@@ -7,6 +7,7 @@ export interface RecipeIngredient {
     item_id: string;
     item_sku?: string;
     item_name: string;
+    item_cost_price?: number | null;
     quantity: number;
     unit_of_measure?: string;
     unit_id?: string;

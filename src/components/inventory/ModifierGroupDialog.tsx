@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
@@ -19,13 +20,16 @@ function emptyOption(sort_order: number): OptionRow {
 }
 
 interface Props {
+    orgSlug: string;
     editing: ModifierGroup | null;
     isPending: boolean;
     onSubmit: (data: ModifierGroupPayload) => void;
     onClose: () => void;
 }
 
-export function ModifierGroupDialog({ editing, isPending, onSubmit, onClose }: Props) {
+export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onClose }: Props) {
+    const [itemId, setItemId] = useState(editing?.item_id ?? '');
+    const [itemName, setItemName] = useState(editing?.item_name ?? '');
     const [formName, setFormName] = useState(editing?.name ?? '');
     const [formDisplayName, setFormDisplayName] = useState(editing?.display_name ?? '');
     const [formMinSelections, setFormMinSelections] = useState(String(editing?.min_selections ?? 0));
@@ -60,9 +64,10 @@ export function ModifierGroupDialog({ editing, isPending, onSubmit, onClose }: P
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!formName.trim()) return;
+        if (!formName.trim() || !itemId) return;
 
         const payload: ModifierGroupPayload = {
+            item_id: itemId,
             name: formName.trim(),
             display_name: formDisplayName.trim() || formName.trim(),
             min_selections: Number(formMinSelections) || 0,
@@ -101,6 +106,33 @@ export function ModifierGroupDialog({ editing, isPending, onSubmit, onClose }: P
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-5">
                             <div className="space-y-4">
+                                {/* Linked item — required */}
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">
+                                        Linked Item *
+                                        <span className="ml-1 text-xs text-muted-foreground font-normal">
+                                            (which menu/GOODS item shows this modifier group)
+                                        </span>
+                                    </label>
+                                    {editing ? (
+                                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm">
+                                            <span className="font-medium">{itemName || itemId}</span>
+                                            <span className="text-xs text-muted-foreground">(cannot change after creation)</span>
+                                        </div>
+                                    ) : (
+                                        <ItemSearchInput
+                                            orgSlug={orgSlug}
+                                            value={itemName}
+                                            onSelect={(item) => { setItemId(item.id); setItemName(item.name); }}
+                                            placeholder="Search for a menu item or goods item..."
+                                            fixedDropdown
+                                        />
+                                    )}
+                                    {!itemId && !editing && (
+                                        <p className="text-xs text-destructive">Select an item to link this modifier group to</p>
+                                    )}
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Internal Name *</label>
@@ -169,7 +201,7 @@ export function ModifierGroupDialog({ editing, isPending, onSubmit, onClose }: P
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground">Price Adj.</label>
+                                                <label className="text-xs text-muted-foreground">Price Adj. (KES)</label>
                                                 <Input
                                                     type="number"
                                                     step="0.01"
@@ -197,7 +229,7 @@ export function ModifierGroupDialog({ editing, isPending, onSubmit, onClose }: P
                                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="flex-1" disabled={isPending}>
+                                <Button type="submit" className="flex-1" disabled={isPending || (!editing && !itemId)}>
                                     {isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
                                 </Button>
                             </div>
