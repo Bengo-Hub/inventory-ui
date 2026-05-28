@@ -21,6 +21,12 @@ export interface Item {
   reorder_level?: number;
   reorder_quantity?: number;
   tags?: string[];
+  // Event capacity fields — SERVICE type only
+  total_capacity?: number | null;
+  booked_capacity?: number | null;
+  event_start_at?: string | null;
+  event_end_at?: string | null;
+  event_venue?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -77,6 +83,9 @@ export const itemsApi = {
 
   delete: (orgSlug: string, sku: string) =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${sku}`),
+
+  listEvents: (orgSlug: string, params?: { page?: number; limit?: number }): Promise<PaginatedItems> =>
+    apiClient.get<PaginatedItems>(`/api/v1/${orgSlug}/inventory/events`, params as Record<string, string | number | undefined>),
 
   import: (orgSlug: string, file: File) => {
     const form = new FormData();
