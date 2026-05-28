@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipe, useUpdateRecipe } from '@/hooks/use-recipes';
 import { useUnits } from '@/hooks/useUnits';
@@ -255,6 +255,23 @@ export default function RecipeDetailPage() {
                         </dl>
                     </CardContent>
                 </Card>
+
+                {(recipe.allergens?.length ?? 0) > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <h2 className="text-lg font-semibold">Allergens</h2>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap gap-2">
+                                {recipe.allergens!.map(tag => (
+                                    <Badge key={tag} variant="warning">
+                                        {tag.replace('contains_', '').replace(/_/g, ' ')}
+                                    </Badge>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </div>
     );
