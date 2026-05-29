@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { itemsApi, type Item } from '@/lib/api/items';
+import { itemsApi, type CreateItemInput, type Item, type UpdateItemInput } from '@/lib/api/items';
 import { apiClient } from '@/lib/api/client';
 
 const EVENTS_KEY = 'events';
@@ -43,6 +43,27 @@ export function useCancelEvent(orgSlug: string) {
     const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (sku: string) => itemsApi.delete(orgSlug, sku),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [EVENTS_KEY, orgSlug] });
+        },
+    });
+}
+
+export function useCreateEvent(orgSlug: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (data: CreateItemInput) => itemsApi.create(orgSlug, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: [EVENTS_KEY, orgSlug] });
+        },
+    });
+}
+
+export function useUpdateEvent(orgSlug: string) {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ sku, data }: { sku: string; data: UpdateItemInput }) =>
+            itemsApi.update(orgSlug, sku, data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: [EVENTS_KEY, orgSlug] });
         },

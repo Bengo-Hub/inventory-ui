@@ -1,5 +1,16 @@
 import { apiClient } from './client';
 
+export interface RecurrenceConfig {
+  type: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  time?: string;        // "HH:MM" (24h)
+  days?: number[];      // weekly: 0=Sun..6=Sat
+  monthDay?: number;    // monthly by date: 1-31
+  weekNum?: number;     // monthly by weekday: 1-4 or -1 (last)
+  weekDay?: number;     // monthly by weekday: 0-6
+  yearMonth?: number;   // yearly: 1-12
+  yearDay?: number;     // yearly: 1-31
+}
+
 export interface Item {
   id: string;
   sku: string;

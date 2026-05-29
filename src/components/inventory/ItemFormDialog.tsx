@@ -1,8 +1,9 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
 import { apiClient } from '@/lib/api/client';
-import { type CreateItemInput, type Item } from '@/lib/api/items';
+import { type CreateItemInput, type Item, type RecurrenceConfig } from '@/lib/api/items';
 import { useQuery } from '@tanstack/react-query';
 import { Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -27,6 +28,7 @@ interface TicketTier {
 interface Props {
   orgSlug: string;
   item?: Item | null;
+  defaultDate?: string;
   onClose: () => void;
   onSubmit: (data: CreateItemInput) => void;
   isPending: boolean;
@@ -43,7 +45,7 @@ function toLocalDatetimeValue(iso?: string | null): string {
   return iso.slice(0, 16); // "YYYY-MM-DDTHH:mm"
 }
 
-export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: Props) {
+export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, isPending }: Props) {
   const [name, setName] = useState(item?.name ?? '');
   const [sku, setSku] = useState(item?.sku ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
@@ -65,7 +67,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Event fields
-  const [eventStartAt, setEventStartAt] = useState(toLocalDatetimeValue(item?.event_start_at));
+  const [eventStartAt, setEventStartAt] = useState(toLocalDatetimeValue(item?.event_start_at ?? defaultDate));
   const [eventEndAt, setEventEndAt] = useState(toLocalDatetimeValue(item?.event_end_at));
   const [eventVenue, setEventVenue] = useState(item?.event_venue ?? '');
   const [totalCapacity, setTotalCapacity] = useState(item?.total_capacity != null ? String(item.total_capacity) : '');
@@ -74,11 +76,10 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
   const existingTiers: TicketTier[] = (item?.metadata?.ticket_tiers as TicketTier[]) ?? [];
   const [tiers, setTiers] = useState<TicketTier[]>(existingTiers);
 
-  // Recurring
-  const isRecurring: boolean = !!(item?.metadata?.is_recurring as boolean);
-  const [recurring, setRecurring] = useState(isRecurring);
-  const [recurrencePattern, setRecurrencePattern] = useState(
-    (item?.metadata?.recurrence_pattern as string) ?? ''
+  // Structured recurrence config
+  const existingRc = item?.metadata?.recurrence_config as RecurrenceConfig | undefined;
+  const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig | null>(
+    (item?.metadata?.is_recurring && existingRc) ? existingRc : null
   );
 
   useEffect(() => {
@@ -104,8 +105,8 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
       setTotalCapacity(item.total_capacity != null ? String(item.total_capacity) : '');
       const trs = (item.metadata?.ticket_tiers as TicketTier[]) ?? [];
       setTiers(trs);
-      setRecurring(!!(item.metadata?.is_recurring as boolean));
-      setRecurrencePattern((item.metadata?.recurrence_pattern as string) ?? '');
+      const rc = item.metadata?.recurrence_config as RecurrenceConfig | undefined;
+      setRecurrenceConfig((item.metadata?.is_recurring && rc) ? rc : null);
     }
   }, [item]);
 
@@ -160,8 +161,11 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
     const metadata: Record<string, unknown> = {};
     if (type === 'SERVICE') {
       if (tiers.length > 0) metadata.ticket_tiers = tiers;
-      if (recurring) metadata.is_recurring = true;
-      if (recurrencePattern) metadata.recurrence_pattern = recurrencePattern;
+      if (recurrenceConfig) {
+        metadata.is_recurring = true;
+        metadata.recurrence_config = recurrenceConfig;
+        metadata.recurrence_pattern = generateRecurrencePattern(recurrenceConfig);
+      }
     }
 
     onSubmit({
@@ -362,17 +366,7 @@ export function ItemFormDialog({ orgSlug, item, onClose, onSubmit, isPending }: 
                   </div>
 
                   <div className="space-y-2">
-                    <label className="flex items-center gap-2 text-sm cursor-pointer">
-                      <input type="checkbox" checked={recurring} onChange={(e) => setRecurring(e.target.checked)} className="rounded" />
-                      Recurring Event
-                    </label>
-                    {recurring && (
-                      <Input
-                        placeholder="e.g. Every Friday, Monthly last Saturday"
-                        value={recurrencePattern}
-                        onChange={(e) => setRecurrencePattern(e.target.value)}
-                      />
-                    )}
+                    <RecurrenceEditor value={recurrenceConfig} onChange={setRecurrenceConfig} />
                   </div>
 
                   {/* Ticket tiers */}
