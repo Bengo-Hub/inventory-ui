@@ -23,6 +23,7 @@ export interface Item {
   cost_price?: number | null;
   suggested_price?: number | null;
   tags?: string[];
+  metadata?: Record<string, unknown>;
   // Event capacity fields — SERVICE type only
   total_capacity?: number | null;
   booked_capacity?: number | null;
@@ -51,6 +52,13 @@ export interface CreateItemInput {
   track_serial_numbers?: boolean;
   initial_quantity?: number;
   tags?: string[];
+  image_url?: string;
+  metadata?: Record<string, unknown>;
+  // Event fields — SERVICE type only
+  total_capacity?: number;
+  event_start_at?: string;
+  event_end_at?: string;
+  event_venue?: string;
 }
 
 export type UpdateItemInput = Partial<CreateItemInput>;
