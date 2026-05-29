@@ -112,7 +112,7 @@ export default function EventsPage() {
       );
     } else {
       createEvent.mutate(
-        { ...data, type: 'SERVICE' },
+        { ...data, type: 'SERVICE', tags: [...(data.tags ?? []), 'event'] },
         {
           onSuccess: () => { toast.success('Event created'); setModalEvent(undefined); },
           onError: () => toast.error('Failed to create event'),
