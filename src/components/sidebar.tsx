@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import {
   ArrowRightLeft,
   BookOpen,
+  Calendar,
   ChefHat,
   ChevronDown,
   ClipboardList,
@@ -54,11 +55,11 @@ interface NavGroup {
 // Mirrors pos-ui's USE_CASE_MODULES pattern.
 
 const USE_CASE_MODULES: Record<string, string[]> = {
-  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'settings'],
+  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'settings'],
   quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'settings'],
   retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'suppliers', 'settings'],
   pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'suppliers', 'settings'],
-  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'settings'],
+  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'settings'],
   warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'settings'],
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'settings'],
 };
@@ -181,6 +182,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
         { label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' },
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
+      ],
+    },
+    {
+      label: 'Events',
+      items: [
+        { label: 'Upcoming Events', icon: Calendar, href: '/events', moduleKey: 'events' },
+        { label: 'Manage Events', icon: Calendar, href: '/events/manage', moduleKey: 'events' },
       ],
     },
     {
