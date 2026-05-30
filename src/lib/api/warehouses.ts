@@ -7,6 +7,7 @@ export interface Warehouse {
   address?: string;
   is_default: boolean;
   is_active: boolean;
+  outlet_id?: string;
   item_count?: number;
   created_at: string;
 }
@@ -16,6 +17,7 @@ export interface CreateWarehouseInput {
   code: string;
   address?: string;
   is_default?: boolean;
+  outlet_id?: string;
 }
 
 export type UpdateWarehouseInput = Partial<CreateWarehouseInput>;

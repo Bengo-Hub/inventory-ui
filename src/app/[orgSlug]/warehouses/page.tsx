@@ -3,7 +3,8 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useWarehouses, useCreateWarehouse, useUpdateWarehouse, useDeleteWarehouse } from '@/hooks/useWarehouses';
 import { type Warehouse, type CreateWarehouseInput } from '@/lib/api/warehouses';
-import { MapPin, Package, Pencil, Plus, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react';
+import { useOutletStore } from '@/store/outlet';
+import { MapPin, Package, Pencil, Plus, Store, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 export default function WarehousesPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
+    const { outlet } = useOutletStore();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Warehouse | null>(null);
 
@@ -59,6 +61,7 @@ export default function WarehousesPage() {
             code: formCode.trim().toUpperCase(),
             address: formAddress.trim() || undefined,
             is_default: formIsDefault,
+            outlet_id: outlet?.id,
         };
 
         if (editing) {
@@ -121,13 +124,19 @@ export default function WarehousesPage() {
                                             <WarehouseIcon className="h-5 w-5 text-primary" />
                                         </div>
                                         <div>
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <h3 className="font-semibold">{wh.name}</h3>
                                                 {wh.is_default && (
                                                     <Badge variant="success" className="text-xs">Default</Badge>
                                                 )}
                                             </div>
                                             <p className="text-xs font-mono text-muted-foreground">{wh.code}</p>
+                                            {wh.outlet_id && outlet?.id === wh.outlet_id && (
+                                                <div className="flex items-center gap-1 text-xs text-primary mt-0.5">
+                                                    <Store className="h-3 w-3" />
+                                                    {outlet.name}
+                                                </div>
+                                            )}
                                             {wh.address && (
                                                 <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                                                     <MapPin className="h-3 w-3" />

@@ -24,6 +24,11 @@ class ApiClient {
     }
 
     private handleRequest = (config: InternalAxiosRequestConfig) => {
+        // FormData must be sent as multipart — delete the default application/json header
+        // so Axios (and the browser) can set Content-Type with the correct multipart boundary.
+        if (config.data instanceof FormData) {
+            delete config.headers['Content-Type'];
+        }
         if (this.accessToken) {
             config.headers.Authorization = `Bearer ${this.accessToken}`;
         }

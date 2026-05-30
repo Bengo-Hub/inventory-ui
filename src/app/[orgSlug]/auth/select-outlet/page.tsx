@@ -63,7 +63,7 @@ function SelectOutletContent() {
   useEffect(() => {
     if (!tenantRef) return;
     apiClient
-      .get<OutletInfo[]>(`/api/v1/${tenantRef}/inventory/warehouses`)
+      .get<OutletInfo[]>(`/api/v1/${tenantRef}/inventory/outlets`)
       .then((data) => {
         const active = data.filter((o) => o.status !== 'inactive');
 
