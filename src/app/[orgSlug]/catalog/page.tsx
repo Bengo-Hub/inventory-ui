@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
@@ -11,7 +12,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
 import { Download, Edit2, Eye, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
-import { useParams } from 'next/navigation';
+import { useSubscription } from '@/hooks/use-subscription';
+import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -148,10 +150,13 @@ function DeleteConfirm({
 
 export default function CatalogPage() {
   const params = useParams();
+  const router = useRouter();
   const orgSlug = params?.orgSlug as string;
   const queryClient = useQueryClient();
   const { outlet } = useOutletStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { hasFeature } = useSubscription();
+  const canBulkImport = hasFeature('bulk_import');
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -168,8 +173,10 @@ export default function CatalogPage() {
   const deleteItemMut = useDeleteItem(orgSlug);
   const { data: categories } = useCategories(orgSlug);
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
+  const [selectedWarehouseCode, setSelectedWarehouseCode] = useState('');
 
   const { bulkImport, isPending: isImporting, templateUrl } = useBulkImport(orgSlug);
+  const { data: warehouses } = useWarehouses(orgSlug);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -186,7 +193,7 @@ export default function CatalogPage() {
         toast.success(`Import complete — ${total} records processed`);
       },
       onError: () => toast.error('Import failed. Check file format and try again.'),
-    });
+    }, selectedWarehouseCode || undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -230,17 +237,37 @@ export default function CatalogPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xlsm" className="hidden" onChange={handleFileChange} />
-            <a href={templateUrl} download className="inline-flex">
-              <Button variant="ghost" size="sm" type="button" asChild>
-                <span><Download className="h-4 w-4 mr-1.5" />Template</span>
-              </Button>
-            </a>
-            <Button variant="outline" onClick={() => { setImportResult(null); fileInputRef.current?.click(); }} disabled={isImporting}>
-              <Upload className="h-4 w-4 mr-2" />
-              {isImporting ? 'Importing…' : 'Import'}
-            </Button>
-            <Button onClick={() => setCreateOpen(true)}>
+            {canBulkImport && (
+              <>
+                {warehouses && warehouses.length > 0 && (
+                  <select
+                    value={selectedWarehouseCode}
+                    onChange={(e) => setSelectedWarehouseCode(e.target.value)}
+                    className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
+                    title="Target warehouse for import"
+                  >
+                    <option value="">— Select Warehouse —</option>
+                    {warehouses.map((wh) => (
+                      <option key={wh.id} value={wh.code}>{wh.name}</option>
+                    ))}
+                  </select>
+                )}
+                <a href={templateUrl} download className="inline-flex">
+                  <Button variant="ghost" size="sm" type="button" asChild>
+                    <span><Download className="h-4 w-4 mr-1.5" />Template</span>
+                  </Button>
+                </a>
+                <Button variant="outline" onClick={() => { setImportResult(null); fileInputRef.current?.click(); }} disabled={isImporting}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  {isImporting ? 'Importing…' : 'Import'}
+                </Button>
+              </>
+            )}
+            <Button variant="outline" onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />New Item
+            </Button>
+            <Button onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
+              <Plus className="h-4 w-4 mr-2" />New Menu Item
             </Button>
           </div>
         </div>
@@ -460,7 +487,7 @@ export default function CatalogPage() {
         </Card>
       </div>
 
-      {/* Create dialog */}
+      {/* Create dialog — for GOODS, INGREDIENT, SERVICE, EQUIPMENT, VOUCHER */}
       {createOpen && (
         <ItemFormDialog
           orgSlug={orgSlug}

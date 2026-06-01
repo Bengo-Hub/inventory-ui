@@ -11,12 +11,16 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-const STEPS = ['Basic Info', 'Ingredients', 'Modifiers'] as const;
+const ITEM_TYPES = ['GOODS', 'INGREDIENT', 'RECIPE', 'SERVICE', 'EQUIPMENT', 'VOUCHER'] as const;
+type ItemType = typeof ITEM_TYPES[number];
 
-function StepIndicator({ current }: { current: number }) {
+const RECIPE_STEPS = ['Basic Info', 'Ingredients', 'Modifiers'] as const;
+const SIMPLE_STEPS = ['Basic Info'] as const;
+
+function StepIndicator({ current, steps }: { current: number; steps: readonly string[] }) {
   return (
     <div className="flex items-center gap-2 mb-6">
-      {STEPS.map((label, i) => (
+      {steps.map((label, i) => (
         <div key={i} className="flex items-center gap-2">
           <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border-2 transition-colors ${
             i < current  ? 'bg-primary border-primary text-primary-foreground' :
@@ -26,7 +30,7 @@ function StepIndicator({ current }: { current: number }) {
             {i < current ? <Check className="h-3.5 w-3.5" /> : i + 1}
           </div>
           <span className={`text-sm ${i === current ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{label}</span>
-          {i < STEPS.length - 1 && <div className="h-px w-8 bg-border" />}
+          {i < steps.length - 1 && <div className="h-px w-8 bg-border" />}
         </div>
       ))}
     </div>
@@ -36,11 +40,13 @@ function StepIndicator({ current }: { current: number }) {
 // ── Step 1 ─────────────────────────────────────────────────────────────────────
 
 interface Step1Data {
+  type:         ItemType;
   name:         string;
   sku:          string;
   categoryName: string;
   description:  string;
   sellingPrice: string;
+  costPrice:    string;
   servings:     string;
   targetMargin: string;
 }
@@ -49,12 +55,32 @@ function Step1({ data, onChange }: { data: Step1Data; onChange: (d: Step1Data) =
   function set(key: keyof Step1Data, val: string) {
     onChange({ ...data, [key]: val });
   }
+  const isRecipe = data.type === 'RECIPE';
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <label className="text-sm font-medium">Item Type *</label>
+        <div className="flex flex-wrap gap-2">
+          {ITEM_TYPES.map(t => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => set('type', t)}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                data.type === t
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'border-border text-muted-foreground hover:border-primary hover:text-primary'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Menu Item Name *</label>
-          <Input placeholder="e.g. Beef Grilled (200g)" value={data.name} onChange={(e) => set('name', e.target.value)} />
+          <label className="text-sm font-medium">{isRecipe ? 'Menu Item Name' : 'Item Name'} *</label>
+          <Input placeholder={isRecipe ? 'e.g. Beef Grilled (200g)' : 'e.g. Butter (1kg)'} value={data.name} onChange={(e) => set('name', e.target.value)} />
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">SKU <span className="text-muted-foreground font-normal">(auto-generated if blank)</span></label>
@@ -67,28 +93,37 @@ function Step1({ data, onChange }: { data: Step1Data; onChange: (d: Step1Data) =
           <Input placeholder="e.g. Main Dishes" value={data.categoryName} onChange={(e) => set('categoryName', e.target.value)} />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Selling Price (KES) *</label>
+          <label className="text-sm font-medium">
+            {isRecipe ? 'Selling Price (KES) *' : 'Selling Price (KES)'}
+          </label>
           <Input type="number" min={0} step={0.01} placeholder="e.g. 900" value={data.sellingPrice} onChange={(e) => set('sellingPrice', e.target.value)} />
-          <p className="text-xs text-muted-foreground">The price customers pay. The system will not overwrite this.</p>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-4">
+      {!isRecipe && (
         <div className="space-y-2">
-          <label className="text-sm font-medium">Servings (batch yield)</label>
-          <Input type="number" min={0.1} step={0.5} placeholder="1" value={data.servings} onChange={(e) => set('servings', e.target.value)} />
-          <p className="text-xs text-muted-foreground">How many portions this batch produces (usually 1).</p>
+          <label className="text-sm font-medium">Cost Price (KES)</label>
+          <Input type="number" min={0} step={0.01} placeholder="Unit cost from supplier" value={data.costPrice} onChange={(e) => set('costPrice', e.target.value)} />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Target Margin % <span className="text-muted-foreground font-normal">(optional)</span></label>
-          <Input type="number" min={0} max={99} step={1} placeholder="e.g. 30" value={data.targetMargin} onChange={(e) => set('targetMargin', e.target.value)} />
+      )}
+      {isRecipe && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Servings (batch yield)</label>
+            <Input type="number" min={0.1} step={0.5} placeholder="1" value={data.servings} onChange={(e) => set('servings', e.target.value)} />
+            <p className="text-xs text-muted-foreground">How many portions this batch produces (usually 1).</p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Target Margin % <span className="text-muted-foreground font-normal">(optional)</span></label>
+            <Input type="number" min={0} max={99} step={1} placeholder="e.g. 30" value={data.targetMargin} onChange={(e) => set('targetMargin', e.target.value)} />
+          </div>
         </div>
-      </div>
+      )}
       <div className="space-y-2">
         <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
         <textarea
           rows={2}
           className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
-          placeholder="Describe the dish…"
+          placeholder={isRecipe ? 'Describe the dish…' : 'Optional description…'}
           value={data.description}
           onChange={(e) => set('description', e.target.value)}
         />
@@ -239,12 +274,16 @@ export default function NewMenuItemPage() {
 
   const [step, setStep] = useState(0);
   const [step1, setStep1] = useState<Step1Data>({
-    name: '', sku: '', categoryName: '', description: '', sellingPrice: '', servings: '1', targetMargin: '',
+    type: 'RECIPE', name: '', sku: '', categoryName: '', description: '',
+    sellingPrice: '', costPrice: '', servings: '1', targetMargin: '',
   });
   const [ingredients, setIngredients] = useState<IngredientRowValue[]>([]);
   const [modifiers, setModifiers] = useState<ModGroup[]>([]);
 
-  const { mutate, isPending } = useMutation({
+  const isRecipe = step1.type === 'RECIPE';
+  const steps = isRecipe ? RECIPE_STEPS : SIMPLE_STEPS;
+
+  const compositeMenu = useMutation({
     mutationFn: (payload: MenuItemCompositeRequest) => itemsApi.createMenuItemComposite(orgSlug, payload),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
@@ -256,26 +295,49 @@ export default function NewMenuItemPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const simpleCreate = useMutation({
+    mutationFn: (payload: Record<string, unknown>) => itemsApi.create(orgSlug, payload as any),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+      toast.success(`"${step1.name}" created successfully`);
+      router.push(`/${orgSlug}/catalog`);
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const isPending = compositeMenu.isPending || simpleCreate.isPending;
   const sellingPrice = parseFloat(step1.sellingPrice) || 0;
   const servings     = parseFloat(step1.servings) || 1;
 
   function canAdvance() {
-    if (step === 0) return step1.name.trim().length > 0 && sellingPrice > 0;
+    if (step === 0) return step1.name.trim().length > 0;
     return true;
   }
 
   function handleSubmit() {
-    mutate({
-      name:          step1.name.trim(),
-      sku:           step1.sku.trim() || undefined,
-      category_name: step1.categoryName.trim() || undefined,
-      description:   step1.description.trim() || undefined,
-      selling_price: sellingPrice,
-      servings,
-      target_margin_percent: step1.targetMargin ? parseFloat(step1.targetMargin) : undefined,
-      ingredients,
-      modifiers: modifiers.length > 0 ? modifiers : undefined,
-    });
+    if (isRecipe) {
+      compositeMenu.mutate({
+        name:          step1.name.trim(),
+        sku:           step1.sku.trim() || undefined,
+        category_name: step1.categoryName.trim() || undefined,
+        description:   step1.description.trim() || undefined,
+        selling_price: sellingPrice,
+        servings,
+        target_margin_percent: step1.targetMargin ? parseFloat(step1.targetMargin) : undefined,
+        ingredients,
+        modifiers: modifiers.length > 0 ? modifiers : undefined,
+      });
+    } else {
+      simpleCreate.mutate({
+        name:         step1.name.trim(),
+        sku:          step1.sku.trim() || undefined,
+        type:         step1.type,
+        category_name: step1.categoryName.trim() || undefined,
+        description:  step1.description.trim() || undefined,
+        selling_price: sellingPrice || undefined,
+        cost_price:   step1.costPrice ? parseFloat(step1.costPrice) : undefined,
+      });
+    }
   }
 
   return (
@@ -284,16 +346,16 @@ export default function NewMenuItemPage() {
         <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-xl font-bold">Define New Menu Item</h1>
+        <h1 className="text-xl font-bold">{isRecipe ? 'New Menu Item' : 'New Inventory Item'}</h1>
       </div>
 
       <Card>
         <CardHeader>
-          <StepIndicator current={step} />
+          <StepIndicator current={step} steps={steps} />
         </CardHeader>
         <CardContent className="space-y-6">
           {step === 0 && <Step1 data={step1} onChange={setStep1} />}
-          {step === 1 && (
+          {step === 1 && isRecipe && (
             <Step2
               orgSlug={orgSlug}
               ingredients={ingredients}
@@ -302,20 +364,20 @@ export default function NewMenuItemPage() {
               servings={servings}
             />
           )}
-          {step === 2 && <Step3 modifiers={modifiers} setModifiers={setModifiers} />}
+          {step === 2 && isRecipe && <Step3 modifiers={modifiers} setModifiers={setModifiers} />}
 
           <div className="flex items-center justify-between pt-2">
             <Button variant="outline" onClick={() => step > 0 ? setStep(step - 1) : router.back()}>
               <ArrowLeft className="h-4 w-4 mr-1.5" />
               {step === 0 ? 'Cancel' : 'Back'}
             </Button>
-            {step < STEPS.length - 1 ? (
+            {step < steps.length - 1 ? (
               <Button onClick={() => setStep(step + 1)} disabled={!canAdvance()}>
                 Next <ArrowRight className="h-4 w-4 ml-1.5" />
               </Button>
             ) : (
               <Button onClick={handleSubmit} disabled={isPending || !canAdvance()}>
-                {isPending ? 'Creating…' : 'Create Menu Item'}
+                {isPending ? 'Creating…' : isRecipe ? 'Create Menu Item' : 'Create Item'}
               </Button>
             )}
           </div>

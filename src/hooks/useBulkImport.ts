@@ -1,11 +1,12 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import type { MutateOptions } from '@tanstack/react-query';
 import { itemsApi, type BulkImportResult } from '@/lib/api/items';
 
 export function useBulkImport(orgSlug: string) {
   const queryClient = useQueryClient();
 
-  const mutation = useMutation<BulkImportResult, Error, File>({
-    mutationFn: (file: File) => itemsApi.bulkImport(orgSlug, file),
+  const mutation = useMutation<BulkImportResult, Error, { file: File; warehouseName?: string }>({
+    mutationFn: ({ file, warehouseName }) => itemsApi.bulkImport(orgSlug, file, warehouseName),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
       queryClient.invalidateQueries({ queryKey: ['recipes', orgSlug] });
@@ -14,7 +15,11 @@ export function useBulkImport(orgSlug: string) {
   });
 
   return {
-    bulkImport:  mutation.mutate,
+    bulkImport: (
+      file: File,
+      callbacks?: MutateOptions<BulkImportResult, Error, { file: File; warehouseName?: string }>,
+      warehouseName?: string,
+    ) => mutation.mutate({ file, warehouseName }, callbacks),
     isPending:   mutation.isPending,
     result:      mutation.data ?? null,
     error:       mutation.error,

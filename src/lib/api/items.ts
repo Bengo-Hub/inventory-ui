@@ -119,9 +119,10 @@ export const itemsApi = {
     );
   },
 
-  bulkImport: (orgSlug: string, file: File) => {
+  bulkImport: (orgSlug: string, file: File, warehouseName?: string) => {
     const form = new FormData();
     form.append('file', file);
+    if (warehouseName) form.append('warehouse_name', warehouseName);
     return apiClient.post<BulkImportResult>(
       `/api/v1/${orgSlug}/inventory/bulk-import`,
       form,

@@ -56,7 +56,7 @@ function SelectOutletContent() {
   const lastOutletId = typeof window !== 'undefined'
     ? localStorage.getItem(INVENTORY_SELECTED_OUTLET_KEY) : null;
 
-  const tenantRef = user?.tenant_id || orgSlug;
+  const tenantRef = orgSlug; // always use slug — inventory-api routes use /{slug}/, not /{uuid}/
 
   const destination = returnTo ? decodeURIComponent(returnTo) : `/${orgSlug}`;
 
