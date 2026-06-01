@@ -251,7 +251,12 @@ export default function RecipeDetailPage() {
                         <dl className="space-y-4 text-sm">
                             <div>
                                 <dt className="text-muted-foreground">Produces</dt>
-                                <dd className="font-medium mt-1">{recipe.item_name || '—'}</dd>
+                                <dd className="font-medium mt-1">
+                                    {recipe.item_name || recipe.name || '—'}
+                                    {recipe.sku && (
+                                        <span className="ml-1.5 text-xs text-muted-foreground font-mono">({recipe.sku})</span>
+                                    )}
+                                </dd>
                             </div>
                             <div>
                                 <dt className="text-muted-foreground">Servings</dt>

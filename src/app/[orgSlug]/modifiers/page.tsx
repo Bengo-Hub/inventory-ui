@@ -199,7 +199,12 @@ export default function ModifiersPage() {
                                                 </td>
                                                 <td className="px-6 py-4 hidden md:table-cell">
                                                     {group.item_name ? (
-                                                        <span className="text-sm">{group.item_name}</span>
+                                                        <span className="text-sm">
+                                                            {group.item_name}
+                                                            {group.item_sku && (
+                                                                <span className="ml-1.5 text-xs text-muted-foreground font-mono">({group.item_sku})</span>
+                                                            )}
+                                                        </span>
                                                     ) : (
                                                         <span className="text-xs text-muted-foreground font-mono">{group.item_id?.slice(0, 8)}…</span>
                                                     )}

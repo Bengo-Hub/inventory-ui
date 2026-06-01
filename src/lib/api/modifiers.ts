@@ -16,6 +16,7 @@ export interface ModifierGroup {
     id: string;
     item_id: string;
     item_name?: string;
+    item_sku?: string;
     name: string;
     display_name: string;
     min_selections: number;

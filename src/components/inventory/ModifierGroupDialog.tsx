@@ -30,6 +30,7 @@ interface Props {
 export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onClose }: Props) {
     const [itemId, setItemId] = useState(editing?.item_id ?? '');
     const [itemName, setItemName] = useState(editing?.item_name ?? '');
+    const [itemSku, setItemSku] = useState(editing?.item_sku ?? '');
     const [formName, setFormName] = useState(editing?.name ?? '');
     const [formDisplayName, setFormDisplayName] = useState(editing?.display_name ?? '');
     const [formMinSelections, setFormMinSelections] = useState(String(editing?.min_selections ?? 0));
@@ -117,13 +118,20 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                                     {editing ? (
                                         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm">
                                             <span className="font-medium">{itemName || itemId}</span>
+                                            {itemSku && (
+                                                <span className="text-xs text-muted-foreground font-mono">({itemSku})</span>
+                                            )}
                                             <span className="text-xs text-muted-foreground">(cannot change after creation)</span>
                                         </div>
                                     ) : (
                                         <ItemSearchInput
                                             orgSlug={orgSlug}
                                             value={itemName}
-                                            onSelect={(item) => { setItemId(item.id); setItemName(item.name); }}
+                                            onSelect={(item) => {
+                                                setItemId(item.id);
+                                                setItemName(item.name);
+                                                setItemSku(item.sku);
+                                            }}
                                             placeholder="Search for a menu item or goods item..."
                                             fixedDropdown
                                         />
