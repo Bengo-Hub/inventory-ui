@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pagination } from '@/components/ui/pagination';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import {
     useBundles,
     useCreateBundle,
@@ -40,6 +41,13 @@ interface BundleModalProps {
 function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending, allItems }: BundleModalProps) {
     const [name, setName] = useState(editing?.name ?? '');
     const [itemId, setItemId] = useState(editing?.item_id ?? '');
+    const [itemName, setItemName] = useState(() => {
+        if (editing) {
+            const found = allItems.find(i => i.id === editing.item_id);
+            return found ? `${found.name} (${found.sku})` : '';
+        }
+        return '';
+    });
     const [isActive, setIsActive] = useState(editing?.is_active ?? true);
     const [components, setComponents] = useState<ComponentRow[]>(
         editing?.components.map(c => ({
@@ -48,14 +56,14 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             quantity: c.quantity,
         })) ?? []
     );
-    const [addSearch, setAddSearch] = useState('');
-    const [addItemId, setAddItemId] = useState('');
     const [addQty, setAddQty] = useState(1);
 
     useEffect(() => {
         if (editing) {
             setName(editing.name);
             setItemId(editing.item_id);
+            const found = allItems.find(i => i.id === editing.item_id);
+            setItemName(found ? `${found.name} (${found.sku})` : '');
             setIsActive(editing.is_active);
             setComponents(editing.components.map(c => ({
                 component_item_id: c.component_item_id,
@@ -63,23 +71,14 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                 quantity: c.quantity,
             })));
         }
-    }, [editing]);
+    }, [editing, allItems]);
 
-    const filteredItems = allItems.filter(i =>
-        !addSearch || i.name.toLowerCase().includes(addSearch.toLowerCase()) || i.sku.toLowerCase().includes(addSearch.toLowerCase())
-    );
-
-    function addComponent() {
-        if (!addItemId) return;
-        const item = allItems.find(i => i.id === addItemId);
-        if (!item) return;
-        if (components.some(c => c.component_item_id === addItemId)) {
+    function addComponent(item: { id: string; name: string; sku: string }) {
+        if (components.some(c => c.component_item_id === item.id)) {
             toast.error('Item already added to this bundle');
             return;
         }
-        setComponents(prev => [...prev, { component_item_id: addItemId, item_name: item.name, quantity: addQty }]);
-        setAddItemId('');
-        setAddSearch('');
+        setComponents(prev => [...prev, { component_item_id: item.id, item_name: item.name, quantity: addQty }]);
         setAddQty(1);
     }
 
@@ -129,18 +128,18 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                             <Input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Back to School Kit" required />
                         </div>
                         <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Bundle Item (SKU) *</label>
-                            <select
-                                value={itemId}
-                                onChange={e => setItemId(e.target.value)}
-                                className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                required
-                            >
-                                <option value="">Select bundle item…</option>
-                                {allItems.map(i => (
-                                    <option key={i.id} value={i.id}>{i.name} ({i.sku})</option>
-                                ))}
-                            </select>
+                            <ItemSearchInput
+                                orgSlug={orgSlug}
+                                value={itemName}
+                                label="Bundle Item (SKU) *"
+                                placeholder="Search bundle item…"
+                                fixedDropdown
+                                onSelect={(item) => {
+                                    setItemId(item.id);
+                                    setItemName(`${item.name} (${item.sku})`);
+                                }}
+                            />
+                            {!itemId && <p className="text-xs text-destructive">Required</p>}
                         </div>
                     </div>
 
@@ -185,38 +184,25 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                         )}
 
                         {/* Add component row */}
-                        <div className="flex gap-2">
-                            <div className="flex-1 space-y-1">
-                                <Input
-                                    value={addSearch}
-                                    onChange={e => setAddSearch(e.target.value)}
+                        <div className="flex gap-2 items-end">
+                            <div className="flex-1">
+                                <ItemSearchInput
+                                    orgSlug={orgSlug}
+                                    value=""
                                     placeholder="Search item to add…"
+                                    fixedDropdown
+                                    onSelect={(item) => addComponent(item)}
                                 />
-                                {addSearch && filteredItems.length > 0 && !addItemId && (
-                                    <div className="rounded-lg border border-border bg-card shadow-md max-h-40 overflow-y-auto">
-                                        {filteredItems.slice(0, 8).map(i => (
-                                            <button
-                                                key={i.id}
-                                                type="button"
-                                                className="w-full text-left px-3 py-2 text-sm hover:bg-muted"
-                                                onClick={() => { setAddItemId(i.id); setAddSearch(i.name); }}
-                                            >
-                                                {i.name} <span className="text-muted-foreground text-xs">({i.sku})</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
                             </div>
-                            <input
-                                type="number"
-                                min={1}
-                                value={addQty}
-                                onChange={e => setAddQty(Number(e.target.value))}
-                                className="w-16 rounded-lg border border-input bg-transparent px-2 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none text-center"
-                            />
-                            <Button type="button" variant="outline" size="sm" onClick={addComponent} disabled={!addItemId}>
-                                <Plus className="h-4 w-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={addQty}
+                                    onChange={e => setAddQty(Number(e.target.value))}
+                                    className="w-16 rounded-lg border border-input bg-transparent px-2 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none text-center"
+                                />
+                            </div>
                         </div>
                     </div>
 

@@ -35,6 +35,9 @@ export interface Item {
   suggested_price?: number | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  // Current stock levels (sum across all warehouses, from ListItems).
+  available?: number | null;
+  on_hand?: number | null;
   // Event capacity fields — SERVICE type only
   total_capacity?: number | null;
   booked_capacity?: number | null;
