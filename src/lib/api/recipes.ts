@@ -31,6 +31,9 @@ export interface Recipe {
     cost_per_portion?: number | null;
     target_margin_percent?: number | null;
     suggested_price?: number | null;
+    selling_price?: number | null;
+    food_cost_pct?: number | null;
+    status?: string | null; // "OK - healthy" | "OK - above target FC%" | "LOSS - cost >= price"
     prep_time_minutes?: number | null;
     allergens?: string[];
     ingredients: RecipeIngredient[];

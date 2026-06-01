@@ -130,7 +130,71 @@ export const itemsApi = {
 
   downloadTemplateUrl: (orgSlug: string) =>
     `/api/v1/${orgSlug}/inventory/import-template`,
+
+  createMenuItemComposite: (orgSlug: string, payload: MenuItemCompositeRequest) =>
+    apiClient.post<MenuItemCompositeResult>(`/api/v1/${orgSlug}/inventory/items/menu-item`, payload),
 };
+
+// ── Composite menu item types ─────────────────────────────────────────────────
+
+export interface MenuItemIngredientInput {
+  ingredient_name?: string;
+  ingredient_sku?:  string;
+  qty:    number;
+  unit:   string;
+  waste_percent?: number;
+  notes?: string;
+  purchase_price?:     number;
+  purchase_unit?:      string;
+  purchase_pack_size?: number;
+  yield_pct?:          number;
+  cost_price?:         number;
+}
+
+export interface MenuItemModifierOptionInput {
+  name:             string;
+  price_adjustment?: number;
+  stock_sku?:        string;
+  is_default?:       boolean;
+}
+
+export interface MenuItemModifierInput {
+  group_name:     string;
+  is_required?:   boolean;
+  min_selections?: number;
+  max_selections?: number;
+  options: MenuItemModifierOptionInput[];
+}
+
+export interface MenuItemCompositeRequest {
+  sku?:          string;
+  name:          string;
+  category_name?: string;
+  description?:  string;
+  selling_price: number;
+  tags?:         string[];
+  is_perishable?: boolean;
+  image_url?:    string;
+  servings?:     number;
+  target_margin_percent?: number;
+  prep_time_minutes?:     number;
+  ingredients:   MenuItemIngredientInput[];
+  modifiers?:    MenuItemModifierInput[];
+}
+
+export interface ReorderSeed {
+  sku:           string;
+  reorder_level: number;
+  reorder_qty:   number;
+  source:        string;
+}
+
+export interface MenuItemCompositeResult {
+  item:           Item;
+  recipe:         import('./recipes').Recipe;
+  reorder_seeds?: ReorderSeed[];
+  warnings?:      string[];
+}
 
 export interface ImportSheetResult {
   created: number;

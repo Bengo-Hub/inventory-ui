@@ -2,11 +2,14 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
+import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
+import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { apiClient } from '@/lib/api/client';
-import { type CreateItemInput, type Item, type RecurrenceConfig } from '@/lib/api/items';
-import { useQuery } from '@tanstack/react-query';
-import { Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
+import { type CreateItemInput, type Item, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi } from '@/lib/api/items';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, ChevronUp, Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 interface Category {
   id: string;
@@ -81,6 +84,33 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
   const [recurrenceConfig, setRecurrenceConfig] = useState<RecurrenceConfig | null>(
     (item?.metadata?.is_recurring && existingRc) ? existingRc : null
   );
+
+  // Recipe fields — shown when type === 'RECIPE'
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [servings, setServings] = useState('1');
+  const [recipeIngredients, setRecipeIngredients] = useState<IngredientRowValue[]>([]);
+  const [recipeOpen, setRecipeOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const compositeMut = useMutation({
+    mutationFn: (payload: MenuItemCompositeRequest) => itemsApi.createMenuItemComposite(orgSlug, payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['recipes', orgSlug] });
+      if (data.warnings?.length) {
+        toast.warning(data.warnings.join('; '));
+      } else {
+        toast.success('Menu item created');
+      }
+      onClose();
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const isRecipe = type === 'RECIPE';
+  const batchCost = recipeIngredients.reduce((sum, row) => {
+    if (!row.qty || !(row.cost_price ?? 0)) return sum;
+    return sum + row.qty * (row.cost_price ?? 0) * (1 + (row.waste_percent ?? 0) / 100);
+  }, 0);
 
   useEffect(() => {
     if (item) {
@@ -157,6 +187,31 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+
+    // Composite path: RECIPE type with ingredients defined inline
+    if (isRecipe && recipeIngredients.length > 0 && sellingPrice) {
+      compositeMut.mutate({
+        name: name.trim(),
+        sku: sku.trim() || undefined,
+        description: description.trim() || undefined,
+        category_name: categories?.find((c) => c.id === categoryId)?.name,
+        selling_price: parseFloat(sellingPrice),
+        servings: parseFloat(servings) || 1,
+        tags: [],
+        is_perishable: isPerishable,
+        image_url: imageUrl || undefined,
+        ingredients: recipeIngredients.map((row) => ({
+          ingredient_name: row.ingredient_name,
+          ingredient_sku:  row.ingredient_sku || undefined,
+          qty:             row.qty,
+          unit:            row.unit,
+          waste_percent:   row.waste_percent || 0,
+          notes:           row.notes || undefined,
+          cost_price:      row.cost_price,
+        })),
+      });
+      return;
+    }
 
     const metadata: Record<string, unknown> = {};
     if (type === 'SERVICE') {
@@ -327,6 +382,90 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
                   Track Lots
                 </label>
               </div>
+
+              {/* Recipe section — RECIPE type only */}
+              {isRecipe && (
+                <div className="space-y-3 border-t border-border pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setRecipeOpen((o) => !o)}
+                    className="flex items-center justify-between w-full text-sm font-semibold"
+                  >
+                    <span>Recipe / BOM Ingredients</span>
+                    {recipeOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+
+                  {recipeOpen && (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Selling Price (KES) *</label>
+                          <Input
+                            type="number"
+                            min={0}
+                            step={0.01}
+                            placeholder="e.g. 900"
+                            value={sellingPrice}
+                            onChange={(e) => setSellingPrice(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">The price customers pay. Never overwritten by the system.</p>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Servings (yield)</label>
+                          <Input
+                            type="number"
+                            min={0.1}
+                            step={0.5}
+                            placeholder="1"
+                            value={servings}
+                            onChange={(e) => setServings(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">Portions this batch produces.</p>
+                        </div>
+                      </div>
+
+                      {/* Ingredient rows */}
+                      <div className="space-y-0">
+                        <div className="grid grid-cols-[1fr_80px_80px_60px_60px_auto] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+                          <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>Cost</span><span/>
+                        </div>
+                        {recipeIngredients.map((row, i) => (
+                          <RecipeIngredientRow
+                            key={i}
+                            orgSlug={orgSlug}
+                            row={row}
+                            index={i}
+                            onChange={(idx, updated) =>
+                              setRecipeIngredients((prev) => prev.map((r, j) => j === idx ? updated : r))
+                            }
+                            onRemove={(idx) =>
+                              setRecipeIngredients((prev) => prev.filter((_, j) => j !== idx))
+                            }
+                          />
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => setRecipeIngredients((prev) => [...prev, {
+                            ingredient_name: '', ingredient_sku: '', qty: 0, unit: 'g', waste_percent: 0, notes: '',
+                          }])}
+                          className="flex items-center gap-1 text-xs text-primary hover:underline mt-2"
+                        >
+                          <Plus className="h-3 w-3" /> Add Ingredient
+                        </button>
+                      </div>
+
+                      {/* Live budget bar */}
+                      {sellingPrice && parseFloat(sellingPrice) > 0 && (
+                        <FoodCostBudgetBar
+                          sellingPrice={parseFloat(sellingPrice)}
+                          batchCost={batchCost}
+                          servings={parseFloat(servings) || 1}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Event Details — SERVICE type only */}
               {isService && (

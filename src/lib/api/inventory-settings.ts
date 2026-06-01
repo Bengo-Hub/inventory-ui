@@ -19,6 +19,7 @@ export interface InventorySettings {
   recipes_module_enabled: boolean;
   purchase_orders_enabled: boolean;
   supplier_management_enabled: boolean;
+  default_target_margin_percent?: number | null;
   updated_at: string;
 }
 
@@ -36,6 +37,7 @@ export interface UpdateInventorySettingsInput {
   enable_expiry_tracking?: boolean;
   purchase_order_approval_required?: boolean;
   auto_adjust_on_transfer?: boolean;
+  default_target_margin_percent?: number;
 }
 
 export interface UpdateInventoryModulesInput {

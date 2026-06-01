@@ -186,12 +186,15 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     lowStockPct: 20,
     criticalStockPct: 5,
     defaultReorderLevel: 10,
+    defaultTargetMargin: 30,
     enableLotTracking: false,
     enableExpiryTracking: false,
     purchaseOrderApprovalRequired: false,
     autoAdjustOnTransfer: true,
   });
   const [unitDefaults, setUnitDefaults] = useState<Record<string, number>>({});
+  const [newUnitAbbr, setNewUnitAbbr] = useState('');
+  const [newUnitLevel, setNewUnitLevel] = useState('');
 
   useEffect(() => {
     if (settings) {
@@ -199,6 +202,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         lowStockPct: settings.low_stock_threshold_pct,
         criticalStockPct: settings.critical_stock_threshold_pct,
         defaultReorderLevel: settings.default_reorder_level,
+        defaultTargetMargin: settings.default_target_margin_percent ?? 30,
         enableLotTracking: settings.enable_lot_tracking,
         enableExpiryTracking: settings.enable_expiry_tracking,
         purchaseOrderApprovalRequired: settings.purchase_order_approval_required,
@@ -213,12 +217,13 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       low_stock_threshold_pct: form.lowStockPct,
       critical_stock_threshold_pct: form.criticalStockPct,
       default_reorder_level: form.defaultReorderLevel,
+      default_target_margin_percent: form.defaultTargetMargin,
       unit_reorder_defaults: unitDefaults,
       enable_lot_tracking: form.enableLotTracking,
       enable_expiry_tracking: form.enableExpiryTracking,
       purchase_order_approval_required: form.purchaseOrderApprovalRequired,
       auto_adjust_on_transfer: form.autoAdjustOnTransfer,
-    });
+    } as Parameters<typeof update.mutate>[0]);
   };
 
   if (isLoading) return (
@@ -276,34 +281,89 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
               />
               <p className="text-xs text-muted-foreground">Global fallback when no unit-specific default applies.</p>
             </div>
+            <div className="space-y-2">
+              <label className={labelClass}>Default Target Margin %</label>
+              <input
+                type="number"
+                min={0}
+                max={99}
+                step={1}
+                value={form.defaultTargetMargin}
+                onChange={(e) => setForm((f) => ({ ...f, defaultTargetMargin: parseFloat(e.target.value) || 30 }))}
+                disabled={!canEdit}
+                className={`${inputClass} font-mono`}
+              />
+              <p className="text-xs text-muted-foreground">Used in recipe costing: suggested_price = cost ÷ (1 − margin%). Food cost target = 100% − margin%.</p>
+            </div>
           </div>
 
           {/* Per-unit reorder defaults */}
-          {Object.keys(unitDefaults).length > 0 && (
-            <div className="space-y-3">
-              <div>
-                <label className={labelClass}>Reorder Defaults by Unit</label>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Minimum quantity to reorder per unit type. Applied when an item has no explicit reorder level configured.
-                </p>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-                {Object.entries(unitDefaults).map(([abbr, qty]) => (
-                  <div key={abbr} className="space-y-1">
-                    <label className="text-xs font-semibold text-muted-foreground uppercase">{abbr}</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={qty}
-                      onChange={(e) => setUnitDefaults((prev) => ({ ...prev, [abbr]: parseInt(e.target.value) || 0 }))}
-                      disabled={!canEdit}
-                      className={`${inputClass} font-mono`}
-                    />
-                  </div>
-                ))}
-              </div>
+          <div className="space-y-3">
+            <div>
+              <label className={labelClass}>Reorder Defaults by Unit</label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Minimum quantity to reorder per unit type. Applied when an item has no explicit reorder level configured.
+                New ingredients are auto-seeded from this table on creation.
+              </p>
             </div>
-          )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+              {Object.entries(unitDefaults).map(([abbr, qty]) => (
+                <div key={abbr} className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase">{abbr}</label>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        onClick={() => setUnitDefaults((prev) => { const n = { ...prev }; delete n[abbr]; return n; })}
+                        className="text-muted-foreground hover:text-destructive text-xs"
+                        title="Remove unit default"
+                      >✕</button>
+                    )}
+                  </div>
+                  <input
+                    type="number"
+                    min={0}
+                    value={qty}
+                    onChange={(e) => setUnitDefaults((prev) => ({ ...prev, [abbr]: parseInt(e.target.value) || 0 }))}
+                    disabled={!canEdit}
+                    className={`${inputClass} font-mono`}
+                  />
+                </div>
+              ))}
+            </div>
+            {canEdit && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  placeholder="Unit abbr (e.g. kg)"
+                  value={newUnitAbbr}
+                  onChange={(e) => setNewUnitAbbr(e.target.value)}
+                  className={`${inputClass} w-32`}
+                />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Level"
+                  value={newUnitLevel}
+                  onChange={(e) => setNewUnitLevel(e.target.value)}
+                  className={`${inputClass} w-24`}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (!newUnitAbbr.trim()) return;
+                    setUnitDefaults((prev) => ({ ...prev, [newUnitAbbr.trim().toLowerCase()]: parseInt(newUnitLevel) || 0 }));
+                    setNewUnitAbbr('');
+                    setNewUnitLevel('');
+                  }}
+                >
+                  + Add Unit
+                </Button>
+              </div>
+            )}
+          </div>
 
           {[
             { key: 'enableLotTracking' as const, label: 'Lot / Batch Tracking', desc: 'Track inventory by lot/batch numbers for traceability.' },
