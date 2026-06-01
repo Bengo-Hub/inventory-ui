@@ -10,7 +10,7 @@ import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { Download, Edit2, Eye, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
 import { useParams, useRouter } from 'next/navigation';
@@ -224,10 +224,11 @@ export default function CatalogPage() {
   return (
     <>
       <div className="p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          {/* Title */}
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">Stock Catalog</h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {outlet ? (
                 <>Showing items for <span className="font-medium text-foreground">{outlet.name}</span></>
               ) : (
@@ -235,39 +236,60 @@ export default function CatalogPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+
+          {/* Action toolbar */}
+          <div className="flex flex-wrap items-center gap-2">
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xlsm" className="hidden" onChange={handleFileChange} />
+
+            {/* Bulk-import group — gated by subscription feature */}
             {canBulkImport && (
               <>
                 {warehouses && warehouses.length > 0 && (
                   <select
                     value={selectedWarehouseCode}
                     onChange={(e) => setSelectedWarehouseCode(e.target.value)}
-                    className="h-9 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:ring-1 focus:ring-ring focus:outline-none"
+                    className="h-9 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none max-w-[200px]"
                     title="Target warehouse for import"
                   >
-                    <option value="">— Select Warehouse —</option>
+                    <option value="">All Warehouses</option>
                     {warehouses.map((wh) => (
                       <option key={wh.id} value={wh.code}>{wh.name}</option>
                     ))}
                   </select>
                 )}
-                <a href={templateUrl} download className="inline-flex">
-                  <Button variant="ghost" size="sm" type="button" asChild>
-                    <span><Download className="h-4 w-4 mr-1.5" />Template</span>
-                  </Button>
-                </a>
-                <Button variant="outline" onClick={() => { setImportResult(null); fileInputRef.current?.click(); }} disabled={isImporting}>
-                  <Upload className="h-4 w-4 mr-2" />
+
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={templateUrl}
+                    download="inventory-template.xlsx"
+                    title="Download XLSX template — fill and re-upload to bulk-add menu items"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 mr-1.5" />Template
+                  </a>
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { setImportResult(null); fileInputRef.current?.click(); }}
+                  disabled={isImporting}
+                  title="Import a filled XLSX or CSV template"
+                >
+                  <Upload className="h-4 w-4 mr-1.5" />
                   {isImporting ? 'Importing…' : 'Import'}
                 </Button>
+
+                {/* Visual separator between import and create groups */}
+                <div className="h-6 w-px bg-border" />
               </>
             )}
-            <Button variant="outline" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />New Item
+
+            {/* Create actions */}
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="h-4 w-4 mr-1.5" />New Item
             </Button>
-            <Button onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
-              <Plus className="h-4 w-4 mr-2" />New Menu Item
+            <Button size="sm" onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
+              <Plus className="h-4 w-4 mr-1.5" />New Menu Item
             </Button>
           </div>
         </div>
