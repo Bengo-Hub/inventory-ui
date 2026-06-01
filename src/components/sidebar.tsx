@@ -329,8 +329,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
 
       <aside
         className={cn(
+          // Mobile: fixed overlay that slides in/out
           'fixed inset-y-0 left-0 z-50 flex w-64 flex-col transition-transform duration-300',
-          'lg:sticky lg:top-0 lg:h-screen lg:z-auto lg:translate-x-0',
+          // Desktop: static flex child inside the fixed shell — reset inset so
+          // the fixed-position mobile classes don't bleed through, h-full fills
+          // the shell height, sticky is NOT used (it's disabled by overflow:hidden
+          // ancestors and the shell is already viewport-locked via fixed inset-0)
+          'lg:static lg:inset-auto lg:h-full lg:z-auto lg:translate-x-0',
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
       >

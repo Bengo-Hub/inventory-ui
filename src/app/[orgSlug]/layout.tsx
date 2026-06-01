@@ -51,19 +51,25 @@ export default function OrgLayout({ children }: { children: ReactNode }) {
                     <ManifestInjector />
                     <PWAUpdateBanner />
                     <PWARegistration />
-                    <div className="flex h-screen overflow-hidden bg-background">
-                    <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-                    <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-                        <Header onMenuClick={() => setSidebarOpen(true)} />
-                        <SubscriptionBanner />
-                        <main className="flex-1 overflow-y-auto bg-accent/5">
-                            <div className="min-h-full flex flex-col">
-                                <div className="flex-1">{children}</div>
-                                <Footer />
-                            </div>
-                        </main>
+                    {/*
+                      * Shell is fixed to the viewport so the document never scrolls.
+                      * Only <main> (overflow-y-auto + min-h-0) scrolls its content.
+                      * min-h-0 is required on <main> — without it flex children have
+                      * min-height:auto and overflow-y-auto never creates a scroll context.
+                      */}
+                    <div className="fixed inset-0 flex overflow-hidden bg-background">
+                        <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+                        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+                            <Header onMenuClick={() => setSidebarOpen(true)} />
+                            <SubscriptionBanner />
+                            <main className="flex-1 min-h-0 overflow-y-auto bg-accent/5">
+                                <div className="min-h-full flex flex-col">
+                                    <div className="flex-1">{children}</div>
+                                    <Footer />
+                                </div>
+                            </main>
+                        </div>
                     </div>
-                </div>
                 </BrandingProvider>
             </AuthProvider>
         </QueryClientProvider>
