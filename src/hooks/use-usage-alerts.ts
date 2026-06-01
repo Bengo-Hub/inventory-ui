@@ -2,7 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
-import type { UsageAlert } from '@bengo-hub/shared-ui-lib/subscription';
+// UsageAlert is not yet exported by shared-ui-lib — define locally.
+interface UsageAlert {
+  metric:   string;
+  used:     number;
+  limit:    number;
+  pct:      number;
+  severity: 'warning' | 'critical';
+}
 
 const SUBSCRIPTIONS_API_URL =
   process.env.NEXT_PUBLIC_SUBSCRIPTIONS_API_URL ||

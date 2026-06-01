@@ -118,4 +118,30 @@ export const itemsApi = {
       form,
     );
   },
+
+  bulkImport: (orgSlug: string, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return apiClient.post<BulkImportResult>(
+      `/api/v1/${orgSlug}/inventory/bulk-import`,
+      form,
+    );
+  },
+
+  downloadTemplateUrl: (orgSlug: string) =>
+    `/api/v1/${orgSlug}/inventory/import-template`,
 };
+
+export interface ImportSheetResult {
+  created: number;
+  updated: number;
+  failed:  number;
+  errors?: string[];
+}
+
+export interface BulkImportResult {
+  items:     ImportSheetResult;
+  recipes:   ImportSheetResult;
+  modifiers: ImportSheetResult;
+  stock:     ImportSheetResult;
+}

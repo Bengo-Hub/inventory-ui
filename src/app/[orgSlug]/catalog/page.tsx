@@ -3,13 +3,13 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { apiClient } from '@/lib/api/client';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
 import { useCategories } from '@/hooks/useCategories';
-import { type CreateItemInput, type Item } from '@/lib/api/items';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useBulkImport } from '@/hooks/useBulkImport';
+import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
+import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { Edit2, Eye, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { Download, Edit2, Eye, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useParams } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -167,26 +167,26 @@ export default function CatalogPage() {
   const updateItem = useUpdateItem(orgSlug);
   const deleteItemMut = useDeleteItem(orgSlug);
   const { data: categories } = useCategories(orgSlug);
+  const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
 
-  const importMutation = useMutation({
-    mutationFn: (file: File) => {
-      const formData = new FormData();
-      formData.append('file', file);
-      return apiClient.post(`/api/v1/${orgSlug}/inventory/items/import`, formData);
-    },
-    onSuccess: () => {
-      toast.success('Items imported successfully');
-      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
-    },
-    onError: () => toast.error('Failed to import items'),
-  });
+  const { bulkImport, isPending: isImporting, templateUrl } = useBulkImport(orgSlug);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (file) {
-      if (!file.name.endsWith('.csv')) { toast.error('Please select a CSV file'); return; }
-      importMutation.mutate(file);
+    if (!file) return;
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    if (!['csv', 'xlsx', 'xlsm'].includes(ext ?? '')) {
+      toast.error('Unsupported file type. Use .csv or .xlsx');
+      return;
     }
+    bulkImport(file, {
+      onSuccess: (data) => {
+        setImportResult(data);
+        const total = data.items.created + data.items.updated + data.recipes.created + data.recipes.updated;
+        toast.success(`Import complete — ${total} records processed`);
+      },
+      onError: () => toast.error('Import failed. Check file format and try again.'),
+    });
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -228,17 +228,65 @@ export default function CatalogPage() {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importMutation.isPending}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xlsm" className="hidden" onChange={handleFileChange} />
+            <a href={templateUrl} download className="inline-flex">
+              <Button variant="ghost" size="sm" type="button" asChild>
+                <span><Download className="h-4 w-4 mr-1.5" />Template</span>
+              </Button>
+            </a>
+            <Button variant="outline" onClick={() => { setImportResult(null); fileInputRef.current?.click(); }} disabled={isImporting}>
               <Upload className="h-4 w-4 mr-2" />
-              {importMutation.isPending ? 'Importing...' : 'Import CSV'}
+              {isImporting ? 'Importing…' : 'Import'}
             </Button>
             <Button onClick={() => setCreateOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />New Item
             </Button>
           </div>
         </div>
+
+        {importResult && (
+          <div className="rounded-lg border border-border bg-muted/30 p-4 text-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="font-semibold text-foreground">Import Results</p>
+              <button onClick={() => setImportResult(null)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {([
+                { label: 'Items',     data: importResult.items },
+                { label: 'Recipes',   data: importResult.recipes },
+                { label: 'Modifiers', data: importResult.modifiers },
+                { label: 'Stock',     data: importResult.stock },
+              ] as const).map(({ label, data }) => (
+                <div key={label} className="rounded-md bg-background border border-border p-3 space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium">{label}</p>
+                  <p className="text-xs">
+                    <span className="text-emerald-600 font-semibold">{data.created ?? 0} created</span>
+                    {', '}
+                    <span className="text-blue-600 font-semibold">{data.updated ?? 0} updated</span>
+                    {(data.failed ?? 0) > 0 && (
+                      <>, <span className="text-red-600 font-semibold">{data.failed} failed</span></>
+                    )}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {(importResult.items.errors?.length ?? 0) > 0 && (
+              <details className="text-xs text-red-600">
+                <summary className="cursor-pointer font-medium">
+                  {(importResult.items.errors?.length ?? 0) + (importResult.recipes.errors?.length ?? 0)} error(s) — click to expand
+                </summary>
+                <ul className="mt-1 list-disc list-inside space-y-0.5">
+                  {[...(importResult.items.errors ?? []), ...(importResult.recipes.errors ?? [])].slice(0, 20).map((e, i) => (
+                    <li key={i}>{e}</li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
 
         <Card>
           <CardHeader className="space-y-3">
