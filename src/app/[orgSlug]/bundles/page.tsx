@@ -36,6 +36,8 @@ interface ComponentRow {
     quantity: number;
     component_kind?: ComponentKind;
     meal_period?: MealPeriod | '';
+    is_metered?: boolean;
+    unit?: string;
 }
 
 interface BundleModalProps {
@@ -108,6 +110,10 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             : c));
     }
 
+    function updateComponentField(id: string, patch: Partial<ComponentRow>) {
+        setComponents(prev => prev.map(c => c.component_item_id === id ? { ...c, ...patch } : c));
+    }
+
     function addComponent(item: { id: string; name: string; sku: string }) {
         if (components.some(c => c.component_item_id === item.id)) {
             toast.error('Item already added to this bundle');
@@ -146,6 +152,8 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                 quantity: c.quantity,
                 component_kind: c.component_kind,
                 meal_period: c.meal_period || undefined,
+                is_metered: c.is_metered,
+                unit: c.unit || undefined,
             })),
         };
 
@@ -259,6 +267,21 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                                                 <option value="">— item —</option>
                                                 {MEAL_PERIODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
                                             </select>
+                                        )}
+                                        {isPackage && (
+                                            <>
+                                                <input
+                                                    value={c.unit ?? ''}
+                                                    onChange={e => updateComponentField(c.component_item_id, { unit: e.target.value })}
+                                                    placeholder="unit"
+                                                    className="w-20 rounded-lg border border-input bg-transparent px-2 py-1 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
+                                                    title="Human-readable unit, e.g. 2x500ml water"
+                                                />
+                                                <label className="flex items-center gap-1 text-[11px] text-muted-foreground cursor-pointer" title="Charged on actuals rather than included flat">
+                                                    <input type="checkbox" checked={!!c.is_metered} onChange={e => updateComponentField(c.component_item_id, { is_metered: e.target.checked })} className="rounded" />
+                                                    metered
+                                                </label>
+                                            </>
                                         )}
                                         <div className="flex items-center gap-1">
                                             <button type="button" onClick={() => updateQty(c.component_item_id, c.quantity - 1)}
