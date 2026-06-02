@@ -11,8 +11,16 @@ import {
     useUpdateBundle,
 } from '@/hooks/useBundles';
 import { useItems } from '@/hooks/useItems';
-import { type Bundle, type CreateBundleInput } from '@/lib/api/bundles';
+import { type Bundle, type CreateBundleInput, type PackageType, type PriceBasis, type ComponentKind, type MealPeriod, PACKAGE_TYPES, MEAL_PERIODS } from '@/lib/api/bundles';
 import type { Item } from '@/lib/api/items';
+
+const PRICE_BASES: { value: PriceBasis; label: string }[] = [
+    { value: 'flat', label: 'Flat' },
+    { value: 'per_delegate_per_day', label: 'Per Delegate / Day' },
+    { value: 'per_person_sharing', label: 'Per Person Sharing' },
+    { value: 'per_session', label: 'Per Session' },
+];
+const bundleSelectCls = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none appearance-none';
 import { Minus, Package, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -26,6 +34,8 @@ interface ComponentRow {
     component_item_id: string;
     item_name: string;
     quantity: number;
+    component_kind?: ComponentKind;
+    meal_period?: MealPeriod | '';
 }
 
 interface BundleModalProps {
@@ -49,14 +59,23 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
         return '';
     });
     const [isActive, setIsActive] = useState(editing?.is_active ?? true);
+    const [packageType, setPackageType] = useState<PackageType>(editing?.package_type ?? 'RETAIL_KIT');
+    const [priceBasis, setPriceBasis] = useState<PriceBasis>(editing?.price_basis ?? 'flat');
+    const [minDelegates, setMinDelegates] = useState(editing?.min_delegates != null ? String(editing.min_delegates) : '');
+    const [accommodationIncluded, setAccommodationIncluded] = useState(editing?.accommodation_included ?? false);
     const [components, setComponents] = useState<ComponentRow[]>(
         editing?.components.map(c => ({
             component_item_id: c.component_item_id,
             item_name: c.item_name ?? c.component_item_id,
             quantity: c.quantity,
+            component_kind: c.component_kind,
+            meal_period: c.meal_period ?? '',
         })) ?? []
     );
     const [addQty, setAddQty] = useState(1);
+
+    // Conference/event packages expose meal-period tagging on components.
+    const isPackage = packageType !== 'RETAIL_KIT';
 
     useEffect(() => {
         if (editing) {
@@ -65,13 +84,25 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             const found = allItems.find(i => i.id === editing.item_id);
             setItemName(found ? `${found.name} (${found.sku})` : '');
             setIsActive(editing.is_active);
+            setPackageType(editing.package_type ?? 'RETAIL_KIT');
+            setPriceBasis(editing.price_basis ?? 'flat');
+            setMinDelegates(editing.min_delegates != null ? String(editing.min_delegates) : '');
+            setAccommodationIncluded(editing.accommodation_included ?? false);
             setComponents(editing.components.map(c => ({
                 component_item_id: c.component_item_id,
                 item_name: c.item_name ?? c.component_item_id,
                 quantity: c.quantity,
+                component_kind: c.component_kind,
+                meal_period: c.meal_period ?? '',
             })));
         }
     }, [editing, allItems]);
+
+    function updateComponentMeal(id: string, meal: MealPeriod | '') {
+        setComponents(prev => prev.map(c => c.component_item_id === id
+            ? { ...c, meal_period: meal, component_kind: meal ? 'MEAL_PERIOD' : 'ITEM' }
+            : c));
+    }
 
     function addComponent(item: { id: string; name: string; sku: string }) {
         if (components.some(c => c.component_item_id === item.id)) {
@@ -100,7 +131,16 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             name: name.trim(),
             item_id: itemId,
             is_active: isActive,
-            components: components.map(c => ({ component_item_id: c.component_item_id, quantity: c.quantity })),
+            package_type: packageType,
+            price_basis: priceBasis,
+            min_delegates: minDelegates ? parseInt(minDelegates, 10) : undefined,
+            accommodation_included: accommodationIncluded,
+            components: components.map(c => ({
+                component_item_id: c.component_item_id,
+                quantity: c.quantity,
+                component_kind: c.component_kind,
+                meal_period: c.meal_period || undefined,
+            })),
         };
 
         if (editing) {
@@ -154,6 +194,34 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                         <label htmlFor="is_active" className="text-sm">Active</label>
                     </div>
 
+                    {/* Package type — conference / room rate plans / service sessions */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Package Type</label>
+                            <select value={packageType} onChange={e => setPackageType(e.target.value as PackageType)} className={bundleSelectCls}>
+                                {PACKAGE_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </select>
+                        </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Price Basis</label>
+                            <select value={priceBasis} onChange={e => setPriceBasis(e.target.value as PriceBasis)} className={bundleSelectCls}>
+                                {PRICE_BASES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    {isPackage && (
+                        <div className="grid grid-cols-2 gap-4 items-end">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Min Delegates</label>
+                                <Input type="number" min={0} value={minDelegates} onChange={e => setMinDelegates(e.target.value)} placeholder="e.g. 10" />
+                            </div>
+                            <label className="flex items-center gap-2 text-sm cursor-pointer pb-2">
+                                <input type="checkbox" checked={accommodationIncluded} onChange={e => setAccommodationIncluded(e.target.checked)} className="rounded" />
+                                Accommodation included (residential)
+                            </label>
+                        </div>
+                    )}
+
                     {/* Components */}
                     <div className="space-y-3">
                         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Components</label>
@@ -163,6 +231,17 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                                 {components.map(c => (
                                     <div key={c.component_item_id} className="flex items-center gap-3 px-4 py-2">
                                         <span className="flex-1 text-sm">{c.item_name}</span>
+                                        {isPackage && (
+                                            <select
+                                                value={c.meal_period ?? ''}
+                                                onChange={e => updateComponentMeal(c.component_item_id, e.target.value as MealPeriod | '')}
+                                                className="rounded-lg border border-input bg-transparent px-2 py-1 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
+                                                title="Tag as a meal period (drives delegate meal-card generation)"
+                                            >
+                                                <option value="">— item —</option>
+                                                {MEAL_PERIODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+                                            </select>
+                                        )}
                                         <div className="flex items-center gap-1">
                                             <button type="button" onClick={() => updateQty(c.component_item_id, c.quantity - 1)}
                                                 className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground">
