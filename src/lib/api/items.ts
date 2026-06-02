@@ -135,7 +135,7 @@ export interface PaginatedItems {
 }
 
 export const itemsApi = {
-  list: async (orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string }): Promise<PaginatedItems> => {
+  list: async (orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string; use_case?: string }): Promise<PaginatedItems> => {
     const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), params as Record<string, string | number | undefined>);
     if (Array.isArray(res)) {
       return { data: res, total: res.length, page: 1, limit: res.length, hasMore: false };

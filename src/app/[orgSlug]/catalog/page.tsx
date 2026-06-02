@@ -161,6 +161,7 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [useCaseFilter, setUseCaseFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -213,6 +214,7 @@ export default function CatalogPage() {
     ...(search ? { search } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
     ...(typeFilter ? { type: typeFilter } : {}),
+    ...(useCaseFilter ? { use_case: useCaseFilter } : {}),
     status: statusFilter,
     page,
     limit: ITEMS_PER_PAGE,
@@ -381,6 +383,22 @@ export default function CatalogPage() {
                   </Button>
                 ))}
               </div>
+              {/* Use-case filter (hospitality) */}
+              <select
+                value={useCaseFilter}
+                onChange={(e) => { setUseCaseFilter(e.target.value); setPage(1); }}
+                className="shrink-0 rounded-lg border border-input bg-transparent px-3 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
+                title="Filter by hospitality use-case"
+              >
+                <option value="">All Use Cases</option>
+                <option value="RETAIL">Retail</option>
+                <option value="FOOD_BEVERAGE">Food &amp; Beverage</option>
+                <option value="HOSPITALITY_ROOM">Hotel Rooms</option>
+                <option value="HOSPITALITY_FACILITY">Facilities</option>
+                <option value="CONFERENCE">Conference</option>
+                <option value="SALON_SERVICE">Salon / Spa</option>
+                <option value="AMENITY">Amenities</option>
+              </select>
             </div>
 
             {/* Category filter pills row */}
@@ -436,7 +454,7 @@ export default function CatalogPage() {
                         {(search || categoryId || typeFilter || statusFilter !== 'active') && (
                           <button
                             className="text-sm text-primary hover:underline mt-1"
-                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setStatusFilter('active'); setPage(1); }}
+                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setUseCaseFilter(''); setStatusFilter('active'); setPage(1); }}
                           >
                             Clear filters
                           </button>

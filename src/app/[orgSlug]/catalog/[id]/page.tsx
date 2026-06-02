@@ -241,14 +241,16 @@ export default function ItemDetailPage() {
                                 <thead>
                                     <tr className="border-b border-border bg-muted/30">
                                         <th className="text-left px-6 py-3 font-medium text-muted-foreground">Pricing Tier</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Basis</th>
                                         <th className="text-right px-6 py-3 font-medium text-muted-foreground">Price</th>
                                         <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Currency</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {itemPricing?.map((p) => (
-                                        <tr key={p.tier_id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-3 font-medium">{p.tier_name ?? p.tier_id}</td>
+                                        <tr key={`${p.tier_id}-${p.outlet_id ?? 'all'}`} className="hover:bg-accent/30 transition-colors">
+                                            <td className="px-6 py-3 font-medium">{p.tier_name ?? p.tier_id}{p.outlet_id ? ' (outlet)' : ''}</td>
+                                            <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell capitalize">{(p.tier_basis ?? 'default').replace(/_/g, ' ')}</td>
                                             <td className="px-6 py-3 text-right font-semibold tabular-nums">{p.price.toLocaleString()}</td>
                                             <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{p.currency ?? 'KES'}</td>
                                         </tr>
