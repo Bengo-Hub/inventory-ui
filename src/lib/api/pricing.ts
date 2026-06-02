@@ -9,6 +9,17 @@ export interface PricingTier {
   created_at: string;
 }
 
+export type TierBasis = 'default' | 'nightly' | 'per_session' | 'per_delegate_per_day' | 'peak' | 'off_peak';
+
+export const TIER_BASES: { value: TierBasis; label: string }[] = [
+  { value: 'default', label: 'Default' },
+  { value: 'nightly', label: 'Nightly (room)' },
+  { value: 'per_session', label: 'Per Session (facility)' },
+  { value: 'per_delegate_per_day', label: 'Per Delegate / Day (conference)' },
+  { value: 'peak', label: 'Peak' },
+  { value: 'off_peak', label: 'Off-Peak' },
+];
+
 export interface ItemPricing {
   item_id: string;
   item_name?: string;
@@ -17,6 +28,10 @@ export interface ItemPricing {
   tier_name?: string;
   price: number;
   currency?: string;
+  /** Outlet-level rate override (null = applies to all outlets). */
+  outlet_id?: string | null;
+  /** Pricing basis/season for hospitality rate tiers. */
+  tier_basis?: TierBasis;
 }
 
 export interface CreateTierInput {
@@ -27,6 +42,8 @@ export interface CreateTierInput {
 
 export interface UpsertItemPricingInput {
   price: number;
+  outlet_id?: string;
+  tier_basis?: TierBasis;
 }
 
 export const pricingApi = {
