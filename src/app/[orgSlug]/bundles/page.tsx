@@ -63,6 +63,8 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
     const [priceBasis, setPriceBasis] = useState<PriceBasis>(editing?.price_basis ?? 'flat');
     const [minDelegates, setMinDelegates] = useState(editing?.min_delegates != null ? String(editing.min_delegates) : '');
     const [accommodationIncluded, setAccommodationIncluded] = useState(editing?.accommodation_included ?? false);
+    const [sessionsTotal, setSessionsTotal] = useState(editing?.sessions_total != null ? String(editing.sessions_total) : '');
+    const [validityDays, setValidityDays] = useState(editing?.validity_days != null ? String(editing.validity_days) : '');
     const [components, setComponents] = useState<ComponentRow[]>(
         editing?.components.map(c => ({
             component_item_id: c.component_item_id,
@@ -88,6 +90,8 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             setPriceBasis(editing.price_basis ?? 'flat');
             setMinDelegates(editing.min_delegates != null ? String(editing.min_delegates) : '');
             setAccommodationIncluded(editing.accommodation_included ?? false);
+            setSessionsTotal(editing.sessions_total != null ? String(editing.sessions_total) : '');
+            setValidityDays(editing.validity_days != null ? String(editing.validity_days) : '');
             setComponents(editing.components.map(c => ({
                 component_item_id: c.component_item_id,
                 item_name: c.item_name ?? c.component_item_id,
@@ -135,6 +139,8 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
             price_basis: priceBasis,
             min_delegates: minDelegates ? parseInt(minDelegates, 10) : undefined,
             accommodation_included: accommodationIncluded,
+            sessions_total: sessionsTotal ? parseInt(sessionsTotal, 10) : undefined,
+            validity_days: validityDays ? parseInt(validityDays, 10) : undefined,
             components: components.map(c => ({
                 component_item_id: c.component_item_id,
                 quantity: c.quantity,
@@ -219,6 +225,18 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                                 <input type="checkbox" checked={accommodationIncluded} onChange={e => setAccommodationIncluded(e.target.checked)} className="rounded" />
                                 Accommodation included (residential)
                             </label>
+                        </div>
+                    )}
+                    {packageType === 'SERVICE_SESSIONS' && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Sessions Total</label>
+                                <Input type="number" min={0} value={sessionsTotal} onChange={e => setSessionsTotal(e.target.value)} placeholder="e.g. 10" />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Validity (days)</label>
+                                <Input type="number" min={0} value={validityDays} onChange={e => setValidityDays(e.target.value)} placeholder="e.g. 365" />
+                            </div>
                         </div>
                     )}
 
