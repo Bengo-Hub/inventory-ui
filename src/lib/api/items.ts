@@ -44,9 +44,46 @@ export interface Item {
   event_start_at?: string | null;
   event_end_at?: string | null;
   event_venue?: string | null;
+  // Hospitality fields — room-type / facility / amenity SERVICE items
+  use_case?: ItemUseCase;
+  meal_plan?: MealPlan | null;
+  occupancy_basis?: 'per_person_sharing' | 'per_room' | null;
+  max_adults?: number | null;
+  max_children?: number | null;
+  extra_bed_allowed?: boolean;
+  single_supplement?: number | null;
   created_at: string;
   updated_at: string;
 }
+
+export type ItemUseCase =
+  | 'RETAIL'
+  | 'FOOD_BEVERAGE'
+  | 'HOSPITALITY_ROOM'
+  | 'HOSPITALITY_FACILITY'
+  | 'CONFERENCE'
+  | 'SALON_SERVICE'
+  | 'AMENITY';
+
+export type MealPlan = 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
+
+export const ITEM_USE_CASES: { value: ItemUseCase; label: string }[] = [
+  { value: 'RETAIL', label: 'Retail' },
+  { value: 'FOOD_BEVERAGE', label: 'Food & Beverage' },
+  { value: 'HOSPITALITY_ROOM', label: 'Hotel Room Type' },
+  { value: 'HOSPITALITY_FACILITY', label: 'Facility' },
+  { value: 'CONFERENCE', label: 'Conference Hall' },
+  { value: 'SALON_SERVICE', label: 'Salon / Spa Service' },
+  { value: 'AMENITY', label: 'Amenity' },
+];
+
+export const MEAL_PLANS: { value: MealPlan; label: string }[] = [
+  { value: 'RO', label: 'Room Only' },
+  { value: 'BB', label: 'Bed & Breakfast' },
+  { value: 'HB', label: 'Half Board' },
+  { value: 'FB', label: 'Full Board' },
+  { value: 'AI', label: 'All Inclusive' },
+];
 
 export interface CreateItemInput {
   sku?: string;
@@ -73,6 +110,14 @@ export interface CreateItemInput {
   event_start_at?: string;
   event_end_at?: string;
   event_venue?: string;
+  // Hospitality fields
+  use_case?: ItemUseCase;
+  meal_plan?: MealPlan;
+  occupancy_basis?: 'per_person_sharing' | 'per_room';
+  max_adults?: number;
+  max_children?: number;
+  extra_bed_allowed?: boolean;
+  single_supplement?: number;
 }
 
 export type UpdateItemInput = Partial<CreateItemInput>;

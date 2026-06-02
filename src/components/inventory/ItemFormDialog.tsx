@@ -5,7 +5,7 @@ import { RecurrenceEditor, generateRecurrencePattern } from '@/components/invent
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { apiClient } from '@/lib/api/client';
-import { type CreateItemInput, type Item, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi } from '@/lib/api/items';
+import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -75,6 +75,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
   const [eventVenue, setEventVenue] = useState(item?.event_venue ?? '');
   const [totalCapacity, setTotalCapacity] = useState(item?.total_capacity != null ? String(item.total_capacity) : '');
 
+  // Hospitality fields (SERVICE items: rooms / facilities / amenities)
+  const [useCase, setUseCase] = useState<ItemUseCase>(item?.use_case ?? 'RETAIL');
+  const [mealPlan, setMealPlan] = useState<string>(item?.meal_plan ?? '');
+  const [occupancyBasis, setOccupancyBasis] = useState<string>(item?.occupancy_basis ?? '');
+  const [maxAdults, setMaxAdults] = useState(item?.max_adults != null ? String(item.max_adults) : '');
+  const [maxChildren, setMaxChildren] = useState(item?.max_children != null ? String(item.max_children) : '');
+  const [singleSupplement, setSingleSupplement] = useState(item?.single_supplement != null ? String(item.single_supplement) : '');
+  const [extraBedAllowed, setExtraBedAllowed] = useState(item?.extra_bed_allowed ?? false);
+
   // Ticket tiers (stored in metadata.ticket_tiers)
   const existingTiers: TicketTier[] = (item?.metadata?.ticket_tiers as TicketTier[]) ?? [];
   const [tiers, setTiers] = useState<TicketTier[]>(existingTiers);
@@ -133,6 +142,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
       setEventEndAt(toLocalDatetimeValue(item.event_end_at));
       setEventVenue(item.event_venue ?? '');
       setTotalCapacity(item.total_capacity != null ? String(item.total_capacity) : '');
+      setUseCase(item.use_case ?? 'RETAIL');
+      setMealPlan(item.meal_plan ?? '');
+      setOccupancyBasis(item.occupancy_basis ?? '');
+      setMaxAdults(item.max_adults != null ? String(item.max_adults) : '');
+      setMaxChildren(item.max_children != null ? String(item.max_children) : '');
+      setSingleSupplement(item.single_supplement != null ? String(item.single_supplement) : '');
+      setExtraBedAllowed(item.extra_bed_allowed ?? false);
       const trs = (item.metadata?.ticket_tiers as TicketTier[]) ?? [];
       setTiers(trs);
       const rc = item.metadata?.recurrence_config as RecurrenceConfig | undefined;
@@ -244,6 +260,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
       event_start_at: eventStartAt ? new Date(eventStartAt).toISOString() : undefined,
       event_end_at: eventEndAt ? new Date(eventEndAt).toISOString() : undefined,
       event_venue: eventVenue.trim() || undefined,
+      // Hospitality (SERVICE items)
+      use_case: isService && useCase !== 'RETAIL' ? useCase : undefined,
+      meal_plan: isService && useCase === 'HOSPITALITY_ROOM' && mealPlan ? (mealPlan as CreateItemInput['meal_plan']) : undefined,
+      occupancy_basis: isService && useCase === 'HOSPITALITY_ROOM' && occupancyBasis ? (occupancyBasis as CreateItemInput['occupancy_basis']) : undefined,
+      max_adults: isService && useCase === 'HOSPITALITY_ROOM' && maxAdults ? parseInt(maxAdults, 10) : undefined,
+      max_children: isService && useCase === 'HOSPITALITY_ROOM' && maxChildren ? parseInt(maxChildren, 10) : undefined,
+      single_supplement: isService && useCase === 'HOSPITALITY_ROOM' && singleSupplement ? parseFloat(singleSupplement) : undefined,
+      extra_bed_allowed: isService && useCase === 'HOSPITALITY_ROOM' ? extraBedAllowed : undefined,
     });
   }
 
@@ -463,6 +487,60 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
                         />
                       )}
                     </div>
+                  )}
+                </div>
+              )}
+
+              {/* Hospitality — SERVICE type only (rooms / facilities / amenities) */}
+              {isService && (
+                <div className="space-y-4 border-t border-border pt-4">
+                  <p className="text-sm font-semibold">Hospitality</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Use Case</label>
+                    <select value={useCase} onChange={(e) => setUseCase(e.target.value as ItemUseCase)} className={selectCls}>
+                      {ITEM_USE_CASES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                    </select>
+                    <p className="text-xs text-muted-foreground">Drives how this service is sold &amp; priced in POS. Rates are set under Pricing tiers.</p>
+                  </div>
+
+                  {useCase === 'HOSPITALITY_ROOM' && (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Meal Plan</label>
+                          <select value={mealPlan} onChange={(e) => setMealPlan(e.target.value)} className={selectCls}>
+                            <option value="">— Select —</option>
+                            {MEAL_PLANS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Occupancy Basis</label>
+                          <select value={occupancyBasis} onChange={(e) => setOccupancyBasis(e.target.value)} className={selectCls}>
+                            <option value="">— Select —</option>
+                            <option value="per_room">Per Room</option>
+                            <option value="per_person_sharing">Per Person Sharing</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Max Adults</label>
+                          <Input type="number" min="0" placeholder="2" value={maxAdults} onChange={(e) => setMaxAdults(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Max Children</label>
+                          <Input type="number" min="0" placeholder="0" value={maxChildren} onChange={(e) => setMaxChildren(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Single Supplement (KES)</label>
+                          <Input type="number" min="0" step="0.01" placeholder="0" value={singleSupplement} onChange={(e) => setSingleSupplement(e.target.value)} />
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={extraBedAllowed} onChange={(e) => setExtraBedAllowed(e.target.checked)} className="rounded" />
+                        Extra bed allowed
+                      </label>
+                    </>
                   )}
                 </div>
               )}
