@@ -34,19 +34,22 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove }:
       : null;
 
   return (
-    <div className="grid grid-cols-[1fr_80px_80px_60px_60px_auto] gap-2 items-end py-2 border-b border-border last:border-0">
-      {/* Ingredient search */}
-      <div>
+    <div className="grid grid-cols-2 lg:grid-cols-[minmax(0,1fr)_72px_72px_64px_104px_100px_36px] gap-2 items-end py-3 border-b border-border last:border-0">
+      {/* Ingredient search — full width on mobile, first column on desktop */}
+      <div className="col-span-2 lg:col-span-1 min-w-0">
+        <label className="text-xs text-muted-foreground mb-1 block lg:hidden">Ingredient</label>
         <ItemSearchInput
           orgSlug={orgSlug}
           value={row.ingredient_name}
-          placeholder="Ingredient name…"
+          placeholder="Search ingredient…"
           fixedDropdown
           onSelect={(item) => {
             onChange(index, {
               ...row,
               ingredient_name: item.name,
               ingredient_sku:  item.sku,
+              // Prefill the EP cost from the picked ingredient so line/batch costs populate.
+              cost_price: item.cost_price ?? row.cost_price,
             });
           }}
         />
@@ -91,16 +94,30 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove }:
         />
       </div>
 
+      {/* EP cost per base unit (editable; prefilled on select) */}
+      <div>
+        <label className="text-xs text-muted-foreground mb-1 block">EP Cost</label>
+        <Input
+          type="number"
+          min={0}
+          step={0.01}
+          value={row.cost_price ?? ''}
+          onChange={(e) => set('cost_price', e.target.value === '' ? undefined : parseFloat(e.target.value) || 0)}
+          className="h-8 text-sm"
+          placeholder="0.00"
+        />
+      </div>
+
       {/* Line cost (read-only) */}
       <div>
-        <label className="text-xs text-muted-foreground mb-1 block">Cost</label>
-        <div className="h-8 flex items-center text-xs font-mono text-muted-foreground px-1">
-          {lineCost != null ? `KES ${lineCost.toFixed(2)}` : '—'}
+        <label className="text-xs text-muted-foreground mb-1 block">Line</label>
+        <div className="h-8 flex items-center text-xs font-mono text-muted-foreground px-1 tabular-nums">
+          {lineCost != null ? lineCost.toFixed(2) : '—'}
         </div>
       </div>
 
       {/* Remove button */}
-      <div className="flex items-end pb-0.5">
+      <div className="flex items-end justify-end pb-1">
         <button
           type="button"
           onClick={() => onRemove(index)}

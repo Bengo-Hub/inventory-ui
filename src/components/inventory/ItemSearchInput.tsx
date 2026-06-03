@@ -6,11 +6,15 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
-interface ItemResult {
+export interface ItemResult {
   id: string;
   sku: string;
   name: string;
   available?: number;
+  cost_price?: number | null;
+  suggested_price?: number | null;
+  unit_id?: string;
+  type?: string;
 }
 
 interface Props {

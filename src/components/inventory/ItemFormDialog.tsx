@@ -450,8 +450,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
 
                       {/* Ingredient rows */}
                       <div className="space-y-0">
-                        <div className="grid grid-cols-[1fr_80px_80px_60px_60px_auto] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
-                          <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>Cost</span><span/>
+                        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_72px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+                          <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>EP Cost</span><span>Line</span><span/>
                         </div>
                         {recipeIngredients.map((row, i) => (
                           <RecipeIngredientRow
