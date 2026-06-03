@@ -4,12 +4,26 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCancelEvent, useEvents, useUpdateEventCapacity } from '@/hooks/use-events';
 import type { Item } from '@/lib/api/items';
-import { Calendar, MapPin, Pencil, Ticket, Users, X } from 'lucide-react';
+import { Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 type Tab = 'upcoming' | 'past' | 'soldout';
+
+// Public ticket storefront base URL (ordering-frontend). Matches the "Online Store" nav convention.
+const ORDERING_URL = process.env.NEXT_PUBLIC_ORDERING_UI_URL ?? 'https://order.codevertexitsolutions.com';
+
+// copyEventLink copies the public, shareable event ticket page URL for a tenant's event.
+function copyEventLink(slug: string, eventId: string) {
+    const url = `${ORDERING_URL.replace(/\/$/, '')}/${slug}/event/${eventId}`;
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(
+            () => toast.success('Public ticket link copied'),
+            () => toast.error('Could not copy link'),
+        );
+    }
+}
 
 function formatEventDate(iso?: string | null): string {
     if (!iso) return '—';
@@ -320,6 +334,14 @@ export default function ManageEventsPage() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            title="Copy public ticket link"
+                                                            onClick={() => copyEventLink(orgSlug, event.id)}
+                                                        >
+                                                            <Share2 className="h-3.5 w-3.5" />
+                                                        </Button>
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
