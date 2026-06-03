@@ -2,6 +2,7 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { SellTicketModal } from '@/components/events/SellTicketModal';
 import { useCancelEvent, useEvents, useUpdateEventCapacity } from '@/hooks/use-events';
 import type { Item } from '@/lib/api/items';
 import { Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
@@ -201,6 +202,7 @@ export default function ManageEventsPage() {
     const [tab, setTab] = useState<Tab>('upcoming');
     const [editEvent, setEditEvent] = useState<Item | null>(null);
     const [cancelTarget, setCancelTarget] = useState<Item | null>(null);
+    const [sellEvent, setSellEvent] = useState<Item | null>(null);
 
     const { data, isLoading, error } = useEvents(orgSlug, { limit: 200 });
     const cancelEvent = useCancelEvent(orgSlug);
@@ -342,6 +344,16 @@ export default function ManageEventsPage() {
                                                         >
                                                             <Share2 className="h-3.5 w-3.5" />
                                                         </Button>
+                                                        {(event.total_capacity ?? 0) > 0 && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                title="Sell tickets"
+                                                                onClick={() => setSellEvent(event)}
+                                                            >
+                                                                <Ticket className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
@@ -387,6 +399,15 @@ export default function ManageEventsPage() {
                     event={editEvent}
                     orgSlug={orgSlug}
                     onClose={() => setEditEvent(null)}
+                />
+            )}
+
+            {sellEvent && (
+                <SellTicketModal
+                    orgSlug={orgSlug}
+                    eventId={sellEvent.id}
+                    eventName={sellEvent.name}
+                    onClose={() => setSellEvent(null)}
                 />
             )}
 
