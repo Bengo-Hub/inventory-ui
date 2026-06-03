@@ -17,6 +17,7 @@ import { ArrowLeft, FileText, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -66,6 +67,11 @@ export default function PurchaseOrdersPage() {
     const sendPO = useSendPurchaseOrder(orgSlug);
     const receivePO = useReceivePurchaseOrder(orgSlug);
     const cancelPO = useCancelPurchaseOrder(orgSlug);
+
+    const { canAny } = usePermissions();
+    const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
+    const canChangePO = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
+    const canCancelPO = canAny([P.PURCHASES_DELETE, P.PURCHASES_MANAGE]);
 
     const filtered = search
         ? orders?.filter((o) =>
@@ -128,9 +134,9 @@ export default function PurchaseOrdersPage() {
 
     if (selectedPO && poDetail) {
         const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
-        const canSend = poDetail.status === 'draft';
-        const canReceive = poDetail.status === 'sent' || poDetail.status === 'partially_received' || poDetail.status === 'draft';
-        const canCancel = poDetail.status === 'draft' || poDetail.status === 'sent';
+        const canSend = canChangePO && poDetail.status === 'draft';
+        const canReceive = canChangePO && (poDetail.status === 'sent' || poDetail.status === 'partially_received' || poDetail.status === 'draft');
+        const canCancel = canCancelPO && (poDetail.status === 'draft' || poDetail.status === 'sent');
 
         return (
             <div className="p-6 space-y-6">
@@ -283,10 +289,12 @@ export default function PurchaseOrdersPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
                     <p className="text-muted-foreground mt-1">Track orders from your suppliers</p>
                 </div>
-                <Button onClick={() => setCreateOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Order
-                </Button>
+                {canCreate && (
+                    <Button onClick={() => setCreateOpen(true)}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Order
+                    </Button>
+                )}
             </div>
 
             <Card>

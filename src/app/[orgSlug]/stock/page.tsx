@@ -11,6 +11,7 @@ import { AlertTriangle, BookOpen, Minus, Plus, Search, SlidersHorizontal } from 
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -41,10 +42,12 @@ function StockDrawer({
     item,
     orgSlug,
     onClose,
+    canAdjust,
 }: {
     item: StockLevel;
     orgSlug: string;
     onClose: () => void;
+    canAdjust: boolean;
 }) {
     const [adjType, setAdjType] = useState<'add' | 'remove'>('add');
     const [adjItemSku, setAdjItemSku] = useState(item.sku);
@@ -129,7 +132,8 @@ function StockDrawer({
                     ))}
                 </div>
 
-                {/* Adjust Stock toggle */}
+                {/* Adjust Stock toggle — gated by stock change permission */}
+                {canAdjust && (
                 <div className="border-t border-border pt-4">
                     <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold">Record Adjustment</h3>
@@ -234,6 +238,7 @@ function StockDrawer({
                         </form>
                     )}
                 </div>
+                )}
 
                 {/* Recent adjustments */}
                 {(itemAdj?.length ?? 0) > 0 && (
@@ -263,6 +268,9 @@ export default function StockPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [selectedItem, setSelectedItem] = useState<StockLevel | null>(null);
+
+    const { canAny } = usePermissions();
+    const canAdjust = canAny([P.STOCK_CHANGE, P.STOCK_MANAGE]);
 
     const { data: stock, isLoading } = useStock(orgSlug, { search: search || undefined });
 
@@ -368,14 +376,16 @@ export default function StockPage() {
                                                     <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
                                                 </td>
                                                 <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        title="Record Adjustment"
-                                                        onClick={() => setSelectedItem(item)}
-                                                    >
-                                                        <SlidersHorizontal className="h-4 w-4" />
-                                                    </Button>
+                                                    {canAdjust && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            title="Record Adjustment"
+                                                            onClick={() => setSelectedItem(item)}
+                                                        >
+                                                            <SlidersHorizontal className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -395,6 +405,7 @@ export default function StockPage() {
                     item={selectedItem}
                     orgSlug={orgSlug}
                     onClose={() => setSelectedItem(null)}
+                    canAdjust={canAdjust}
                 />
             )}
         </div>

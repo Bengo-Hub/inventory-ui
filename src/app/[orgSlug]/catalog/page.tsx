@@ -13,21 +13,24 @@ import { Pagination } from '@/components/ui/pagination';
 import { Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
+import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
 
-function ItemDrawer({ item, onClose, onEdit }: { item: Item; onClose: () => void; onEdit: () => void }) {
+function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: () => void; onEdit: () => void; canEdit: boolean }) {
   return (
     <Sheet open onClose={onClose} width="md">
       <SheetHeader>
         <SheetTitle>{item.name}</SheetTitle>
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={onEdit}>
-            <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
-          </Button>
+          {canEdit && (
+            <Button size="sm" variant="outline" onClick={onEdit}>
+              <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
+            </Button>
+          )}
           <button
             onClick={onClose}
             className="p-1 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
@@ -157,6 +160,10 @@ export default function CatalogPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { hasFeature } = useSubscription();
   const canBulkImport = hasFeature('bulk_import');
+  const { can } = usePermissions();
+  const canAdd = can(P.CATALOG_ADD);
+  const canChange = can(P.CATALOG_CHANGE);
+  const canDelete = can(P.CATALOG_DELETE);
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -287,12 +294,16 @@ export default function CatalogPage() {
             )}
 
             {/* Create actions */}
-            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1.5" />New Item
-            </Button>
-            <Button size="sm" onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
-              <Plus className="h-4 w-4 mr-1.5" />New Menu Item
-            </Button>
+            {canAdd && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+                  <Plus className="h-4 w-4 mr-1.5" />New Item
+                </Button>
+                <Button size="sm" onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
+                  <Plus className="h-4 w-4 mr-1.5" />New Menu Item
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -496,22 +507,26 @@ export default function CatalogPage() {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            <button
-                              title="Edit item"
-                              aria-label="Edit item"
-                              onClick={() => setEditItem(item)}
-                              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Edit2 className="h-4 w-4" />
-                            </button>
-                            <button
-                              title="Delete item"
-                              aria-label="Delete item"
-                              onClick={() => setDeleteItem(item)}
-                              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {canChange && (
+                              <button
+                                title="Edit item"
+                                aria-label="Edit item"
+                                onClick={() => setEditItem(item)}
+                                className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                <Edit2 className="h-4 w-4" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                title="Delete item"
+                                aria-label="Delete item"
+                                onClick={() => setDeleteItem(item)}
+                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -568,6 +583,7 @@ export default function CatalogPage() {
           item={viewItem}
           onClose={() => setViewItem(null)}
           onEdit={() => { setEditItem(viewItem); setViewItem(null); }}
+          canEdit={canChange}
         />
       )}
 

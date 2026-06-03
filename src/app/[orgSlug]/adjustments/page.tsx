@@ -8,6 +8,7 @@ import { ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { usePermissions, P } from '@/hooks/usePermissions';
 
 const REASON_OPTIONS = [
     { value: 'correction', label: 'Count Correction' },
@@ -196,6 +197,9 @@ export default function AdjustmentsPage() {
     const [prefillSku, setPrefillSku] = useState('');
     const [prefillName, setPrefillName] = useState('');
 
+    const { canAny } = usePermissions();
+    const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
+
     const { data: adjustments, isLoading } = useAdjustments(orgSlug);
 
     const filtered = useMemo(() => {
@@ -225,10 +229,12 @@ export default function AdjustmentsPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Stock Adjustments</h1>
                     <p className="text-muted-foreground mt-1">Add or remove stock manually</p>
                 </div>
-                <Button onClick={() => openModal()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Adjustment
-                </Button>
+                {canAdjust && (
+                    <Button onClick={() => openModal()}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Adjustment
+                    </Button>
+                )}
             </div>
 
             <Card>

@@ -9,6 +9,7 @@ import { Plus, Search, Trash2, Truck } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -32,6 +33,11 @@ export default function SuppliersPage() {
     const createSupplier = useCreateSupplier(orgSlug);
     const updateSupplier = useUpdateSupplier(orgSlug);
     const deleteSupplier = useDeleteSupplier(orgSlug);
+
+    const { canAny } = usePermissions();
+    const canAdd = canAny([P.SUPPLIERS_ADD, P.SUPPLIERS_MANAGE]);
+    const canChange = canAny([P.SUPPLIERS_CHANGE, P.SUPPLIERS_MANAGE]);
+    const canDelete = canAny([P.SUPPLIERS_DELETE, P.SUPPLIERS_MANAGE]);
 
     const isPending = createSupplier.isPending || updateSupplier.isPending;
 
@@ -84,10 +90,12 @@ export default function SuppliersPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Suppliers</h1>
                     <p className="text-muted-foreground mt-1">Manage your inventory suppliers</p>
                 </div>
-                <Button onClick={openCreate}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Supplier
-                </Button>
+                {canAdd && (
+                    <Button onClick={openCreate}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Supplier
+                    </Button>
+                )}
             </div>
 
             <Card>
@@ -154,18 +162,22 @@ export default function SuppliersPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
-                                                        Edit
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDelete(supplier)}
-                                                        disabled={deleteSupplier.isPending}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    {canChange && (
+                                                        <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
+                                                            Edit
+                                                        </Button>
+                                                    )}
+                                                    {canDelete && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            className="text-destructive hover:text-destructive"
+                                                            onClick={() => handleDelete(supplier)}
+                                                            disabled={deleteSupplier.isPending}
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
