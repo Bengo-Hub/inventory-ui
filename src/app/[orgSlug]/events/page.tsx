@@ -21,7 +21,8 @@ import {
   subDays,
   subMonths,
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, QrCode } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -129,9 +130,16 @@ export default function EventsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Events & Experiences</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Click a day to schedule, click an event to edit</p>
         </div>
-        <Button variant="primary" size="sm" onClick={() => openCreate()}>
-          <Plus className="h-4 w-4 mr-1.5" />New Event
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href={`/${orgSlug}/events/check-in`}>
+            <Button variant="outline" size="sm">
+              <QrCode className="h-4 w-4 mr-1.5" />Check-In
+            </Button>
+          </Link>
+          <Button variant="primary" size="sm" onClick={() => openCreate()}>
+            <Plus className="h-4 w-4 mr-1.5" />New Event
+          </Button>
+        </div>
       </div>
 
       {/* Month navigation */}
