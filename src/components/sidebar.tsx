@@ -4,10 +4,13 @@ import { cn } from '@/lib/utils';
 import {
   ArrowRightLeft,
   BookOpen,
+  Boxes,
   Calendar,
   ChefHat,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
+  Factory,
   FileText,
   Key,
   LayoutDashboard,
@@ -55,13 +58,13 @@ interface NavGroup {
 // Mirrors pos-ui's USE_CASE_MODULES pattern.
 
 const USE_CASE_MODULES: Record<string, string[]> = {
-  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'settings'],
-  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'suppliers', 'settings'],
-  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'suppliers', 'settings'],
-  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'settings'],
-  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'settings'],
-  logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'settings'],
+  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'settings'],
+  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'suppliers', 'requisitions', 'assets', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'suppliers', 'requisitions', 'assets', 'settings'],
+  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'settings'],
+  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'production_batches', 'assets', 'requisitions', 'settings'],
+  logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
 };
 
 const ADMIN_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
@@ -205,8 +208,23 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       label: 'Procurement',
       defaultCollapsed: true,
       items: [
+        { label: 'Requisitions', icon: ClipboardCheck, href: '/requisitions', moduleKey: 'requisitions' },
         { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', moduleKey: 'purchase_orders' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
+      ],
+    },
+    {
+      label: 'Manufacturing',
+      defaultCollapsed: true,
+      items: [
+        { label: 'Production Batches', icon: Factory, href: '/production-batches', moduleKey: 'production_batches' },
+      ],
+    },
+    {
+      label: 'Assets',
+      defaultCollapsed: true,
+      items: [
+        { label: 'Fixed Assets', icon: Boxes, href: '/assets', moduleKey: 'assets' },
       ],
     },
     {
