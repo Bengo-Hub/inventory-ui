@@ -1,11 +1,12 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { useProcurementDashboard, useSupplierPerformance } from '@/hooks/useProcurement';
+import { useProcurementDashboard, useSupplierPerformance, useRecomputeSupplierPerformance } from '@/hooks/useProcurement';
 import { useSuppliers } from '@/hooks/useSuppliers';
-import { ArrowLeft, ClipboardList, DollarSign, ShoppingCart, Users } from 'lucide-react';
+import { ArrowLeft, ClipboardList, DollarSign, RefreshCw, ShoppingCart, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
 
 const PO_STATUS_LABEL: Record<string, string> = {
     draft: 'Draft', sent: 'Sent', partially_received: 'Partial', received: 'Received', cancelled: 'Cancelled',
@@ -21,6 +22,7 @@ export default function ProcurementAnalyticsPage() {
     const org = params?.orgSlug as string;
     const { data: dash, isLoading } = useProcurementDashboard(org);
     const { data: perf } = useSupplierPerformance(org);
+    const recompute = useRecomputeSupplierPerformance(org);
     const { data: suppliersPage } = useSuppliers(org);
     const suppliers = suppliersPage?.data ?? [];
     const nameOf = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id.slice(0, 8);
@@ -78,7 +80,15 @@ export default function ProcurementAnalyticsPage() {
             </Card>
 
             <Card>
-                <CardHeader><h2 className="text-lg font-semibold">Supplier Performance</h2></CardHeader>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-lg font-semibold">Supplier Performance</h2>
+                        <Button variant="outline" size="sm" disabled={recompute.isPending}
+                            onClick={() => recompute.mutate(undefined, { onSuccess: (res) => toast.success(`Recomputed ${res?.computed ?? 0} suppliers`), onError: () => toast.error('Failed to recompute') })}>
+                            <RefreshCw className="h-4 w-4 mr-2" /> Recompute
+                        </Button>
+                    </div>
+                </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm">

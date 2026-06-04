@@ -32,4 +32,5 @@ const base = (org: string) => `/api/v1/${org}/inventory`;
 export const procurementApi = {
   dashboard: (org: string): Promise<ProcurementDashboard> => apiClient.get<ProcurementDashboard>(`${base(org)}/procurement/dashboard`),
   supplierPerformance: (org: string): Promise<PaginatedSupplierPerformance> => apiClient.get<PaginatedSupplierPerformance>(`${base(org)}/supplier-performance`),
+  recomputeSupplierPerformance: (org: string) => apiClient.post<{ computed: number }>(`${base(org)}/supplier-performance/recompute`, {}),
 };
