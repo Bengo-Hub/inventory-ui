@@ -13,7 +13,8 @@ import {
 } from '@/hooks/usePurchaseOrders';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
-import { ArrowLeft, FileText, Minus, Plus, Search, X } from 'lucide-react';
+import { ArrowLeft, BarChart3, FileText, Minus, Plus, Search, X } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -289,12 +290,15 @@ export default function PurchaseOrdersPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
                     <p className="text-muted-foreground mt-1">Track orders from your suppliers</p>
                 </div>
-                {canCreate && (
-                    <Button onClick={() => setCreateOpen(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Order
-                    </Button>
-                )}
+                <div className="flex gap-2">
+                    <Link href={`/${orgSlug}/purchase-orders/analytics`}><Button variant="outline"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</Button></Link>
+                    {canCreate && (
+                        <Button onClick={() => setCreateOpen(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Order
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <Card>
