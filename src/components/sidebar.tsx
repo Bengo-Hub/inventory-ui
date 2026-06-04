@@ -213,6 +213,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Requisitions', icon: ClipboardCheck, href: '/requisitions', moduleKey: 'requisitions' },
         { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', moduleKey: 'purchase_orders' },
+        { label: 'Goods Receipts', icon: ClipboardCheck, href: '/goods-receipts', moduleKey: 'purchase_orders' },
         { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
         { label: 'Contracts', icon: FileSignature, href: '/contracts', moduleKey: 'contracts' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
