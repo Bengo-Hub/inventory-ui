@@ -12,6 +12,12 @@ export interface RequisitionLine {
   quantity: number;
   estimated_price?: number | null;
   description?: string;
+  /** External-item details (item_type=external). */
+  specifications?: string;
+  /** Service details (item_type=service). */
+  service_description?: string;
+  expected_deliverables?: string;
+  duration?: string;
   supplier_id?: string | null;
   urgent?: boolean;
 }
@@ -35,6 +41,8 @@ export interface CreateRequisitionInput {
   purpose: string;
   priority: Priority;
   required_by_date?: string | null;
+  /** Destination branch/warehouse for inventory requisitions (maps to outlet_id). */
+  outlet_id?: string | null;
   notes?: string;
   lines: RequisitionLine[];
 }
