@@ -33,6 +33,17 @@ export function useCreatePurchaseOrder(orgSlug: string) {
   });
 }
 
+export function useAmendPurchaseOrder(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: CreatePOInput }) => purchaseOrdersApi.amend(orgSlug, id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug, id] });
+    },
+  });
+}
+
 export function useReceivePurchaseOrder(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

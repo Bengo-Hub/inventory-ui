@@ -8,10 +8,12 @@ import {
     usePurchaseOrders,
     usePurchaseOrder,
     useCreatePurchaseOrder,
+    useAmendPurchaseOrder,
     useSendPurchaseOrder,
     useReceivePurchaseOrder,
     useCancelPurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
+import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ArrowLeft, BarChart3, FileText, Minus, Plus, Search, X } from 'lucide-react';
@@ -53,6 +55,7 @@ export default function PurchaseOrdersPage() {
     const [page, setPage] = useState(1);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
+    const [amendingId, setAmendingId] = useState<string | null>(null);
 
     const [supplierId, setSupplierId] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
@@ -66,6 +69,7 @@ export default function PurchaseOrdersPage() {
     const { data: orders, isLoading } = usePurchaseOrders(orgSlug);
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
     const createPO = useCreatePurchaseOrder(orgSlug);
+    const amendPO = useAmendPurchaseOrder(orgSlug);
     const sendPO = useSendPurchaseOrder(orgSlug);
     const receivePO = useReceivePurchaseOrder(orgSlug);
     const cancelPO = useCancelPurchaseOrder(orgSlug);
@@ -101,6 +105,49 @@ export default function PurchaseOrdersPage() {
         setPoLines(updated);
     }
 
+    function resetPOForm() {
+        setSupplierId('');
+        setWarehouseId('');
+        setExpectedDate('');
+        setPoNotes('');
+        setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+    }
+
+    function closePODialog() {
+        setCreateOpen(false);
+        setAmendingId(null);
+        resetPOForm();
+    }
+
+    function startCreate() {
+        setAmendingId(null);
+        resetPOForm();
+        setCreateOpen(true);
+    }
+
+    // startAmend pre-fills the create dialog with an existing PO's lines and switches the
+    // submit path to /amend. Amend replaces ALL lines server-side, so we seed every line.
+    function startAmend(po: PurchaseOrder) {
+        setSelectedPO(null); // leave the detail view; the dialog lives in the list view
+        setAmendingId(po.id);
+        setSupplierId(po.supplier_id);
+        setWarehouseId(po.warehouse_id);
+        setExpectedDate(po.expected_date ? po.expected_date.slice(0, 10) : '');
+        setPoNotes(po.notes ?? '');
+        setPoLines(
+            (po.line_items ?? []).map((li) => ({
+                itemId: li.item_id,
+                itemName: li.item_name ?? '',
+                quantity: String(li.quantity),
+                unitPrice: String(li.unit_cost),
+            }))
+        );
+        if ((po.line_items?.length ?? 0) === 0) {
+            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+        }
+        setCreateOpen(true);
+    }
+
     function handlePOSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!supplierId) { toast.error('Select a supplier'); return; }
@@ -114,22 +161,24 @@ export default function PurchaseOrdersPage() {
             }));
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
 
-        createPO.mutate({
+        const payload = {
             supplier_id: supplierId,
             warehouse_id: warehouseId,
             expected_date: expectedDate || undefined,
             notes: poNotes.trim() || undefined,
             line_items: lines,
-        }, {
-            onSuccess: () => {
-                toast.success('Purchase order created');
-                setCreateOpen(false);
-                setSupplierId('');
-                setWarehouseId('');
-                setExpectedDate('');
-                setPoNotes('');
-                setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
-            },
+        };
+
+        if (amendingId) {
+            amendPO.mutate({ id: amendingId, data: payload }, {
+                onSuccess: () => { toast.success('Purchase order amended'); closePODialog(); },
+                onError: () => toast.error('Failed to amend purchase order'),
+            });
+            return;
+        }
+
+        createPO.mutate(payload, {
+            onSuccess: () => { toast.success('Purchase order created'); closePODialog(); },
             onError: () => toast.error('Failed to create purchase order'),
         });
     }
@@ -139,6 +188,8 @@ export default function PurchaseOrdersPage() {
         const canSend = canChangePO && poDetail.status === 'draft';
         const canReceive = canChangePO && (poDetail.status === 'sent' || poDetail.status === 'partially_received' || poDetail.status === 'draft');
         const canCancel = canCancelPO && (poDetail.status === 'draft' || poDetail.status === 'sent');
+        // Amend is allowed only before goods start arriving (draft or sent) — it replaces all lines.
+        const canAmend = canChangePO && (poDetail.status === 'draft' || poDetail.status === 'sent');
 
         return (
             <div className="p-6 space-y-6">
@@ -155,6 +206,16 @@ export default function PurchaseOrdersPage() {
                         {STATUS_LABEL[poDetail.status] ?? poDetail.status}
                     </Badge>
                     <div className="ml-auto flex flex-wrap gap-2">
+                        {canAmend && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isPOBusy}
+                                onClick={() => startAmend(poDetail)}
+                            >
+                                Amend
+                            </Button>
+                        )}
                         {canSend && (
                             <Button
                                 size="sm"
@@ -296,7 +357,7 @@ export default function PurchaseOrdersPage() {
                 <div className="flex gap-2">
                     <Link href={`/${orgSlug}/purchase-orders/analytics`}><Button variant="outline"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</Button></Link>
                     {canCreate && (
-                        <Button onClick={() => setCreateOpen(true)}>
+                        <Button onClick={startCreate}>
                             <Plus className="h-4 w-4 mr-2" />
                             New Order
                         </Button>
@@ -377,14 +438,14 @@ export default function PurchaseOrdersPage() {
 
         {createOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCreateOpen(false)} />
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closePODialog} />
                 <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
-                                <h2 className="text-lg font-semibold">New Purchase Order</h2>
+                                <h2 className="text-lg font-semibold">{amendingId ? 'Amend Purchase Order' : 'New Purchase Order'}</h2>
                                 <button
-                                    onClick={() => setCreateOpen(false)}
+                                    onClick={closePODialog}
                                     className="p-1 rounded-lg hover:bg-accent transition-colors"
                                 >
                                     <X className="h-5 w-5 text-muted-foreground" />
@@ -509,12 +570,14 @@ export default function PurchaseOrdersPage() {
                                         type="button"
                                         variant="outline"
                                         className="flex-1"
-                                        onClick={() => setCreateOpen(false)}
+                                        onClick={closePODialog}
                                     >
                                         Cancel
                                     </Button>
-                                    <Button type="submit" className="flex-1" disabled={createPO.isPending}>
-                                        {createPO.isPending ? 'Creating...' : 'Create Order'}
+                                    <Button type="submit" className="flex-1" disabled={createPO.isPending || amendPO.isPending}>
+                                        {amendingId
+                                            ? (amendPO.isPending ? 'Saving...' : 'Save Changes')
+                                            : (createPO.isPending ? 'Creating...' : 'Create Order')}
                                     </Button>
                                 </div>
                             </form>
