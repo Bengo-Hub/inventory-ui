@@ -56,8 +56,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         >
           <Menu className="h-5 w-5 text-muted-foreground" />
         </button>
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate max-w-[150px] sm:max-w-none">
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0">
+          <h1 className="text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate max-w-[110px] sm:max-w-none">
             {getServiceTitle('Inventory')}
           </h1>
           <div className="hidden md:flex relative w-80 max-w-full group ml-4">
@@ -67,7 +67,8 @@ export function Header({ onMenuClick }: HeaderProps) {
               className="w-full h-10 bg-accent/50 border-none rounded-xl py-1.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/30 transition-all outline-none"
             />
           </div>
-          <OutletFilter className="hidden md:block" />
+          {/* Outlet switcher stays accessible on mobile (essential for multi-outlet tenants). */}
+          <OutletFilter className="block shrink-0" />
         </div>
       </div>
 
