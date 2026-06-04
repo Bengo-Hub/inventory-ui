@@ -33,6 +33,14 @@ export interface Item {
   reorder_quantity?: number;
   cost_price?: number | null;
   suggested_price?: number | null;
+  // Tax / compliance (treasury-api is the rate source of truth)
+  tax_code_id?: string;
+  tax_inclusive?: boolean;
+  // Read-only effective price + tax split enriched by inventory-api for POS/ordering
+  selling_price?: number | null;
+  net_price?: number | null;
+  tax_amount?: number | null;
+  tax_rate?: number | null;
   tags?: string[];
   metadata?: Record<string, unknown>;
   // Current stock levels (sum across all warehouses, from ListItems).
@@ -96,6 +104,8 @@ export interface CreateItemInput {
   reorder_level?: number;
   reorder_quantity?: number;
   cost_price?: number;
+  tax_code_id?: string;
+  tax_inclusive?: boolean;
   is_active?: boolean;
   requires_age_verification?: boolean;
   is_perishable?: boolean;

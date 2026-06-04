@@ -19,7 +19,14 @@ export interface InventorySettings {
   recipes_module_enabled: boolean;
   purchase_orders_enabled: boolean;
   supplier_management_enabled: boolean;
+  // Hospitality modules
+  enable_room_pricing: boolean;
+  enable_facility_booking: boolean;
+  enable_conference_packages: boolean;
+  // Costing & tax / compliance
   default_target_margin_percent?: number | null;
+  prices_inclusive_of_tax: boolean;
+  default_tax_code: string;
   updated_at: string;
 }
 
@@ -38,6 +45,11 @@ export interface UpdateInventorySettingsInput {
   purchase_order_approval_required?: boolean;
   auto_adjust_on_transfer?: boolean;
   default_target_margin_percent?: number;
+  enable_room_pricing?: boolean;
+  enable_facility_booking?: boolean;
+  enable_conference_packages?: boolean;
+  prices_inclusive_of_tax?: boolean;
+  default_tax_code?: string;
 }
 
 export interface UpdateInventoryModulesInput {

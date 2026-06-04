@@ -3,8 +3,10 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SellTicketModal } from '@/components/events/SellTicketModal';
+import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { useCancelEvent, useEvents, useUpdateEventCapacity } from '@/hooks/use-events';
-import type { Item } from '@/lib/api/items';
+import { useUpdateItem } from '@/hooks/useItems';
+import type { CreateItemInput, Item } from '@/lib/api/items';
 import { Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -38,11 +40,6 @@ function formatEventDate(iso?: string | null): string {
     }).format(new Date(iso));
 }
 
-function toDatetimeLocal(iso?: string | null): string {
-    if (!iso) return '';
-    return new Date(iso).toISOString().slice(0, 16);
-}
-
 function availableSeats(event: Item): number {
     return Math.max(0, (event.total_capacity ?? 0) - (event.booked_capacity ?? 0));
 }
@@ -69,14 +66,6 @@ function filterEvents(events: Item[], tab: Tab, now: Date): Item[] {
     });
 }
 
-interface EditForm {
-    total_capacity: string;
-    booked_capacity: string;
-    event_venue: string;
-    event_start_at: string;
-    event_end_at: string;
-}
-
 function EditEventModal({
     event,
     orgSlug,
@@ -86,107 +75,25 @@ function EditEventModal({
     orgSlug: string;
     onClose: () => void;
 }) {
-    const [form, setForm] = useState<EditForm>({
-        total_capacity: String(event.total_capacity ?? ''),
-        booked_capacity: String(event.booked_capacity ?? ''),
-        event_venue: event.event_venue ?? '',
-        event_start_at: toDatetimeLocal(event.event_start_at),
-        event_end_at: toDatetimeLocal(event.event_end_at),
-    });
-
-    const update = useUpdateEventCapacity(orgSlug);
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        const total = form.total_capacity !== '' ? parseInt(form.total_capacity, 10) : undefined;
-        const booked = form.booked_capacity !== '' ? parseInt(form.booked_capacity, 10) : undefined;
-        if (total !== undefined && (isNaN(total) || total < 0)) {
-            toast.error('Total capacity must be a non-negative number');
-            return;
-        }
-        if (booked !== undefined && (isNaN(booked) || booked < 0)) {
-            toast.error('Booked capacity must be a non-negative number');
-            return;
-        }
-        if (total !== undefined && booked !== undefined && booked > total) {
-            toast.error('Booked cannot exceed total capacity');
-            return;
-        }
-        update.mutate({
-            id: event.id,
-            total_capacity: total,
-            booked_capacity: booked,
-            event_venue: form.event_venue || undefined,
-            event_start_at: form.event_start_at ? new Date(form.event_start_at).toISOString() : undefined,
-            event_end_at: form.event_end_at ? new Date(form.event_end_at).toISOString() : undefined,
-        }, {
-            onSuccess: () => { toast.success('Event updated'); onClose(); },
-            onError: () => toast.error('Failed to update event'),
-        });
-    }
-
-    function field(key: keyof EditForm) {
-        return {
-            value: form[key],
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-                setForm((prev) => ({ ...prev, [key]: e.target.value })),
-        };
-    }
-
+    // Full event editor reuses ItemFormDialog (all fields), with type/category/unit locked to the event.
+    const update = useUpdateItem(orgSlug);
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative z-50 w-full max-w-md mx-4 rounded-xl border border-border bg-card shadow-lg">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-                    <h2 className="font-semibold text-base">Edit Event</h2>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="p-1 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
-                    >
-                        <X className="h-4 w-4" />
-                    </button>
-                </div>
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <p className="font-medium text-sm">{event.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{event.sku}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium">Total Capacity</label>
-                            <Input type="number" min="0" placeholder="0" {...field('total_capacity')} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium">Booked</label>
-                            <Input type="number" min="0" placeholder="0" {...field('booked_capacity')} />
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-xs font-medium">Venue</label>
-                        <Input placeholder="Event venue or address" {...field('event_venue')} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium">Start</label>
-                            <Input type="datetime-local" {...field('event_start_at')} />
-                        </div>
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-medium">End</label>
-                            <Input type="datetime-local" {...field('event_end_at')} />
-                        </div>
-                    </div>
-                    <div className="flex gap-3 pt-2">
-                        <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" variant="primary" className="flex-1" disabled={update.isPending}>
-                            {update.isPending ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <ItemFormDialog
+            orgSlug={orgSlug}
+            item={event}
+            lockToEvent
+            isPending={update.isPending}
+            onClose={onClose}
+            onSubmit={(data: CreateItemInput) => {
+                update.mutate(
+                    { sku: event.sku, data },
+                    {
+                        onSuccess: () => { toast.success('Event updated'); onClose(); },
+                        onError: () => toast.error('Failed to update event'),
+                    },
+                );
+            }}
+        />
     );
 }
 

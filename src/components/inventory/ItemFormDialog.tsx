@@ -32,6 +32,8 @@ interface Props {
   orgSlug: string;
   item?: Item | null;
   defaultDate?: string;
+  /** Lock the form to event editing: type fixed to SERVICE; category/unit/type read-only (predefined). */
+  lockToEvent?: boolean;
   onClose: () => void;
   onSubmit: (data: CreateItemInput) => void;
   isPending: boolean;
@@ -48,17 +50,19 @@ function toLocalDatetimeValue(iso?: string | null): string {
   return iso.slice(0, 16); // "YYYY-MM-DDTHH:mm"
 }
 
-export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, isPending }: Props) {
+export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClose, onSubmit, isPending }: Props) {
   const [name, setName] = useState(item?.name ?? '');
   const [sku, setSku] = useState(item?.sku ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
-  const [type, setType] = useState<string>(item?.type ?? 'GOODS');
+  const [type, setType] = useState<string>(item?.type ?? (lockToEvent ? 'SERVICE' : 'GOODS'));
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
   const [costPrice, setCostPrice] = useState(item?.cost_price != null ? String(item.cost_price) : '');
+  const [taxCode, setTaxCode] = useState(item?.tax_code_id ?? '');
+  const [taxInclusive, setTaxInclusive] = useState(item?.tax_inclusive ?? false);
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
   const [trackLots, setTrackLots] = useState(item?.track_lots ?? false);
@@ -133,6 +137,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
       setReorderLevel(String(item.reorder_level ?? ''));
       setReorderQty(String(item.reorder_quantity ?? ''));
       setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
+      setTaxCode(item.tax_code_id ?? '');
+      setTaxInclusive(item.tax_inclusive ?? false);
       setRequiresAge(item.requires_age_verification);
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
@@ -204,6 +210,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
     e.preventDefault();
     if (!name.trim()) return;
 
+    // Ticket tiers can never allocate more seats than the event's total capacity.
+    if (type === 'SERVICE') {
+      const totalCap = totalCapacity !== '' ? parseInt(totalCapacity, 10) || 0 : 0;
+      const allocated = tiers.reduce((sum, t) => sum + (t.capacity || 0), 0);
+      if (totalCap > 0 && allocated > totalCap) {
+        toast.error(`Ticket tiers total ${allocated} seats but the event capacity is only ${totalCap}. Reduce tier capacities.`);
+        return;
+      }
+    }
+
     // Composite path: RECIPE type with ingredients defined inline
     if (isRecipe && recipeIngredients.length > 0 && sellingPrice) {
       compositeMut.mutate({
@@ -250,6 +266,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
       cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
+      tax_code_id: taxCode.trim() || undefined,
+      tax_inclusive: taxInclusive,
       requires_age_verification: requiresAge,
       is_perishable: isPerishable,
       track_lots: trackLots,
@@ -272,15 +290,19 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
   }
 
   const isService = type === 'SERVICE';
+  // Ticket-tier capacity gating: the sum of tier capacities must never exceed the event total.
+  const totalCapNum = totalCapacity !== '' ? parseInt(totalCapacity, 10) || 0 : 0;
+  const tiersAllocated = tiers.reduce((sum, t) => sum + (t.capacity || 0), 0);
+  const tiersOverCapacity = isService && totalCapNum > 0 && tiersAllocated > totalCapNum;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="relative z-50 w-full max-w-3xl mx-4 max-h-[92vh] overflow-y-auto">
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{item ? 'Edit Item' : 'New Item'}</h2>
+              <h2 className="text-lg font-semibold">{lockToEvent ? (item ? 'Edit Event' : 'New Event') : (item ? 'Edit Item' : 'New Item')}</h2>
               <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent transition-colors">
                 <X className="h-5 w-5 text-muted-foreground" />
               </button>
@@ -303,7 +325,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type *</label>
-                  <select value={type} onChange={(e) => setType(e.target.value)} className={selectCls}>
+                  <select value={type} onChange={(e) => setType(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
                     {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
@@ -316,14 +338,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className={selectCls}>
+                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
                     <option value="">No category</option>
                     {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Unit</label>
-                  <select value={unitId} onChange={(e) => setUnitId(e.target.value)} className={selectCls}>
+                  <select value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
                     <option value="">No unit</option>
                     {units?.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.abbreviation})</option>)}
                   </select>
@@ -378,6 +400,21 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
                   <label className="text-sm font-medium">Cost Price (KES)</label>
                   <Input type="number" min="0" step="0.01" placeholder="Unit cost from supplier" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
                   <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports</p>
+                </div>
+              )}
+
+              {/* Tax & compliance — per-item override of the tenant Tax & Compliance defaults */}
+              {['GOODS', 'RECIPE', 'SERVICE', 'VOUCHER'].includes(type) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Tax Code <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <Input placeholder="e.g. VAT-16" value={taxCode} onChange={(e) => setTaxCode(e.target.value.toUpperCase())} />
+                    <p className="text-xs text-muted-foreground">KRA/eTIMS code. Leave blank to use the tenant default.</p>
+                  </div>
+                  <label className="flex items-start gap-2 text-sm cursor-pointer sm:pt-7">
+                    <input type="checkbox" checked={taxInclusive} onChange={(e) => setTaxInclusive(e.target.checked)} className="rounded mt-0.5" />
+                    <span>Price is inclusive of tax (VAT)<br /><span className="text-xs text-muted-foreground font-normal">Tax is computed backwards from the price.</span></span>
+                  </label>
                 </div>
               )}
 
@@ -609,20 +646,28 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, onClose, onSubmit, 
                         </div>
                         <div className="space-y-1">
                           {i === 0 && <label className="text-xs text-muted-foreground">Capacity</label>}
-                          <Input type="number" min="0" placeholder="0" value={tier.capacity || ''} onChange={(e) => updateTier(i, 'capacity', parseInt(e.target.value, 10) || 0)} />
+                          <Input type="number" min="0" max={totalCapNum || undefined} placeholder="0" value={tier.capacity || ''} onChange={(e) => updateTier(i, 'capacity', parseInt(e.target.value, 10) || 0)} />
                         </div>
                         <button type="button" onClick={() => removeTier(i)} className="pb-0.5 text-destructive hover:opacity-70">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
                     ))}
+                    {tiers.length > 0 && totalCapNum > 0 && (
+                      <p className={`text-xs ${tiersOverCapacity ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+                        Allocated {tiersAllocated} of {totalCapNum} tickets
+                        {tiersOverCapacity
+                          ? ` — ${tiersAllocated - totalCapNum} over the event capacity`
+                          : ` · ${totalCapNum - tiersAllocated} unallocated`}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
 
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-                <Button type="submit" className="flex-1" disabled={isPending}>
+                <Button type="submit" className="flex-1" disabled={isPending || tiersOverCapacity}>
                   {isPending ? 'Saving...' : item ? 'Update' : 'Create'}
                 </Button>
               </div>

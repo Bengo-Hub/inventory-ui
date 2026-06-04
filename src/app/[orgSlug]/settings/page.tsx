@@ -13,6 +13,8 @@ import { apiClient } from '@/lib/api/client';
 import {
   Bell,
   BookOpen,
+  Building2,
+  CalendarDays,
   ChefHat,
   Globe,
   Layers,
@@ -20,6 +22,7 @@ import {
   Loader2,
   Lock,
   Package,
+  Percent,
   Save,
   Settings,
   ShieldCheck,
@@ -29,12 +32,13 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
-type Tab = 'general' | 'stock' | 'modules' | 'integrations' | 'platform';
+type Tab = 'general' | 'stock' | 'modules' | 'tax' | 'integrations' | 'platform';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'General', icon: Settings },
   { id: 'stock', label: 'Stock & Thresholds', icon: BookOpen },
   { id: 'modules', label: 'Modules', icon: Layers },
+  { id: 'tax', label: 'Tax & Compliance', icon: Percent },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
   { id: 'platform', label: 'Platform', icon: ShieldCheck },
 ];
@@ -433,6 +437,7 @@ function ModuleCard({ icon: Icon, name, description, checked, onChange, disabled
 function ModulesTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
   const updateModules = useUpdateInventoryModules(orgSlug);
+  const updateSettings = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
   const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || !!(user as any)?.isSuperUser;
 
@@ -441,6 +446,11 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
     recipes_module_enabled: false,
     purchase_orders_enabled: true,
     supplier_management_enabled: true,
+  });
+  const [hosp, setHosp] = useState({
+    enable_room_pricing: false,
+    enable_facility_booking: false,
+    enable_conference_packages: false,
   });
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -452,6 +462,11 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
         purchase_orders_enabled: settings.purchase_orders_enabled,
         supplier_management_enabled: settings.supplier_management_enabled,
       });
+      setHosp({
+        enable_room_pricing: settings.enable_room_pricing,
+        enable_facility_booking: settings.enable_facility_booking,
+        enable_conference_packages: settings.enable_conference_packages,
+      });
     }
   }, [settings]);
 
@@ -462,6 +477,19 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
       await updateModules.mutateAsync({ [key]: value });
     } catch {
       setModules((m) => ({ ...m, [key]: !value }));
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  // Hospitality toggles persist via the settings PUT endpoint (not the modules PATCH).
+  const hospToggle = (key: keyof typeof hosp) => async (value: boolean) => {
+    setHosp((m) => ({ ...m, [key]: value }));
+    setSaving(key);
+    try {
+      await updateSettings.mutateAsync({ [key]: value });
+    } catch {
+      setHosp((m) => ({ ...m, [key]: !value }));
     } finally {
       setSaving(null);
     }
@@ -514,6 +542,37 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
         onChange={toggle('supplier_management_enabled')}
         disabled={!canEdit}
         saving={saving === 'supplier_management_enabled'}
+      />
+
+      <div className="pt-2 pb-1">
+        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Hospitality</h3>
+      </div>
+      <ModuleCard
+        icon={Building2}
+        name="Room Pricing"
+        description="Enable hotel room-type SERVICE items with nightly rate plans and occupancy-based pricing."
+        checked={hosp.enable_room_pricing}
+        onChange={hospToggle('enable_room_pricing')}
+        disabled={!canEdit}
+        saving={saving === 'enable_room_pricing'}
+      />
+      <ModuleCard
+        icon={CalendarDays}
+        name="Facility Booking"
+        description="Enable facility/conference-hall SERVICE items with session-based rates."
+        checked={hosp.enable_facility_booking}
+        onChange={hospToggle('enable_facility_booking')}
+        disabled={!canEdit}
+        saving={saving === 'enable_facility_booking'}
+      />
+      <ModuleCard
+        icon={BookOpen}
+        name="Conference Packages"
+        description="Enable conference/event bundle packages (DDR/RDR) with meals included."
+        checked={hosp.enable_conference_packages}
+        onChange={hospToggle('enable_conference_packages')}
+        disabled={!canEdit}
+        saving={saving === 'enable_conference_packages'}
       />
     </div>
   );
@@ -624,6 +683,97 @@ function PlatformTab() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Tax & Compliance tab
+// ══════════════════════════════════════════════════════════════════════════════
+
+function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
+  const { data: settings, isLoading } = useInventorySettings(orgSlug);
+  const update = useUpdateInventorySettings(orgSlug);
+  const user = useAuthStore((s) => s.user);
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']);
+
+  const [form, setForm] = useState({ pricesInclusiveOfTax: false, defaultTaxCode: '' });
+
+  useEffect(() => {
+    if (settings) {
+      setForm({
+        pricesInclusiveOfTax: settings.prices_inclusive_of_tax,
+        defaultTaxCode: settings.default_tax_code ?? '',
+      });
+    }
+  }, [settings]);
+
+  const handleSave = () => {
+    update.mutate({
+      prices_inclusive_of_tax: form.pricesInclusiveOfTax,
+      default_tax_code: form.defaultTaxCode.trim(),
+    });
+  };
+
+  if (isLoading) return (
+    <div className="h-40 flex items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Percent className="h-4 w-4 text-primary" />
+            <span className="font-bold text-sm">Tax &amp; Compliance</span>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
+            <div className="pr-4">
+              <h4 className="text-sm font-bold">Prices are inclusive of tax (VAT)</h4>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                When enabled, item selling prices are treated as VAT-inclusive and the tax portion is
+                computed backwards from the price. Applies to new and existing items across POS and online
+                ordering. Leave off to add VAT on top of net prices.
+              </p>
+            </div>
+            <Toggle
+              checked={form.pricesInclusiveOfTax}
+              onChange={(v) => setForm((f) => ({ ...f, pricesInclusiveOfTax: v }))}
+              disabled={!canEdit}
+            />
+          </div>
+
+          <div className="space-y-2 max-w-xs">
+            <label className={labelClass}>Default Tax Code</label>
+            <input
+              type="text"
+              value={form.defaultTaxCode}
+              onChange={(e) => setForm((f) => ({ ...f, defaultTaxCode: e.target.value }))}
+              disabled={!canEdit}
+              placeholder="e.g. VAT-16"
+              className={`${inputClass} font-mono uppercase`}
+            />
+            <p className="text-xs text-muted-foreground">
+              KRA/eTIMS tax code applied to items that don&apos;t specify one. Tax rates are sourced from
+              treasury-api (the platform source of truth) — no rate is stored here.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-3">
+            {!canEdit && (
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                <Lock className="h-3 w-3" /> View only
+              </p>
+            )}
+            <Button onClick={handleSave} disabled={!canEdit || update.isPending} className="gap-2 px-8 shadow-lg shadow-primary/10">
+              {update.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {update.isPending ? 'Saving…' : 'Save'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Root page
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -666,6 +816,7 @@ export default function SettingsPage() {
         {activeTab === 'general' && <GeneralTab orgSlug={orgSlug} />}
         {activeTab === 'stock' && <StockTab orgSlug={orgSlug} />}
         {activeTab === 'modules' && <ModulesTab orgSlug={orgSlug} />}
+        {activeTab === 'tax' && <TaxComplianceTab orgSlug={orgSlug} />}
         {activeTab === 'integrations' && <IntegrationsTab />}
         {activeTab === 'platform' && isPlatformOwner && <PlatformTab />}
       </div>
