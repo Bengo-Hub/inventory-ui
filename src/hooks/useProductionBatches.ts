@@ -75,6 +75,15 @@ export function useBatchQC(org: string, id: string) {
   });
 }
 
+export function useManufacturingDashboard(org: string) {
+  return useQuery({
+    queryKey: [KEY, org, 'dashboard'],
+    queryFn: () => productionBatchesApi.dashboard(org),
+    enabled: !!org,
+    staleTime: 120_000,
+  });
+}
+
 export function useMaterialCheck(org: string, recipeId: string, quantity: number) {
   return useQuery({
     queryKey: [KEY, org, 'material-check', recipeId, quantity],

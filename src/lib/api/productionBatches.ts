@@ -40,6 +40,15 @@ export interface CreateBatchInput {
 export interface BatchListParams { status?: BatchStatus; recipe_id?: string; page?: number; limit?: number; }
 export interface PaginatedBatches { data: ProductionBatch[]; total: number; page: number; limit: number; hasMore: boolean; }
 
+export interface ManufacturingDashboard {
+  total_batches: number;
+  total_produced_quantity: number;
+  completion_rate: number;
+  scrap_total: number;
+  recent_batches: { id: string; batch_number: string; status: BatchStatus; planned_quantity: number; actual_quantity?: number | null }[];
+  batches_by_status: Record<string, number>;
+}
+
 const base = (org: string) => `/api/v1/${org}/inventory/production-batches`;
 const mfgBase = (org: string) => `/api/v1/${org}/inventory/manufacturing`;
 
@@ -58,4 +67,5 @@ export const productionBatchesApi = {
   listQC: (org: string, id: string) => apiClient.get<QualityCheckRec[]>(`${base(org)}/${id}/quality-checks`),
   materialCheck: (org: string, recipeId: string, quantity: number): Promise<MaterialCheckResult> =>
     apiClient.get<MaterialCheckResult>(`${mfgBase(org)}/material-check`, { recipe_id: recipeId, quantity }),
+  dashboard: (org: string): Promise<ManufacturingDashboard> => apiClient.get<ManufacturingDashboard>(`${mfgBase(org)}/dashboard`),
 };

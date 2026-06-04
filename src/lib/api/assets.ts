@@ -86,6 +86,14 @@ export interface InsuranceInput { policy_number: string; provider?: string; poli
 export interface AuditInput { auditor_id?: string; location_verified?: string; condition_verified?: string; discrepancies?: string; recommendations?: string; }
 export interface ReservationInput { reserved_by: string; start_date?: string; end_date?: string; purpose?: string; }
 
+export interface AssetDashboard {
+  total_assets: number;
+  total_purchase_cost: number;
+  total_current_value: number;
+  total_accumulated_depreciation: number;
+  assets_by_status: Record<string, number>;
+}
+
 const base = (org: string) => `/api/v1/${org}/inventory/assets`;
 const catBase = (org: string) => `/api/v1/${org}/inventory/asset-categories`;
 const opBase = (org: string) => `/api/v1/${org}/inventory`;
@@ -98,6 +106,7 @@ export const assetsApi = {
   remove: (org: string, id: string) => apiClient.delete(`${base(org)}/${id}`),
   runDepreciation: (org: string, id: string) => apiClient.post<Asset>(`${base(org)}/${id}/depreciation-run`, {}),
 
+  dashboard: (org: string): Promise<AssetDashboard> => apiClient.get<AssetDashboard>(`${opBase(org)}/asset-dashboard`),
   listCategories: (org: string): Promise<AssetCategory[]> => apiClient.get<AssetCategory[]>(catBase(org)),
   createCategory: (org: string, data: CreateCategoryInput) => apiClient.post<AssetCategory>(catBase(org), data),
   updateCategory: (org: string, id: string, data: UpdateCategoryInput) => apiClient.put<AssetCategory>(`${catBase(org)}/${id}`, data),

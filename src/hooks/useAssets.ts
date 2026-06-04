@@ -81,6 +81,10 @@ export function useAsset(org: string, id: string) {
   return useQuery({ queryKey: [KEY, org, id], queryFn: () => assetsApi.get(org, id), enabled: !!org && !!id });
 }
 
+export function useAssetDashboard(org: string) {
+  return useQuery({ queryKey: [KEY, org, 'dashboard'], queryFn: () => assetsApi.dashboard(org), enabled: !!org, staleTime: 120_000 });
+}
+
 export function useUpdateAssetCategory(org: string) {
   const qc = useQueryClient();
   return useMutation({

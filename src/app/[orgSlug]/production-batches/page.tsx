@@ -7,7 +7,7 @@ import {
     useProductionBatches, useCreateBatch, useStartBatch, useCompleteBatch, useCancelBatch,
 } from '@/hooks/useProductionBatches';
 import { type CreateBatchInput, type ProductionBatch, type BatchStatus } from '@/lib/api/productionBatches';
-import { Factory, Plus } from 'lucide-react';
+import { BarChart3, Factory, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -91,7 +91,10 @@ export default function ProductionBatchesPage() {
                     <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Factory className="h-6 w-6" /> Production Batches</h1>
                     <p className="text-muted-foreground mt-1">Manufacturing runs, raw-material consumption &amp; finished-goods output</p>
                 </div>
-                {canAdd && <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> New Batch</Button>}
+                <div className="flex gap-2">
+                    <Link href={`/${orgSlug}/production-batches/analytics`}><Button variant="outline"><BarChart3 className="h-4 w-4 mr-2" /> Analytics</Button></Link>
+                    {canAdd && <Button onClick={() => setDialogOpen(true)}><Plus className="h-4 w-4 mr-2" /> New Batch</Button>}
+                </div>
             </div>
 
             <Card>
