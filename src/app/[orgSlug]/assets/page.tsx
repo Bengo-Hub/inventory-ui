@@ -8,6 +8,7 @@ import {
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
 import { Boxes, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -126,6 +127,7 @@ export default function AssetsPage() {
                                         <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge></td>
                                         <td className="px-6 py-3">
                                             <div className="flex gap-2 justify-end">
+                                                <Link href={`/${orgSlug}/assets/${a.id}`}><Button variant="outline">View</Button></Link>
                                                 {canChange && <Button variant="outline" onClick={() => openEdit(a)}>Edit</Button>}
                                                 {canChange && a.status === 'active' && (
                                                     <Button variant="outline" onClick={() => act('Depreciation run', runDep.mutateAsync(a.id))}>Depreciate</Button>
