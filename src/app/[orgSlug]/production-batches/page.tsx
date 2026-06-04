@@ -8,6 +8,7 @@ import {
 } from '@/hooks/useProductionBatches';
 import { type CreateBatchInput, type ProductionBatch, type BatchStatus } from '@/lib/api/productionBatches';
 import { Factory, Plus } from 'lucide-react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -71,7 +72,7 @@ export default function ProductionBatchesPage() {
         if (!canChange) return null;
         return (
             <div className="flex gap-2 justify-end">
-                {r.status === 'planned' && <Button variant="outline" onClick={() => act('Started', startBatch.mutateAsync(r.id))}>Start</Button>}
+                {r.status === 'planned' && <Button variant="outline" onClick={() => act('Started', startBatch.mutateAsync({ id: r.id }))}>Start</Button>}
                 {r.status === 'in_progress' && (
                     <>
                         <Button onClick={() => handleComplete(r)}>Complete</Button>
@@ -124,7 +125,12 @@ export default function ProductionBatchesPage() {
                                         <td className="px-6 py-3 text-right">{r.planned_quantity}</td>
                                         <td className="px-6 py-3 text-right hidden md:table-cell">{r.actual_quantity ?? '—'}</td>
                                         <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[r.status]}>{r.status.replace(/_/g, ' ')}</Badge></td>
-                                        <td className="px-6 py-3">{workflowActions(r)}</td>
+                                        <td className="px-6 py-3">
+                                            <div className="flex gap-2 justify-end items-center">
+                                                <Link href={`/${orgSlug}/production-batches/${r.id}`}><Button variant="outline" size="sm">View</Button></Link>
+                                                {workflowActions(r)}
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
