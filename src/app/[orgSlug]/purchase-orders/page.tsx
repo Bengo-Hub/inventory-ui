@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import {
     usePurchaseOrders,
     usePurchaseOrder,
@@ -278,6 +279,8 @@ export default function PurchaseOrdersPage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                <ThreeWayMatchPanel org={orgSlug} poId={poDetail.id} />
             </div>
         );
     }
