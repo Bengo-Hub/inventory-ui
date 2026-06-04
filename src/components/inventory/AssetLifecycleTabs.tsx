@@ -3,7 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import {
     useAssetMaintenance, useCreateMaintenance, useCompleteMaintenance,
-    useAssetTransfers, useCreateTransfer, useCompleteTransfer,
+    useAssetTransfers, useCreateTransfer, useApproveTransfer, useCompleteTransfer,
     useAssetDisposals, useCreateDisposal, useCompleteDisposal,
     useAssetInsurance, useCreateInsurance,
     useAssetAudits, useCreateAudit, useCompleteAudit,
@@ -28,7 +28,7 @@ type FieldDef = { key: string; label: string; type: 'text' | 'number' | 'date' |
 
 // Generic list + inline-add panel for a single asset lifecycle operation.
 function OpTab<TRec extends { id: string; status?: string }>({
-    label, items, isLoading, headers, renderRow, fields, onCreate, isCreating, onComplete,
+    label, items, isLoading, headers, renderRow, fields, onCreate, isCreating, onComplete, onApprove,
 }: {
     label: string;
     items: TRec[] | undefined;
@@ -39,6 +39,7 @@ function OpTab<TRec extends { id: string; status?: string }>({
     onCreate: (data: Record<string, string | number>, onDone: () => void) => void;
     isCreating: boolean;
     onComplete?: (id: string) => void;
+    onApprove?: (id: string) => void;
 }) {
     const [form, setForm] = useState<Record<string, string>>({});
     const [open, setOpen] = useState(false);
@@ -56,7 +57,7 @@ function OpTab<TRec extends { id: string; status?: string }>({
         onCreate(payload, () => { setForm({}); setOpen(false); });
     }
 
-    const colSpan = headers.length + (onComplete ? 1 : 0);
+    const colSpan = headers.length + (onComplete || onApprove ? 1 : 0);
 
     return (
         <div className="space-y-4">
@@ -92,7 +93,7 @@ function OpTab<TRec extends { id: string; status?: string }>({
                     <thead>
                         <tr className="border-b border-border bg-muted/30">
                             {headers.map((h) => <th key={h} className="text-left px-4 py-2 font-medium text-muted-foreground">{h}</th>)}
-                            {onComplete && <th className="px-4 py-2" />}
+                            {(onComplete || onApprove) && <th className="px-4 py-2" />}
                         </tr>
                     </thead>
                     <tbody>
@@ -101,11 +102,16 @@ function OpTab<TRec extends { id: string; status?: string }>({
                         {items?.map((r) => (
                             <tr key={r.id} className="border-b border-border">
                                 {renderRow(r).map((cell, i) => <td key={i} className="px-4 py-2">{cell}</td>)}
-                                {onComplete && (
+                                {(onComplete || onApprove) && (
                                     <td className="px-4 py-2 text-right">
-                                        {r.status && !['completed', 'cancelled', 'rejected'].includes(r.status) && (
-                                            <Button type="button" size="sm" variant="outline" onClick={() => onComplete(r.id)}>Complete</Button>
-                                        )}
+                                        <div className="flex gap-2 justify-end">
+                                            {onApprove && r.status === 'pending' && (
+                                                <Button type="button" size="sm" variant="outline" onClick={() => onApprove(r.id)}>Approve</Button>
+                                            )}
+                                            {onComplete && r.status && !['completed', 'cancelled', 'rejected'].includes(r.status) && !(onApprove && r.status === 'pending') && (
+                                                <Button type="button" size="sm" variant="outline" onClick={() => onComplete(r.id)}>Complete</Button>
+                                            )}
+                                        </div>
                                     </td>
                                 )}
                             </tr>
@@ -145,6 +151,7 @@ function MaintenanceTab({ org, assetId }: { org: string; assetId: string }) {
 function TransferTab({ org, assetId }: { org: string; assetId: string }) {
     const { data, isLoading } = useAssetTransfers(org, assetId);
     const create = useCreateTransfer(org, assetId);
+    const approve = useApproveTransfer(org, assetId);
     const complete = useCompleteTransfer(org, assetId);
     return (
         <OpTab
@@ -158,6 +165,7 @@ function TransferTab({ org, assetId }: { org: string; assetId: string }) {
             ]}
             onCreate={(d, onDone) => create.mutate(d as unknown as TransferInput, { onSuccess: () => { toast.success('Transfer requested'); onDone(); }, onError: () => toast.error('Failed to request') })}
             isCreating={create.isPending}
+            onApprove={(id) => approve.mutate(id, { onSuccess: () => toast.success('Transfer approved'), onError: () => toast.error('Failed to approve') })}
             onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Transfer completed — asset moved'), onError: () => toast.error('Failed') })}
         />
     );

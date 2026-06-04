@@ -111,6 +111,7 @@ export const assetsApi = {
   // ── Transfers ──
   listTransfers: (org: string, assetId: string) => apiClient.get<AssetTransferRec[]>(`${base(org)}/${assetId}/transfers`),
   createTransfer: (org: string, assetId: string, data: TransferInput) => apiClient.post<AssetTransferRec>(`${base(org)}/${assetId}/transfers`, data),
+  approveTransfer: (org: string, recId: string) => apiClient.post<AssetTransferRec>(`${opBase(org)}/asset-transfers/${recId}/approve`, {}),
   completeTransfer: (org: string, recId: string) => apiClient.post<AssetTransferRec>(`${opBase(org)}/asset-transfers/${recId}/complete`, {}),
 
   // ── Disposals ──

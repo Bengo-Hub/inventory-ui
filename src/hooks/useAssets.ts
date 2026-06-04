@@ -119,6 +119,10 @@ export function useCreateTransfer(org: string, assetId: string) {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (data: TransferInput) => assetsApi.createTransfer(org, assetId, data), onSuccess: () => qc.invalidateQueries({ queryKey: [TRF_KEY, org, assetId] }) });
 }
+export function useApproveTransfer(org: string, assetId: string) {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (recId: string) => assetsApi.approveTransfer(org, recId), onSuccess: () => qc.invalidateQueries({ queryKey: [TRF_KEY, org, assetId] }) });
+}
 export function useCompleteTransfer(org: string, assetId: string) {
   const qc = useQueryClient();
   return useMutation({ mutationFn: (recId: string) => assetsApi.completeTransfer(org, recId), onSuccess: () => { qc.invalidateQueries({ queryKey: [TRF_KEY, org, assetId] }); invalidateAsset(qc, org); } });
