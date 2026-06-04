@@ -11,13 +11,16 @@ import {
   ClipboardCheck,
   ClipboardList,
   Factory,
+  FileSignature,
   FileText,
+  FolderTree,
   Key,
   LayoutDashboard,
   Layers,
   LogOut,
   Monitor,
   Package,
+  RotateCcw,
   Ruler,
   Settings,
   Shield,
@@ -60,10 +63,10 @@ interface NavGroup {
 const USE_CASE_MODULES: Record<string, string[]> = {
   hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'settings'],
   quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'suppliers', 'requisitions', 'assets', 'settings'],
-  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'suppliers', 'requisitions', 'assets', 'settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'assets', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'assets', 'settings'],
   services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'settings'],
-  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'production_batches', 'assets', 'requisitions', 'settings'],
+  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'settings'],
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
 };
 
@@ -210,6 +213,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Requisitions', icon: ClipboardCheck, href: '/requisitions', moduleKey: 'requisitions' },
         { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', moduleKey: 'purchase_orders' },
+        { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
+        { label: 'Contracts', icon: FileSignature, href: '/contracts', moduleKey: 'contracts' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
       ],
     },
@@ -225,6 +230,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       defaultCollapsed: true,
       items: [
         { label: 'Fixed Assets', icon: Boxes, href: '/assets', moduleKey: 'assets' },
+        { label: 'Asset Categories', icon: FolderTree, href: '/asset-categories', moduleKey: 'assets' },
       ],
     },
     {
