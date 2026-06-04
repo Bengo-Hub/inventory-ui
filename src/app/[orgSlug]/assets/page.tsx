@@ -7,7 +7,7 @@ import {
     useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset, useRunDepreciation,
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
-import { Boxes, Plus } from 'lucide-react';
+import { Boxes, FolderTree, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -88,7 +88,10 @@ export default function AssetsPage() {
                     <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><Boxes className="h-6 w-6" /> Fixed Assets</h1>
                     <p className="text-muted-foreground mt-1">Asset register, depreciation &amp; lifecycle</p>
                 </div>
-                {canAdd && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> New Asset</Button>}
+                <div className="flex gap-2">
+                    <Link href={`/${orgSlug}/asset-categories`}><Button variant="outline"><FolderTree className="h-4 w-4 mr-2" /> Categories</Button></Link>
+                    {canAdd && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> New Asset</Button>}
+                </div>
             </div>
 
             <Card>
