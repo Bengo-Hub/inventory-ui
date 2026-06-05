@@ -16,11 +16,13 @@ type IngredientRow = {
     item_cost_price: number | null;
     quantity: string;
     unit_id: string;
+    /** Legacy free-text unit (g/ml/pc) used to resolve unit_id when the row has none. */
+    unit_of_measure: string;
     waste_percent: string;
 };
 
 function emptyRow(): IngredientRow {
-    return { item_id: '', item_name: '', item_cost_price: null, quantity: '', unit_id: '', waste_percent: '0' };
+    return { item_id: '', item_name: '', item_cost_price: null, quantity: '', unit_id: '', unit_of_measure: '', waste_percent: '0' };
 }
 
 function formatCurrency(value?: number | null): string {
@@ -50,12 +52,33 @@ export default function RecipeDetailPage() {
                     item_cost_price: ing.item_cost_price ?? null,
                     quantity: String(ing.quantity),
                     unit_id: ing.unit_id ?? '',
+                    unit_of_measure: ing.unit_of_measure ?? '',
                     waste_percent: String(ing.waste_percent ?? 0),
                 }))
             );
             setInitialized(true);
         }
     }, [recipe, initialized]);
+
+    // Backfill any row whose unit_id is empty by resolving its legacy unit_of_measure (e.g. "g",
+    // "ml", "pc") against the units list, so older recipe lines still show their unit instead of "—".
+    useEffect(() => {
+        if (!units?.length) return;
+        setRows((prev) => {
+            let changed = false;
+            const next = prev.map((r) => {
+                if (r.unit_id || !r.unit_of_measure) return r;
+                const uom = r.unit_of_measure.trim().toLowerCase();
+                const match = units.find(
+                    (u) => (u.abbreviation ?? '').toLowerCase() === uom || u.name.toLowerCase() === uom,
+                );
+                if (!match) return r;
+                changed = true;
+                return { ...r, unit_id: match.id };
+            });
+            return changed ? next : prev;
+        });
+    }, [units]);
 
     function addRow() {
         setRows((prev) => [...prev, emptyRow()]);
@@ -73,19 +96,54 @@ export default function RecipeDetailPage() {
         });
     }
 
+    function patchRow(idx: number, patch: Partial<IngredientRow>) {
+        setRows((prev) => {
+            const updated = [...prev];
+            updated[idx] = { ...updated[idx], ...patch };
+            return updated;
+        });
+    }
+
+    // Resolve a unit_id from an item's unit_id, falling back to matching its unit name/abbr.
+    function resolveItemUnitId(item: { unit_id?: string; unit_name?: string }): string {
+        if (item.unit_id) return item.unit_id;
+        const uom = (item.unit_name ?? '').trim().toLowerCase();
+        if (!uom || !units) return '';
+        return units.find((u) => (u.abbreviation ?? '').toLowerCase() === uom || u.name.toLowerCase() === uom)?.id ?? '';
+    }
+
+    // Active units grouped by type for the unit picker (excludes the placeholder "-" unit).
+    const UNIT_TYPE_LABEL: Record<string, string> = {
+        weight: 'Weight', volume: 'Volume', count: 'Count', length: 'Length', area: 'Area', other: 'Other',
+    };
+    const activeUnits = (units ?? []).filter(
+        (u) => u.name !== '-' && (u.abbreviation ?? '') !== '-',
+    );
+    const unitGroups = Object.entries(
+        activeUnits.reduce<Record<string, typeof activeUnits>>((acc, u) => {
+            const t = u.type && u.type !== '-' ? u.type : 'other';
+            (acc[t] ??= []).push(u);
+            return acc;
+        }, {}),
+    ).sort(([a], [b]) => a.localeCompare(b));
+
     function handleSave() {
         if (!recipe) return;
 
         const validIngredients = rows
             .filter((r) => r.item_id && r.quantity && Number(r.quantity) > 0)
-            .map((r) => ({
-                item_id: r.item_id,
-                quantity: Number(r.quantity),
-                unit_id: r.unit_id || undefined,
-                waste_percent: Number(r.waste_percent) || 0,
-                unit_of_measure: '',
-                notes: '',
-            }));
+            .map((r) => {
+                // Keep the legacy unit_of_measure string in sync with the chosen unit's abbreviation.
+                const unit = r.unit_id ? activeUnits.find((u) => u.id === r.unit_id) : undefined;
+                return {
+                    item_id: r.item_id,
+                    quantity: Number(r.quantity),
+                    unit_id: r.unit_id || undefined,
+                    waste_percent: Number(r.waste_percent) || 0,
+                    unit_of_measure: unit?.abbreviation ?? unit?.name ?? r.unit_of_measure ?? '',
+                    notes: '',
+                };
+            });
 
         updateRecipe.mutate({
             id: recipe.id,
@@ -170,8 +228,14 @@ export default function RecipeDetailPage() {
                                                     value={row.item_name}
                                                     placeholder="Search ingredient..."
                                                     onSelect={(item) => {
-                                                        updateRow(idx, 'item_id', item.id);
-                                                        updateRow(idx, 'item_name', item.name);
+                                                        // Auto-populate the unit (and cost) from the chosen item so the
+                                                        // row never defaults to "—". Falls back to matching the unit name.
+                                                        patchRow(idx, {
+                                                            item_id: item.id,
+                                                            item_name: item.name,
+                                                            item_cost_price: item.cost_price ?? null,
+                                                            unit_id: resolveItemUnitId(item) || row.unit_id,
+                                                        });
                                                     }}
                                                 />
                                                 {row.item_cost_price != null && (
@@ -199,8 +263,12 @@ export default function RecipeDetailPage() {
                                                     className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                                 >
                                                     <option value="">—</option>
-                                                    {units?.map((u) => (
-                                                        <option key={u.id} value={u.id}>{u.abbreviation ?? u.name}</option>
+                                                    {unitGroups.map(([type, us]) => (
+                                                        <optgroup key={type} label={UNIT_TYPE_LABEL[type] ?? type}>
+                                                            {us.map((u) => (
+                                                                <option key={u.id} value={u.id}>{u.abbreviation ?? u.name} · {u.name}</option>
+                                                            ))}
+                                                        </optgroup>
                                                     ))}
                                                 </select>
                                             </div>
