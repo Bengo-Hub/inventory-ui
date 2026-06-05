@@ -24,6 +24,7 @@ import {
   Ruler,
   Settings,
   Shield,
+  ShieldCheck,
   SquareStack,
   Tag,
   Truck,
@@ -61,12 +62,12 @@ interface NavGroup {
 // Mirrors pos-ui's USE_CASE_MODULES pattern.
 
 const USE_CASE_MODULES: Record<string, string[]> = {
-  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'settings'],
-  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'assets', 'settings'],
-  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'assets', 'settings'],
-  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'settings'],
-  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'settings'],
+  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'approvals','settings'],
+  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
 };
 
@@ -217,6 +218,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
         { label: 'Contracts', icon: FileSignature, href: '/contracts', moduleKey: 'contracts' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
+        { label: 'Approvals', icon: ShieldCheck, href: '/approvals', moduleKey: 'approvals' },
+        { label: 'Approval Rules', icon: Shield, href: '/approvals/rules', moduleKey: 'approvals' },
       ],
     },
     {

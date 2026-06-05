@@ -71,6 +71,12 @@ export type Permission =
   | "inventory.purchases.manage"
   | "inventory.purchases.manage_own"
   | "inventory.purchases.refund"
+  // Approvals (approval matrix)
+  | "inventory.approvals.view"
+  | "inventory.approvals.add"
+  | "inventory.approvals.change"
+  | "inventory.approvals.delete"
+  | "inventory.approvals.manage"
   // Reports
   | "inventory.reports.add"
   | "inventory.reports.read"

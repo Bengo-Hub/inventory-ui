@@ -16,7 +16,8 @@ import {
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
-import { ArrowLeft, BarChart3, FileText, Minus, Plus, Search, X } from 'lucide-react';
+import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
+import { ArrowLeft, BarChart3, FileText, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -73,6 +74,8 @@ export default function PurchaseOrdersPage() {
     const sendPO = useSendPurchaseOrder(orgSlug);
     const receivePO = useReceivePurchaseOrder(orgSlug);
     const cancelPO = useCancelPurchaseOrder(orgSlug);
+    const { data: poApproval } = useApprovalForObject(orgSlug, selectedPO ?? undefined);
+    const submitForApproval = useSubmitPurchaseOrderForApproval(orgSlug);
 
     const { canAny } = usePermissions();
     const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
@@ -190,6 +193,10 @@ export default function PurchaseOrdersPage() {
         const canCancel = canCancelPO && (poDetail.status === 'draft' || poDetail.status === 'sent');
         // Amend is allowed only before goods start arriving (draft or sent) — it replaces all lines.
         const canAmend = canChangePO && (poDetail.status === 'draft' || poDetail.status === 'sent');
+        // Approval-matrix awareness: offer "Submit for Approval" on drafts that have not
+        // already entered (or cleared) an approval workflow.
+        const approvalStatus = poApproval?.status;
+        const showSubmit = canChangePO && poDetail.status === 'draft' && approvalStatus !== 'pending' && approvalStatus !== 'approved';
 
         return (
             <div className="p-6 space-y-6">
@@ -205,7 +212,36 @@ export default function PurchaseOrdersPage() {
                     <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'} className="ml-2">
                         {STATUS_LABEL[poDetail.status] ?? poDetail.status}
                     </Badge>
+                    {approvalStatus && (
+                        <Badge
+                            variant={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'error' : 'warning'}
+                            className="ml-1"
+                        >
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            {approvalStatus === 'pending'
+                                ? `Awaiting approval${poApproval?.current_step ? ` · ${poApproval.current_step.name}` : ''}`
+                                : `Approval ${approvalStatus}`}
+                        </Badge>
+                    )}
                     <div className="ml-auto flex flex-wrap gap-2">
+                        {showSubmit && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={submitForApproval.isPending}
+                                onClick={() => submitForApproval.mutate(poDetail.id, {
+                                    onSuccess: (res) => toast.success(
+                                        res.approval_required
+                                            ? 'Submitted for approval'
+                                            : 'No approval rule matches — you can send this order directly',
+                                    ),
+                                    onError: () => toast.error('Failed to submit for approval'),
+                                })}
+                            >
+                                <ShieldCheck className="h-4 w-4 mr-2" />
+                                Submit for Approval
+                            </Button>
+                        )}
                         {canAmend && (
                             <Button
                                 size="sm"
@@ -222,7 +258,10 @@ export default function PurchaseOrdersPage() {
                                 disabled={isPOBusy}
                                 onClick={() => sendPO.mutate(poDetail.id, {
                                     onSuccess: () => toast.success('PO sent to supplier'),
-                                    onError: () => toast.error('Failed to send PO'),
+                                    onError: (e: unknown) => {
+                                        const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                                        toast.error(msg || 'Failed to send PO');
+                                    },
                                 })}
                             >
                                 Send to Supplier

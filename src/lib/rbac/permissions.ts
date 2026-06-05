@@ -57,6 +57,13 @@ export const P = {
   PURCHASES_DELETE:   'inventory.purchases.delete',
   PURCHASES_MANAGE:   'inventory.purchases.manage',
 
+  // Approvals (approval matrix) — these match inventory-api codes exactly
+  APPROVALS_VIEW:     'inventory.approvals.view',
+  APPROVALS_ADD:      'inventory.approvals.add',
+  APPROVALS_CHANGE:   'inventory.approvals.change',
+  APPROVALS_DELETE:   'inventory.approvals.delete',
+  APPROVALS_MANAGE:   'inventory.approvals.manage',
+
   // Reports
   REPORTS_READ:       'inventory.reports.read',
   REPORTS_MANAGE:     'inventory.reports.manage',
