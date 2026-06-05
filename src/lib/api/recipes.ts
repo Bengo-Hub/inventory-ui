@@ -27,6 +27,8 @@ export interface Recipe {
     servings: number;
     unit_of_measure: string;
     is_active: boolean;
+    kind?: 'menu' | 'bom';
+    requires_qc?: boolean;
     total_cost?: number | null;
     cost_per_portion?: number | null;
     target_margin_percent?: number | null;
@@ -46,6 +48,8 @@ export interface RecipePayload {
     output_qty: number;
     unit_of_measure: string;
     is_active: boolean;
+    kind?: 'menu' | 'bom';
+    requires_qc?: boolean;
     target_margin_percent?: number | null;
     prep_time_minutes?: number | null;
     ingredients: Pick<RecipeIngredient, 'item_id' | 'item_sku' | 'quantity' | 'unit_of_measure' | 'unit_id' | 'waste_percent' | 'notes'>[];
@@ -85,4 +89,8 @@ export function updateRecipe(orgSlug: string, id: string, data: RecipePayload) {
 
 export function deleteRecipe(orgSlug: string, id: string) {
     return apiClient.delete<void>(`/api/v1/${orgSlug}/inventory/recipes/${id}`);
+}
+
+export function recomputeRecipeCost(orgSlug: string, id: string) {
+    return apiClient.post<Recipe>(`/api/v1/${orgSlug}/inventory/recipes/${id}/recompute-cost`, {});
 }

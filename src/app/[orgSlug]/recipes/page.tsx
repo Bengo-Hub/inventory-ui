@@ -6,7 +6,8 @@ import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
-import { ChefHat, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
+import { useOutletStore } from '@/store/outlet';
+import { ChefHat, Factory, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -28,6 +29,10 @@ export default function RecipesPage() {
     const params = useParams();
     const router = useRouter();
     const orgSlug = params?.orgSlug as string;
+    const { outlet } = useOutletStore();
+    const isMfg = outlet?.use_case === 'manufacturing';
+    const docLabel = isMfg ? 'Bill of Materials' : 'Recipe';
+
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -41,6 +46,7 @@ export default function RecipesPage() {
     const [formItemName, setFormItemName] = useState('');
     const [formServings, setFormServings] = useState('1');
     const [formMargin, setFormMargin] = useState('30');
+    const [formRequiresQC, setFormRequiresQC] = useState(true);
 
     const { data, isLoading } = useRecipes(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createMutation = useCreateRecipe(orgSlug);
@@ -62,6 +68,7 @@ export default function RecipesPage() {
         setFormItemName('');
         setFormServings('1');
         setFormMargin('30');
+        setFormRequiresQC(true);
         setDialogOpen(true);
     }
 
@@ -73,6 +80,7 @@ export default function RecipesPage() {
         setFormItemName(recipe.item_name ?? '');
         setFormServings(String(recipe.output_qty ?? 1));
         setFormMargin(String(recipe.target_margin_percent ?? 30));
+        setFormRequiresQC(recipe.requires_qc ?? true);
         setDialogOpen(true);
     }
 
@@ -88,14 +96,17 @@ export default function RecipesPage() {
             return;
         }
         const sku = formSKU.trim() || generateSKU(formName.trim());
+        const kind: 'menu' | 'bom' = editing?.kind ?? (isMfg ? 'bom' : 'menu');
         const payload: RecipePayload = {
             sku,
             name: formName.trim(),
             item_id: formItemId.trim() || undefined,
             output_qty: Number(formServings) || 1,
-            unit_of_measure: 'PORTION',
+            unit_of_measure: kind === 'bom' ? 'UNIT' : 'PORTION',
             is_active: true,
-            target_margin_percent: Number(formMargin) || null,
+            kind,
+            requires_qc: kind === 'bom' ? formRequiresQC : undefined,
+            target_margin_percent: kind === 'bom' ? null : (Number(formMargin) || null),
             ingredients: editing?.ingredients?.map((ing) => ({
                 item_id: ing.item_id,
                 item_sku: ing.item_sku,
@@ -135,12 +146,14 @@ export default function RecipesPage() {
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Recipes / BOM</h1>
-                    <p className="text-muted-foreground mt-1">Manage recipes and bills of materials</p>
+                    <h1 className="text-2xl font-bold tracking-tight">{isMfg ? 'Bills of Materials' : 'Recipes / BOM'}</h1>
+                    <p className="text-muted-foreground mt-1">
+                        {isMfg ? 'Define formulas: which raw materials produce each finished product' : 'Manage recipes and bills of materials'}
+                    </p>
                 </div>
                 <Button onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Recipe
+                    Add {docLabel}
                 </Button>
             </div>
 
@@ -164,8 +177,8 @@ export default function RecipesPage() {
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Produces</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Ingredients</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Cost/Portion</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Suggested Price</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">{isMfg ? 'Unit Cost' : 'Cost/Portion'}</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">{isMfg ? 'Material Cost' : 'Suggested Price'}</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
                             </thead>
@@ -179,8 +192,10 @@ export default function RecipesPage() {
                                 ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
-                                            <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No recipes found</p>
+                                            {isMfg
+                                                ? <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                                : <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />}
+                                            <p className="text-muted-foreground">{isMfg ? 'No bills of materials yet' : 'No recipes found'}</p>
                                         </td>
                                     </tr>
                                 ) : (
@@ -199,7 +214,7 @@ export default function RecipesPage() {
                                                 {formatCurrency(recipe.cost_per_portion)}
                                             </td>
                                             <td className="px-6 py-4 text-right tabular-nums hidden lg:table-cell">
-                                                {formatCurrency(recipe.suggested_price)}
+                                                {formatCurrency(isMfg ? recipe.total_cost : recipe.suggested_price)}
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1">
@@ -240,7 +255,7 @@ export default function RecipesPage() {
                             <CardHeader>
                                 <div className="flex items-center justify-between">
                                     <h2 className="text-lg font-semibold">
-                                        {editing ? 'Edit Recipe' : 'Add Recipe'}
+                                        {editing ? `Edit ${docLabel}` : `Add ${docLabel}`}
                                     </h2>
                                     <button onClick={closeDialog} className="p-1 rounded-lg hover:bg-accent transition-colors">
                                         <X className="h-5 w-5 text-muted-foreground" />
@@ -250,9 +265,9 @@ export default function RecipesPage() {
                             <CardContent>
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Recipe Name *</label>
+                                        <label className="text-sm font-medium">{docLabel} Name *</label>
                                         <Input
-                                            placeholder="e.g. Margherita Pizza"
+                                            placeholder={isMfg ? 'e.g. Dishwashing Liquid 750ml' : 'e.g. Margherita Pizza'}
                                             value={formName}
                                             onChange={(e) => setFormName(e.target.value)}
                                             required
@@ -269,8 +284,8 @@ export default function RecipesPage() {
                                     <ItemSearchInput
                                         orgSlug={orgSlug}
                                         value={formItemName}
-                                        label="Produced Item"
-                                        placeholder="Search for produced item..."
+                                        label={isMfg ? 'Finished Product' : 'Produced Item'}
+                                        placeholder={isMfg ? 'Search for the finished product...' : 'Search for produced item...'}
                                         onSelect={(item) => {
                                             setFormItemId(item.id);
                                             setFormItemName(item.name);
@@ -278,27 +293,44 @@ export default function RecipesPage() {
                                     />
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-medium">Servings</label>
+                                            <label className="text-sm font-medium">{isMfg ? 'Output Qty (units / batch)' : 'Servings'}</label>
                                             <Input
                                                 type="number"
                                                 min="1"
+                                                step="any"
                                                 value={formServings}
                                                 onChange={(e) => setFormServings(e.target.value)}
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">Target Margin %</label>
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={formMargin}
-                                                onChange={(e) => setFormMargin(e.target.value)}
-                                            />
-                                        </div>
+                                        {isMfg ? (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Quality Control</label>
+                                                <label className="flex items-center gap-2 text-sm h-9">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={formRequiresQC}
+                                                        onChange={(e) => setFormRequiresQC(e.target.checked)}
+                                                    />
+                                                    Requires passing QC to complete
+                                                </label>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Target Margin %</label>
+                                                <Input
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    value={formMargin}
+                                                    onChange={(e) => setFormMargin(e.target.value)}
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                     <p className="text-xs text-muted-foreground">
-                                        Ingredients can be managed after creating the recipe.
+                                        {isMfg
+                                            ? 'Raw materials (the BOM) can be added after creating the bill of materials.'
+                                            : 'Ingredients can be managed after creating the recipe.'}
                                     </p>
                                     <div className="flex gap-3 pt-2">
                                         <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>

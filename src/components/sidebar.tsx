@@ -71,6 +71,7 @@ const USE_CASE_MODULES: Record<string, string[]> = {
   services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'approvals','settings'],
   warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
+  manufacturing: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs', 'suppliers', 'production_batches', 'assets', 'requisitions', 'approvals', 'settings'],
 };
 
 const ADMIN_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
@@ -190,7 +191,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Items', icon: Package, href: '/catalog', moduleKey: 'catalog' },
         { label: 'Categories', icon: Tag, href: '/categories', moduleKey: 'categories' },
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
-        { label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' },
+        { label: useCase === 'manufacturing' ? 'Bill of Materials' : 'Recipes / BOM', icon: useCase === 'manufacturing' ? Factory : ChefHat, href: '/recipes', moduleKey: 'recipes' },
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
       ],
     },
