@@ -30,6 +30,15 @@ const ROLE_LABEL: Record<string, string> = {
 const MODULE_LABEL: Record<string, string> = {
     purchase_order: 'Purchase Order',
     requisition: 'Requisition',
+    rfq: 'RFQ Award',
+    purchase_return: 'Purchase Return',
+    goods_receipt: 'Goods Receipt',
+    contract: 'Contract',
+    production_batch: 'Production Batch',
+    stock_transfer: 'Stock Transfer',
+    asset_disposal: 'Asset Disposal',
+    asset_transfer: 'Asset Transfer',
+    asset_maintenance: 'Asset Maintenance',
 };
 
 function roleLabel(code: string) {
@@ -98,7 +107,7 @@ export default function ApprovalsInboxPage() {
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <ShieldCheck className="h-6 w-6" /> Approvals
                         </h1>
-                        <p className="text-muted-foreground mt-1">Review and sign off on purchase orders and requisitions</p>
+                        <p className="text-muted-foreground mt-1">Review and sign off on approvals across procurement, manufacturing, assets &amp; stock</p>
                     </div>
                     <Link href={`/${orgSlug}/approvals/rules`}>
                         <Button variant="outline"><ClipboardList className="h-4 w-4 mr-2" /> Approval Rules</Button>

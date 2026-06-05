@@ -18,6 +18,15 @@ import { toast } from 'sonner';
 const MODULE_LABEL: Record<string, string> = {
     purchase_order: 'Purchase Order',
     requisition: 'Requisition',
+    rfq: 'RFQ Award',
+    purchase_return: 'Purchase Return',
+    goods_receipt: 'Goods Receipt',
+    contract: 'Contract',
+    production_batch: 'Production Batch',
+    stock_transfer: 'Stock Transfer',
+    asset_disposal: 'Asset Disposal',
+    asset_transfer: 'Asset Transfer',
+    asset_maintenance: 'Asset Maintenance',
 };
 
 const ROLE_OPTIONS: { value: string; label: string }[] = [
@@ -160,7 +169,7 @@ export default function ApprovalRulesPage() {
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Shield className="h-6 w-6" /> Approval Rules
                         </h1>
-                        <p className="text-muted-foreground mt-1">Amount-tiered, multi-step sign-off for purchase orders and requisitions</p>
+                        <p className="text-muted-foreground mt-1">Amount-tiered, multi-step sign-off across procurement, manufacturing, assets &amp; stock workflows</p>
                     </div>
                     {canAdd && (
                         <Button onClick={startCreate}><Plus className="h-4 w-4 mr-2" /> New Rule</Button>
@@ -250,8 +259,25 @@ export default function ApprovalRulesPage() {
                                                 onChange={(e) => setModule(e.target.value as ApprovalModule)}
                                                 className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                             >
-                                                <option value="purchase_order">Purchase Order</option>
-                                                <option value="requisition">Requisition</option>
+                                                <optgroup label="Procurement">
+                                                    <option value="purchase_order">Purchase Order (send)</option>
+                                                    <option value="requisition">Requisition (submit)</option>
+                                                    <option value="rfq">RFQ (award)</option>
+                                                    <option value="purchase_return">Purchase Return (approve)</option>
+                                                    <option value="goods_receipt">Goods Receipt (post)</option>
+                                                    <option value="contract">Contract (activate)</option>
+                                                </optgroup>
+                                                <optgroup label="Manufacturing">
+                                                    <option value="production_batch">Production Batch (start)</option>
+                                                </optgroup>
+                                                <optgroup label="Stock">
+                                                    <option value="stock_transfer">Stock Transfer (ship)</option>
+                                                </optgroup>
+                                                <optgroup label="Assets">
+                                                    <option value="asset_disposal">Asset Disposal (complete)</option>
+                                                    <option value="asset_transfer">Asset Transfer (complete)</option>
+                                                    <option value="asset_maintenance">Asset Maintenance (complete)</option>
+                                                </optgroup>
                                             </select>
                                         </div>
                                         <div className="space-y-2">

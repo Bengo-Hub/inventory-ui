@@ -1,6 +1,17 @@
 import { apiClient } from './client';
 
-export type ApprovalModule = 'purchase_order' | 'requisition';
+export type ApprovalModule =
+  | 'purchase_order'
+  | 'requisition'
+  | 'stock_transfer'
+  | 'purchase_return'
+  | 'goods_receipt'
+  | 'production_batch'
+  | 'asset_disposal'
+  | 'asset_transfer'
+  | 'asset_maintenance'
+  | 'rfq'
+  | 'contract';
 export type ApprovalRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 export type ApprovalActionStatus = 'pending' | 'approved' | 'rejected' | 'skipped';
 

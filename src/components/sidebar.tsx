@@ -191,7 +191,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Items', icon: Package, href: '/catalog', moduleKey: 'catalog' },
         { label: 'Categories', icon: Tag, href: '/categories', moduleKey: 'categories' },
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
-        { label: useCase === 'manufacturing' ? 'Bill of Materials' : 'Recipes / BOM', icon: useCase === 'manufacturing' ? Factory : ChefHat, href: '/recipes', moduleKey: 'recipes' },
+        // Manufacturing outlets get "Bill of Materials" under the Manufacturing group instead.
+        ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' }]),
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
       ],
     },
@@ -223,14 +224,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
         { label: 'Contracts', icon: FileSignature, href: '/contracts', moduleKey: 'contracts' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
-        { label: 'Approvals', icon: ShieldCheck, href: '/approvals', moduleKey: 'approvals' },
-        { label: 'Approval Rules', icon: Shield, href: '/approvals/rules', moduleKey: 'approvals' },
       ],
     },
     {
       label: 'Manufacturing',
       defaultCollapsed: true,
       items: [
+        // BOM lives here for manufacturing outlets (it's under Catalog elsewhere).
+        ...(useCase === 'manufacturing' ? [{ label: 'Bill of Materials', icon: Factory, href: '/recipes', moduleKey: 'recipes' }] : []),
         { label: 'Production Batches', icon: Factory, href: '/production-batches', moduleKey: 'production_batches' },
       ],
     },
@@ -246,6 +247,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       label: 'Management',
       defaultCollapsed: true,
       items: [
+        { label: 'Approvals', icon: ShieldCheck, href: '/approvals', moduleKey: 'approvals' },
+        { label: 'Approval Rules', icon: Shield, href: '/approvals/rules', moduleKey: 'approvals' },
         { label: 'Settings', icon: Settings, href: '/settings', moduleKey: 'settings' },
       ],
     },
