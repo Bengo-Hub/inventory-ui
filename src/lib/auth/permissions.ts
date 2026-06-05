@@ -35,6 +35,22 @@ export function isPlatformOwner(
   );
 }
 
+// Roles that grant full access to TENANT-level resources (settings, items, warehouses,
+// stock, …). This mirrors the inventory-api RBAC middleware, which bypasses every per-route
+// permission check for platform owners, superusers, and tenant admins (`claims.IsAdmin()` /
+// the local `inventory_admin` role). Without this, a tenant admin — who has full API access —
+// would be blocked client-side whenever a specific granular permission string is missing from
+// their token (e.g. a newly added permission not yet in their cached claims). NOTE: this does
+// NOT grant platform-level access; platform pages are gated separately via isPlatformOwner().
+const FULL_TENANT_ACCESS_ROLES = ["superuser", "admin", "inventory_admin"];
+
+function hasFullTenantAccess(user: UserProfile | null): boolean {
+  if (!user) return false;
+  if (user.isSuperUser === true || (user as { isPlatformOwner?: boolean }).isPlatformOwner === true) return true;
+  const roles = (user.roles ?? []) as unknown as string[];
+  return roles.some((r) => FULL_TENANT_ACCESS_ROLES.includes(r));
+}
+
 export function userHasRole(
   user: UserProfile | null,
   roles?: UserRole[] | null,
@@ -42,8 +58,8 @@ export function userHasRole(
 ): boolean {
   if (!roles?.length) return true;
   if (!user) return false;
-  // Superuser bypasses all role checks
-  if (user.isSuperUser || user.roles.includes("superuser")) return true;
+  // Superuser / platform owner / tenant admin bypass all role checks.
+  if (hasFullTenantAccess(user)) return true;
   const matches = roles.map((role) => user.roles.includes(role));
   return operator === "and" ? matches.every(Boolean) : matches.some(Boolean);
 }
@@ -55,8 +71,8 @@ export function userHasPermission(
 ): boolean {
   if (!permissions?.length) return true;
   if (!user) return false;
-  // Superuser bypasses all permission checks
-  if (user.isSuperUser || user.roles.includes("superuser")) return true;
+  // Superuser / platform owner / tenant admin bypass all permission checks.
+  if (hasFullTenantAccess(user)) return true;
   const matches = permissions.map((permission) => user.permissions.includes(permission));
   return operator === "and" ? matches.every(Boolean) : matches.some(Boolean);
 }
