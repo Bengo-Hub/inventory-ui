@@ -48,14 +48,13 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
             return;
         }
 
-        const reasonText = reason === 'other'
-            ? `other: ${notes.trim()}`
-            : REASON_OPTIONS.find((r) => r.value === reason)?.label ?? reason;
-
+        // Send the enum VALUE (e.g. "correction"), not the human label — the API validates
+        // reason against the stockadjustment enum and silently collapses unknown values to
+        // "other". The human note travels in `notes`.
         mutation.mutate({
             sku: itemSku,
             adjustment: type === 'add' ? qty : -qty,
-            reason: reasonText,
+            reason,
             notes: notes.trim() || undefined,
             warehouse_id: warehouseId || undefined,
         }, {

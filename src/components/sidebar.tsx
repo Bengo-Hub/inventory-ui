@@ -37,6 +37,7 @@ import { useParams, usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { useBranding } from '@/providers/branding-provider';
 import { useAuthStore } from '@/store/auth';
+import { isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import { useOutletStore } from '@/store/outlet';
 
 interface SidebarProps {
@@ -160,7 +161,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const logout = useAuthStore((s) => s.logout);
   const user = useAuthStore((s) => s.user);
   const { outlet, clearOutlet } = useOutletStore();
-  const isPlatformOwner = orgSlug === 'codevertex';
+  // Owner-only (Platform nav). Derived from the server profile, never the URL orgSlug.
+  const isPlatformOwner = checkPlatformOwner(user);
   const isAdmin =
     !!user?.isPlatformOwner ||
     !!user?.isSuperUser ||

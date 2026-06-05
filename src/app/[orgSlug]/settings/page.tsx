@@ -2,7 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useAuthStore } from '@/store/auth';
-import { userHasPermission } from '@/lib/auth/permissions';
+import { userHasPermission, isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import type { UserProfile as AuthUserProfile } from '@/lib/auth/types';
 import {
   useInventorySettings,
@@ -70,7 +70,7 @@ function GeneralTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
   const update = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
-  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']);
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
 
   const [form, setForm] = useState({
     notificationEmail: '',
@@ -184,7 +184,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
   const update = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
-  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']);
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
 
   const [form, setForm] = useState({
     lowStockPct: 20,
@@ -439,7 +439,7 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
   const updateModules = useUpdateInventoryModules(orgSlug);
   const updateSettings = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
-  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || !!(user as any)?.isSuperUser;
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
 
   const [modules, setModules] = useState({
     lots_module_enabled: false,
@@ -690,7 +690,7 @@ function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
   const update = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
-  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']);
+  const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
 
   const [form, setForm] = useState({ pricesInclusiveOfTax: false, defaultTaxCode: '' });
 
@@ -782,7 +782,9 @@ export default function SettingsPage() {
   const orgSlug = params?.orgSlug as string;
   const [activeTab, setActiveTab] = useState<Tab>('general');
   const user = useAuthStore((s) => s.user);
-  const isPlatformOwner = !!user?.isPlatformOwner || orgSlug === 'codevertex';
+  // Owner-only: derived from the server profile (is_platform_owner / superuser / server
+  // tenant slug), never the URL orgSlug, so a tenant admin can't see the Platform tab.
+  const isPlatformOwner = checkPlatformOwner(user);
 
   const visibleTabs = TABS.filter((t) => t.id !== 'platform' || isPlatformOwner);
 
