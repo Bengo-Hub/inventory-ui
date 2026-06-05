@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Factory,
+  FileQuestion,
   FileSignature,
   FileText,
   FolderTree,
@@ -64,10 +65,10 @@ interface NavGroup {
 const USE_CASE_MODULES: Record<string, string[]> = {
   hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
-  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
   services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'approvals','settings'],
-  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
 };
 
@@ -213,6 +214,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       defaultCollapsed: true,
       items: [
         { label: 'Requisitions', icon: ClipboardCheck, href: '/requisitions', moduleKey: 'requisitions' },
+        { label: 'RFQs', icon: FileQuestion, href: '/rfqs', moduleKey: 'rfqs' },
         { label: 'Purchase Orders', icon: FileText, href: '/purchase-orders', moduleKey: 'purchase_orders' },
         { label: 'Goods Receipts', icon: ClipboardCheck, href: '/goods-receipts', moduleKey: 'purchase_orders' },
         { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
