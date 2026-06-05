@@ -256,6 +256,7 @@ export default function EventsPage() {
           orgSlug={orgSlug}
           item={modalEvent ?? null}
           defaultDate={modalDate}
+          lockToEvent
           onClose={() => setModalEvent(undefined)}
           onSubmit={handleSubmit}
           isPending={createEvent.isPending || updateEvent.isPending}

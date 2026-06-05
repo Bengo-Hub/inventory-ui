@@ -2,6 +2,7 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useAuthStore, UserProfile } from '@/store/auth';
+import { isPlatformOwner } from '@/lib/auth/permissions';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -64,9 +65,11 @@ type TabKey = 'connectors' | 'config' | 'warehouses' | 'auto-reorder' | 'stock-a
 
 /* ─── Helpers ────────────────────────────────────────────────────────── */
 
+// Platform pages are owner-only. A tenant admin / inventory_admin is NOT a platform owner;
+// only the is_platform_owner claim, the superuser role, or the codevertex tenant (via the
+// server-returned tenant slug, not the URL) qualifies. See isPlatformOwner().
 function isAdmin(user: UserProfile | null): boolean {
-    if (!user?.roles) return false;
-    return user.roles.some((r) => r === 'super_admin' || r === 'admin');
+    return isPlatformOwner(user);
 }
 
 /* ─── Page ───────────────────────────────────────────────────────────── */

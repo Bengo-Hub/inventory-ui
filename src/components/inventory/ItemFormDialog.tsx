@@ -14,6 +14,22 @@ import { toast } from 'sonner';
 interface Category {
   id: string;
   name: string;
+  code?: string;
+  slug?: string;
+}
+
+// Frontend type → allowed-category map. Categories are domain groupings (Beverages, Pizza,
+// Events…) and only map cleanly to item type for events, so that is the one filter we apply;
+// every other type shows all categories. The "Events & Experiences" category is seeded with
+// code EVT / slug "events" (see cmd/seed/seed_categories.go).
+const EVENT_CATEGORY_CODES = ['EVT'];
+const EVENT_CATEGORY_SLUGS = ['events'];
+
+function isEventCategory(c: Category): boolean {
+  return (
+    EVENT_CATEGORY_CODES.includes((c.code ?? '').toUpperCase()) ||
+    EVENT_CATEGORY_SLUGS.includes((c.slug ?? '').toLowerCase())
+  );
 }
 
 interface Unit {
@@ -120,6 +136,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   });
 
   const isRecipe = type === 'RECIPE';
+  // Event mode (the dedicated Events pages pass lockToEvent): type is fixed to SERVICE and the
+  // category is preset to "Events & Experiences". isStockable gates goods-only fields (cost,
+  // reorder, perishable/lot/age) so they don't render for services/events/vouchers.
+  const isEventMode = !!lockToEvent;
+  const isStockable = ['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type);
   const batchCost = recipeIngredients.reduce((sum, row) => {
     if (!row.qty || !(row.cost_price ?? 0)) return sum;
     return sum + row.qty * (row.cost_price ?? 0) * (1 + (row.waste_percent ?? 0) / 100);
@@ -176,6 +197,19 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
     queryFn: () => apiClient.get<Unit[]>(`/api/v1/${orgSlug}/inventory/units`),
     placeholderData: [],
   });
+
+  // In event mode show only event categories; fall back to all if the tenant has none seeded.
+  const eventCategories = categories?.filter(isEventCategory) ?? [];
+  const visibleCategories = isEventMode
+    ? (eventCategories.length > 0 ? eventCategories : categories)
+    : categories;
+
+  // Preset the "Events & Experiences" category for a new event once categories have loaded.
+  useEffect(() => {
+    if (!isEventMode || item || categoryId) return;
+    const evt = categories?.find(isEventCategory);
+    if (evt) setCategoryId(evt.id);
+  }, [isEventMode, item, categories, categoryId]);
 
   async function handleImageFile(file: File) {
     if (!file.type.startsWith('image/')) return;
@@ -340,7 +374,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                   <label className="text-sm font-medium">Category</label>
                   <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
                     <option value="">No category</option>
-                    {categories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    {visibleCategories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -418,31 +452,36 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Reorder Level</label>
-                  <Input type="number" min="0" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Reorder Quantity</label>
-                  <Input type="number" min="0" placeholder="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} />
-                </div>
-              </div>
+              {/* Stock-only fields — irrelevant for services/events/vouchers/recipes */}
+              {isStockable && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reorder Level</label>
+                      <Input type="number" min="0" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Reorder Quantity</label>
+                      <Input type="number" min="0" placeholder="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} />
+                    </div>
+                  </div>
 
-              <div className="flex flex-wrap gap-4">
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={requiresAge} onChange={(e) => setRequiresAge(e.target.checked)} className="rounded" />
-                  Requires Age Verification
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={isPerishable} onChange={(e) => setIsPerishable(e.target.checked)} className="rounded" />
-                  Perishable
-                </label>
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" checked={trackLots} onChange={(e) => setTrackLots(e.target.checked)} className="rounded" />
-                  Track Lots
-                </label>
-              </div>
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={requiresAge} onChange={(e) => setRequiresAge(e.target.checked)} className="rounded" />
+                      Requires Age Verification
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={isPerishable} onChange={(e) => setIsPerishable(e.target.checked)} className="rounded" />
+                      Perishable
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer">
+                      <input type="checkbox" checked={trackLots} onChange={(e) => setTrackLots(e.target.checked)} className="rounded" />
+                      Track Lots
+                    </label>
+                  </div>
+                </>
+              )}
 
               {/* Recipe section — RECIPE type only */}
               {isRecipe && (
@@ -528,8 +567,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 </div>
               )}
 
-              {/* Hospitality — SERVICE type only (rooms / facilities / amenities) */}
-              {isService && (
+              {/* Hospitality — non-event SERVICE items only (rooms / facilities / amenities) */}
+              {isService && !isEventMode && (
                 <div className="space-y-4 border-t border-border pt-4">
                   <p className="text-sm font-semibold">Hospitality</p>
                   <div className="space-y-2">
@@ -582,8 +621,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 </div>
               )}
 
-              {/* Event Details — SERVICE type only */}
-              {isService && (
+              {/* Event Details — event-mode SERVICE items only */}
+              {isService && isEventMode && (
                 <div className="space-y-4 border-t border-border pt-4">
                   <p className="text-sm font-semibold">Event Details</p>
 
