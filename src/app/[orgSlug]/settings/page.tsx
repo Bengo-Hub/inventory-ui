@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { useAuthStore } from '@/store/auth';
 import { userHasPermission, isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import type { UserProfile as AuthUserProfile } from '@/lib/auth/types';
@@ -742,16 +743,14 @@ function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
 
           <div className="space-y-2 max-w-xs">
             <label className={labelClass}>Default Tax Code</label>
-            <input
-              type="text"
+            <TaxCodeCombobox
+              orgSlug={orgSlug}
               value={form.defaultTaxCode}
-              onChange={(e) => setForm((f) => ({ ...f, defaultTaxCode: e.target.value }))}
+              onChange={(code) => setForm((f) => ({ ...f, defaultTaxCode: code }))}
               disabled={!canEdit}
-              placeholder="e.g. VAT-16"
-              className={`${inputClass} font-mono uppercase`}
             />
             <p className="text-xs text-muted-foreground">
-              KRA/eTIMS tax code applied to items that don&apos;t specify one. Tax rates are sourced from
+              KRA/eTIMS tax code applied to items that don&apos;t specify one. Options are synced from
               treasury-api (the platform source of truth) — no rate is stored here.
             </p>
           </div>

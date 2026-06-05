@@ -4,6 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { apiClient } from '@/lib/api/client';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -442,8 +443,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Tax Code <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <Input placeholder="e.g. VAT-16" value={taxCode} onChange={(e) => setTaxCode(e.target.value.toUpperCase())} />
-                    <p className="text-xs text-muted-foreground">KRA/eTIMS code. Leave blank to use the tenant default.</p>
+                    <TaxCodeCombobox orgSlug={orgSlug} value={taxCode} onChange={setTaxCode} />
+                    <p className="text-xs text-muted-foreground">KRA/eTIMS code from treasury. Leave blank to use the tenant default.</p>
                   </div>
                   <label className="flex items-start gap-2 text-sm cursor-pointer sm:pt-7">
                     <input type="checkbox" checked={taxInclusive} onChange={(e) => setTaxInclusive(e.target.checked)} className="rounded mt-0.5" />
