@@ -211,8 +211,8 @@ export default function TransfersPage() {
             return;
         }
         const validItems = transferItems
-            .filter((i) => i.itemId.trim() && parseInt(i.quantity, 10) > 0)
-            .map((i) => ({ item_id: i.itemId.trim(), quantity: parseInt(i.quantity, 10) }));
+            .filter((i) => i.itemId.trim() && parseFloat(i.quantity) > 0)
+            .map((i) => ({ item_id: i.itemId.trim(), quantity: parseFloat(i.quantity) }));
 
         if (validItems.length === 0) {
             toast.error('Add at least one item with a valid quantity');
@@ -426,7 +426,8 @@ export default function TransfersPage() {
                                                         <Input
                                                             type="number"
                                                             placeholder="0"
-                                                            min="1"
+                                                            min="0"
+                                                            step="any"
                                                             value={item.quantity}
                                                             onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
                                                         />

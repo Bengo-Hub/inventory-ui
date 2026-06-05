@@ -66,7 +66,7 @@ function StockDrawer({
 
     function handleAdjSubmit(e: React.FormEvent) {
         e.preventDefault();
-        const qty = parseInt(adjQty, 10);
+        const qty = parseFloat(adjQty);
         if (!adjItemSku || isNaN(qty) || qty <= 0 || !adjReason) {
             toast.error('Fill in all required fields');
             return;
@@ -186,7 +186,8 @@ function StockDrawer({
                                     <Input
                                         type="number"
                                         placeholder="0"
-                                        min="1"
+                                        min="0"
+                                        step="any"
                                         value={adjQty}
                                         onChange={(e) => setAdjQty(e.target.value)}
                                         required

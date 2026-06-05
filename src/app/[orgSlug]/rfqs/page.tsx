@@ -77,7 +77,7 @@ export default function RFQListPage() {
             .map((l) => ({
                 item_id: l.itemId || null,
                 description: l.itemName,
-                quantity: parseInt(l.quantity, 10) || 1,
+                quantity: parseFloat(l.quantity) || 1,
                 uom: l.uom || undefined,
             }));
         if (cleaned.length === 0) {
@@ -229,7 +229,7 @@ export default function RFQListPage() {
                                                 <div className="grid grid-cols-3 gap-2 items-end">
                                                     <div className="space-y-1">
                                                         <label className="text-xs text-muted-foreground">Qty</label>
-                                                        <Input type="number" min="1" value={line.quantity} onChange={(e) => updateLine(idx, 'quantity', e.target.value)} />
+                                                        <Input type="number" min="0" step="any" value={line.quantity} onChange={(e) => updateLine(idx, 'quantity', e.target.value)} />
                                                     </div>
                                                     <div className="space-y-1">
                                                         <label className="text-xs text-muted-foreground">UoM</label>

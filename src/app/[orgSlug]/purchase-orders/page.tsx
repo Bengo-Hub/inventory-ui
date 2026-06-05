@@ -156,10 +156,10 @@ export default function PurchaseOrdersPage() {
         if (!supplierId) { toast.error('Select a supplier'); return; }
         if (!warehouseId) { toast.error('Select a warehouse'); return; }
         const lines = poLines
-            .filter((l) => l.itemId && parseInt(l.quantity, 10) > 0)
+            .filter((l) => l.itemId && parseFloat(l.quantity) > 0)
             .map((l) => ({
                 item_id: l.itemId,
-                quantity: parseInt(l.quantity, 10),
+                quantity: parseFloat(l.quantity),
                 unit_cost: parseFloat(l.unitPrice) || 0,
             }));
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
@@ -558,7 +558,8 @@ export default function PurchaseOrdersPage() {
                                                     <label className="text-xs text-muted-foreground">Qty</label>
                                                     <Input
                                                         type="number"
-                                                        min="1"
+                                                        min="0"
+                                                        step="any"
                                                         placeholder="1"
                                                         value={line.quantity}
                                                         onChange={(e) => updatePOLine(idx, 'quantity', e.target.value)}
