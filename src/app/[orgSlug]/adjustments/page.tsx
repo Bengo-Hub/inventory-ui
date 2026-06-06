@@ -4,6 +4,8 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useUnits } from '@/hooks/useUnits';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -36,8 +38,10 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
     const [reason, setReason] = useState('');
     const [notes, setNotes] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
+    const [unitId, setUnitId] = useState('');
 
     const { data: warehouses } = useWarehouses(orgSlug);
+    const { data: units } = useUnits(orgSlug);
     const mutation = useCreateAdjustment(orgSlug);
 
     function handleSubmit(e: React.FormEvent) {
@@ -57,6 +61,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
             reason,
             notes: notes.trim() || undefined,
             warehouse_id: warehouseId || undefined,
+            unit_id: unitId || undefined,
         }, {
             onSuccess: () => {
                 toast.success('Stock adjustment recorded');
@@ -112,6 +117,8 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                 onSelect={(item) => {
                                     setItemSku(item.sku);
                                     setItemName(item.name);
+                                    // Preselect the chosen item's unit of measure.
+                                    setUnitId(item.unit_id ?? '');
                                 }}
                             />
 
@@ -129,18 +136,34 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Warehouse</label>
+                                    <label className="text-sm font-medium">Unit</label>
                                     <select
-                                        value={warehouseId}
-                                        onChange={(e) => setWarehouseId(e.target.value)}
+                                        value={unitId}
+                                        onChange={(e) => setUnitId(e.target.value)}
                                         className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                     >
-                                        <option value="">All Warehouses</option>
-                                        {warehouses?.map((wh) => (
-                                            <option key={wh.id} value={wh.id}>{wh.name}</option>
+                                        <option value="">Base unit</option>
+                                        {units?.map((u) => (
+                                            <option key={u.id} value={u.id}>
+                                                {u.name}{u.abbreviation ? ` (${u.abbreviation})` : ''}
+                                            </option>
                                         ))}
                                     </select>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Warehouse</label>
+                                <select
+                                    value={warehouseId}
+                                    onChange={(e) => setWarehouseId(e.target.value)}
+                                    className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                >
+                                    <option value="">All Warehouses</option>
+                                    {warehouses?.map((wh) => (
+                                        <option key={wh.id} value={wh.id}>{wh.name}</option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div className="space-y-2">
@@ -230,10 +253,12 @@ export default function AdjustmentsPage() {
                     <p className="text-muted-foreground mt-1">Add or remove stock manually</p>
                 </div>
                 {canAdjust && (
-                    <Button onClick={() => openModal()}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Adjustment
-                    </Button>
+                    <SubscriptionGate feature="stock_tracking" fallback={null}>
+                        <Button onClick={() => openModal()}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Adjustment
+                        </Button>
+                    </SubscriptionGate>
                 )}
             </div>
 

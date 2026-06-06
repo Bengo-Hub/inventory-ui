@@ -10,6 +10,10 @@ export interface StockLevel {
   reserved: number;
   reorder_point?: number;
   unit?: string;
+  unit_id?: string;
+  category_id?: string;
+  category_name?: string;
+  type?: string;
 }
 
 export interface StockAdjustment {
@@ -33,12 +37,16 @@ export interface CreateAdjustmentInput {
   reference?: string;
   notes?: string;
   warehouse_id?: string;
+  unit_id?: string;
 }
 
 export interface StockListParams {
   warehouse_id?: string;
   search?: string;
   low_stock?: boolean;
+  out_of_stock?: boolean;
+  category_id?: string;
+  type?: string;
 }
 
 export interface AdjustmentListParams {

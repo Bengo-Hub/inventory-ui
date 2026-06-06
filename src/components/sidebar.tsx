@@ -39,6 +39,7 @@ import { useBranding } from '@/providers/branding-provider';
 import { useAuthStore } from '@/store/auth';
 import { isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import { useOutletStore } from '@/store/outlet';
+import { useSubscription } from '@/hooks/use-subscription';
 
 interface SidebarProps {
   open?: boolean;
@@ -75,6 +76,15 @@ const USE_CASE_MODULES: Record<string, string[]> = {
 };
 
 const ADMIN_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
+
+// Maps a sidebar module key to the subscription feature the backend enforces for it.
+// Only modules whose endpoints are feature-gated server-side are listed, so the UI and
+// API stay consistent. Modules without an entry are always shown (subject to use_case).
+const MODULE_FEATURE: Record<string, string> = {
+  stock: 'stock_tracking',
+  adjustments: 'stock_tracking',
+  purchase_orders: 'purchase_orders',
+};
 
 function hasModule(key: string | undefined, useCase: string | undefined, isAdmin: boolean): boolean {
   if (!key) return true; // no key = always visible
@@ -169,6 +179,18 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     !!user?.isSuperUser ||
     !!(user?.roles ?? []).some((r) => ADMIN_ROLES.includes(r));
 
+  // Subscription-feature gating: hide nav items whose feature the current plan lacks.
+  // Bypassed for platform/demo/service-charge tenants and while the plan is still loading,
+  // so we never hide a feature the tenant actually has.
+  const { hasFeature, isLoading: subLoading, isPlatformOwner: subPlatform, isDemo, isServiceCharge, info } = useSubscription();
+  function hasFeatureAccess(key: string | undefined): boolean {
+    if (!key) return true;
+    const feature = MODULE_FEATURE[key];
+    if (!feature) return true;
+    if (subLoading || subPlatform || isDemo || isServiceCharge || !info?.planCode) return true;
+    return hasFeature(feature);
+  }
+
   async function handleLogout() {
     clearOutlet();
     await logout();
@@ -258,7 +280,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const navGroups = allNavGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => hasModule(item.moduleKey, useCase, isAdmin)),
+      items: group.items.filter(
+        (item) => hasModule(item.moduleKey, useCase, isAdmin) && hasFeatureAccess(item.moduleKey),
+      ),
     }))
     .filter((group) => group.items.length > 0);
 
