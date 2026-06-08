@@ -33,10 +33,40 @@ export interface MenuEngineeringParams {
   tenant_slug?: string;
 }
 
+export interface StockValuationItem {
+  item_id: string;
+  sku: string;
+  name: string;
+  category_name?: string;
+  on_hand: number;
+  unit_cost: number;
+  value: number;
+}
+
+export interface StockValuationCategory {
+  category_id?: string;
+  category_name: string;
+  item_count: number;
+  total_units: number;
+  total_value: number;
+}
+
+export interface StockValuation {
+  currency: string;
+  total_value: number;
+  total_units: number;
+  item_count: number;
+  by_category: StockValuationCategory[];
+  top_items: StockValuationItem[];
+}
+
 export const reportsApi = {
   foodCostVariance: (orgSlug: string, params?: FoodCostVarianceParams): Promise<VarianceReportItem[]> =>
     apiClient.get<VarianceReportItem[]>(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance`, params as Record<string, string | boolean | undefined>),
 
   menuEngineering: (orgSlug: string, params?: MenuEngineeringParams): Promise<MenuMatrixItem[]> =>
     apiClient.get<MenuMatrixItem[]>(`/api/v1/${orgSlug}/inventory/reports/menu-engineering`, params),
+
+  stockValuation: (orgSlug: string): Promise<StockValuation> =>
+    apiClient.get<StockValuation>(`/api/v1/${orgSlug}/inventory/reports/stock-valuation`),
 };
