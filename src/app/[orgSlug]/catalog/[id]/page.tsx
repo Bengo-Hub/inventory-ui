@@ -4,11 +4,12 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
-import { useItemPricing } from '@/hooks/usePricing';
+import { useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
+import type { PricingTier } from '@/lib/api/pricing';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { type Item } from '@/lib/api/items';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, History, Pencil, RefreshCw, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -69,6 +70,37 @@ export default function ItemDetailPage() {
     });
 
     const { data: itemPricing } = useItemPricing(orgSlug, id);
+    const { data: pricingTiers } = usePricingTiers(orgSlug);
+    const upsertPricing = useUpsertItemPricing(orgSlug);
+    const [pricingEditOpen, setPricingEditOpen] = useState(false);
+    const [tierPrices, setTierPrices] = useState<Record<string, string>>({});
+
+    function openPricingEditor() {
+        const seed: Record<string, string> = {};
+        for (const p of itemPricing ?? []) {
+            if (p.price > 0) seed[p.pricing_tier_id] = String(p.price);
+        }
+        setTierPrices(seed);
+        setPricingEditOpen(true);
+    }
+
+    function savePricing() {
+        const entries = Object.entries(tierPrices)
+            .map(([pricing_tier_id, v]) => ({ pricing_tier_id, price: Number(v), currency: 'KES' }))
+            .filter((e) => Number.isFinite(e.price) && e.price > 0);
+        if (entries.length === 0) {
+            toast.error('Enter at least one tier price');
+            return;
+        }
+        upsertPricing.mutate(
+            { itemId: id, entries },
+            {
+                onSuccess: () => { toast.success('Pricing updated'); setPricingEditOpen(false); },
+                onError: () => toast.error('Failed to update pricing'),
+            },
+        );
+    }
+
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data;
 
@@ -225,9 +257,15 @@ export default function ItemDetailPage() {
             {/* Item Pricing */}
             <Card>
                 <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <DollarSign className="h-5 w-5 text-primary" />
-                        <h2 className="text-lg font-semibold">Pricing</h2>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <DollarSign className="h-5 w-5 text-primary" />
+                            <h2 className="text-lg font-semibold">Pricing</h2>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={openPricingEditor}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                        </Button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -248,8 +286,8 @@ export default function ItemDetailPage() {
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {itemPricing?.map((p) => (
-                                        <tr key={`${p.tier_id}-${p.outlet_id ?? 'all'}`} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-3 font-medium">{p.tier_name ?? p.tier_id}{p.outlet_id ? ' (outlet)' : ''}</td>
+                                        <tr key={`${p.pricing_tier_id}-${p.outlet_id ?? 'all'}`} className="hover:bg-accent/30 transition-colors">
+                                            <td className="px-6 py-3 font-medium">{p.tier_name ?? p.tier_code ?? p.pricing_tier_id}{p.outlet_id ? ' (outlet)' : ''}</td>
                                             <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell capitalize">{(p.tier_basis ?? 'default').replace(/_/g, ' ')}</td>
                                             <td className="px-6 py-3 text-right font-semibold tabular-nums">{p.price.toLocaleString()}</td>
                                             <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{p.currency ?? 'KES'}</td>
@@ -261,6 +299,57 @@ export default function ItemDetailPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {pricingEditOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setPricingEditOpen(false)} />
+                    <div className="relative z-50 w-full max-w-md mx-4">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-semibold">Edit Pricing</h2>
+                                    <button onClick={() => setPricingEditOpen(false)} className="p-1 rounded-lg hover:bg-accent transition-colors">
+                                        <X className="h-5 w-5 text-muted-foreground" />
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {((pricingTiers ?? []) as PricingTier[]).filter((t) => t.is_active).length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No pricing profiles defined yet. Create them under Pricing Profiles first.</p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {((pricingTiers ?? []) as PricingTier[]).filter((t) => t.is_active).map((t) => (
+                                            <div key={t.id} className="flex items-center gap-3">
+                                                <label className="flex-1 text-sm font-medium">
+                                                    {t.name}
+                                                    {t.is_default && <span className="ml-1 text-xs text-muted-foreground">(default)</span>}
+                                                </label>
+                                                <div className="relative w-36">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">KES</span>
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="decimal"
+                                                        className="pl-10 text-right"
+                                                        placeholder="0"
+                                                        value={tierPrices[t.id] ?? ''}
+                                                        onChange={(e) => setTierPrices((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex gap-3 pt-2">
+                                    <Button type="button" variant="outline" className="flex-1" onClick={() => setPricingEditOpen(false)}>Cancel</Button>
+                                    <Button type="button" className="flex-1" onClick={savePricing} disabled={upsertPricing.isPending}>
+                                        {upsertPricing.isPending ? 'Saving...' : 'Save'}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+            )}
 
             {/* Reorder Configuration */}
             <Card>
