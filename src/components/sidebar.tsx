@@ -3,6 +3,7 @@
 import { cn } from '@/lib/utils';
 import {
   ArrowRightLeft,
+  BarChart3,
   BookOpen,
   Boxes,
   Calendar,
@@ -247,6 +248,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Returns', icon: RotateCcw, href: '/returns', moduleKey: 'returns' },
         { label: 'Contracts', icon: FileSignature, href: '/contracts', moduleKey: 'contracts' },
         { label: 'Suppliers', icon: Truck, href: '/suppliers', moduleKey: 'suppliers' },
+        { label: 'Analytics', icon: BarChart3, href: '/purchase-orders/analytics', moduleKey: 'purchase_orders' },
+      ],
+    },
+    {
+      label: 'Reports',
+      defaultCollapsed: true,
+      items: [
+        { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes' },
+        { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes' },
       ],
     },
     {
