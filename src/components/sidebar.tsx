@@ -27,6 +27,7 @@ import {
   Shield,
   ShieldCheck,
   SquareStack,
+  DollarSign,
   Tag,
   Truck,
   Warehouse,
@@ -271,6 +272,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Approvals', icon: ShieldCheck, href: '/approvals', moduleKey: 'approvals' },
         { label: 'Approval Rules', icon: Shield, href: '/approvals/rules', moduleKey: 'approvals' },
+        { label: 'Pricing Profiles', icon: DollarSign, href: '/pricing-profiles', moduleKey: 'settings' },
         { label: 'Settings', icon: Settings, href: '/settings', moduleKey: 'settings' },
       ],
     },

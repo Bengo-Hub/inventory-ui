@@ -3,6 +3,7 @@ import { apiClient } from './client';
 export interface PricingTier {
   id: string;
   name: string;
+  code?: string;
   description?: string;
   is_default: boolean;
   is_active: boolean;
@@ -36,6 +37,7 @@ export interface ItemPricing {
 
 export interface CreateTierInput {
   name: string;
+  code?: string;
   description?: string;
   is_default?: boolean;
 }
