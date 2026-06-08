@@ -25,8 +25,9 @@ export interface ItemPricing {
   item_id: string;
   item_name?: string;
   item_sku?: string;
-  tier_id: string;
+  pricing_tier_id: string;
   tier_name?: string;
+  tier_code?: string;
   price: number;
   currency?: string;
   /** Outlet-level rate override (null = applies to all outlets). */
@@ -42,9 +43,12 @@ export interface CreateTierInput {
   is_default?: boolean;
 }
 
-export interface UpsertItemPricingInput {
+// The PUT /items/{id}/pricing endpoint accepts an ARRAY of these entries (one per tier).
+export interface UpsertItemPricingEntry {
+  pricing_tier_id: string;
   price: number;
-  outlet_id?: string;
+  currency?: string;
+  outlet_id?: string | null;
   tier_basis?: TierBasis;
 }
 
@@ -64,8 +68,8 @@ export const pricingApi = {
   getItemPricing: (orgSlug: string, itemId: string) =>
     apiClient.get<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/${itemId}/pricing`),
 
-  upsertItemPricing: (orgSlug: string, itemId: string, data: UpsertItemPricingInput) =>
-    apiClient.put<ItemPricing>(`/api/v1/${orgSlug}/inventory/items/${itemId}/pricing`, data),
+  upsertItemPricing: (orgSlug: string, itemId: string, entries: UpsertItemPricingEntry[]) =>
+    apiClient.put<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/${itemId}/pricing`, entries),
 
   listAllItemPricing: (orgSlug: string) =>
     apiClient.get<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/pricing`),
