@@ -60,6 +60,25 @@ export interface StockValuation {
   top_items: StockValuationItem[];
 }
 
+export interface DeadstockItem {
+  item_id: string;
+  sku: string;
+  name: string;
+  category_name?: string;
+  on_hand: number;
+  unit_cost: number;
+  value: number;
+  last_activity: string;
+}
+
+export interface DeadstockReport {
+  days: number;
+  currency: string;
+  item_count: number;
+  total_dead_value: number;
+  items: DeadstockItem[];
+}
+
 export const reportsApi = {
   foodCostVariance: (orgSlug: string, params?: FoodCostVarianceParams): Promise<VarianceReportItem[]> =>
     apiClient.get<VarianceReportItem[]>(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance`, params as Record<string, string | boolean | undefined>),
@@ -69,4 +88,7 @@ export const reportsApi = {
 
   stockValuation: (orgSlug: string): Promise<StockValuation> =>
     apiClient.get<StockValuation>(`/api/v1/${orgSlug}/inventory/reports/stock-valuation`),
+
+  deadstock: (orgSlug: string, days = 90): Promise<DeadstockReport> =>
+    apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days) }),
 };
