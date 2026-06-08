@@ -53,6 +53,7 @@ export default function PurchaseOrdersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState('');
     const [page, setPage] = useState(1);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
@@ -82,17 +83,18 @@ export default function PurchaseOrdersPage() {
     const canChangePO = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
     const canCancelPO = canAny([P.PURCHASES_DELETE, P.PURCHASES_MANAGE]);
 
-    const filtered = search
-        ? orders?.filter((o) =>
+    const filtered = (orders ?? []).filter((o) => {
+        const matchesSearch = !search ||
             o.po_number.toLowerCase().includes(search.toLowerCase()) ||
-            (o.supplier_name ?? '').toLowerCase().includes(search.toLowerCase())
-          )
-        : orders;
+            (o.supplier_name ?? '').toLowerCase().includes(search.toLowerCase());
+        const matchesStatus = !statusFilter || o.status === statusFilter;
+        return matchesSearch && matchesStatus;
+    });
 
     const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, statusFilter]);
 
     function addPOLine() {
         setPoLines([...poLines, { itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
@@ -406,14 +408,29 @@ export default function PurchaseOrdersPage() {
 
             <Card>
                 <CardHeader>
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search by PO number or supplier..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-10"
-                        />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search by PO number or supplier..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-10"
+                            />
+                        </div>
+                        <select
+                            value={statusFilter}
+                            onChange={(e) => setStatusFilter(e.target.value)}
+                            className="rounded-md border border-input bg-background px-3 py-2 text-sm sm:w-52"
+                            aria-label="Filter by status"
+                        >
+                            <option value="">All statuses</option>
+                            <option value="draft">Draft (incl. auto-reorder)</option>
+                            <option value="sent">Sent</option>
+                            <option value="partially_received">Partially received</option>
+                            <option value="received">Received</option>
+                            <option value="cancelled">Cancelled</option>
+                        </select>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
