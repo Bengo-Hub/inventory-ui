@@ -6,6 +6,7 @@ import {
   type FoodCostVarianceParams,
   type MenuEngineeringParams,
   type MenuMatrixItem,
+  type StockValuation,
   type VarianceReportItem,
 } from '@/lib/api/reports';
 
@@ -24,6 +25,15 @@ export function useMenuEngineering(orgSlug: string, params?: MenuEngineeringPara
   return useQuery<MenuMatrixItem[]>({
     queryKey: [REPORTS_KEY, 'menu-engineering', orgSlug, params],
     queryFn: () => reportsApi.menuEngineering(orgSlug, params),
+    enabled: !!orgSlug,
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useStockValuation(orgSlug: string) {
+  return useQuery<StockValuation>({
+    queryKey: [REPORTS_KEY, 'stock-valuation', orgSlug],
+    queryFn: () => reportsApi.stockValuation(orgSlug),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
   });

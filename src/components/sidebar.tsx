@@ -255,6 +255,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       label: 'Reports',
       defaultCollapsed: true,
       items: [
+        { label: 'Stock Valuation', icon: BarChart3, href: '/reports/stock-valuation', moduleKey: 'stock' },
         { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes' },
         { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes' },
       ],
