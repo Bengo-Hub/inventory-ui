@@ -17,7 +17,7 @@ import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { ArrowLeft, BarChart3, FileText, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, FileText, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -68,7 +68,7 @@ export default function PurchaseOrdersPage() {
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data;
     const { data: warehouses } = useWarehouses(orgSlug);
-    const { data: orders, isLoading } = usePurchaseOrders(orgSlug);
+    const { data: orders, isLoading, isError, refetch } = usePurchaseOrders(orgSlug);
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
     const createPO = useCreatePurchaseOrder(orgSlug);
     const amendPO = useAmendPurchaseOrder(orgSlug);
@@ -450,6 +450,14 @@ export default function PurchaseOrdersPage() {
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading purchase orders...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load purchase orders</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (filtered?.length ?? 0) === 0 ? (

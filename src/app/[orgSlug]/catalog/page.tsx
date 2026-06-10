@@ -10,7 +10,7 @@ import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
@@ -217,7 +217,7 @@ export default function CatalogPage() {
     });
   }
 
-  const { data: itemsPage, isLoading } = useItems(orgSlug, {
+  const { data: itemsPage, isLoading, isError, refetch } = useItems(orgSlug, {
     ...(search ? { search } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
     ...(typeFilter ? { type: typeFilter } : {}),
@@ -455,6 +455,14 @@ export default function CatalogPage() {
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                         Loading items...
+                      </td>
+                    </tr>
+                  ) : isError ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center">
+                        <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                        <p className="text-muted-foreground">Couldn&apos;t load items</p>
+                        <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                       </td>
                     </tr>
                   ) : items.length === 0 ? (

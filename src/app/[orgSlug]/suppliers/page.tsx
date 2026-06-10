@@ -5,7 +5,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '@/hooks/useSuppliers';
 import { type Supplier, type CreateSupplierInput } from '@/lib/api/suppliers';
-import { Plus, Search, Trash2, Truck } from 'lucide-react';
+import { AlertTriangle, Plus, Search, Trash2, Truck } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -29,7 +29,7 @@ export default function SuppliersPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Supplier | null>(null);
 
-    const { data, isLoading } = useSuppliers(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useSuppliers(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createSupplier = useCreateSupplier(orgSlug);
     const updateSupplier = useUpdateSupplier(orgSlug);
     const deleteSupplier = useDeleteSupplier(orgSlug);
@@ -131,6 +131,14 @@ export default function SuppliersPage() {
                                             Loading suppliers...
                                         </td>
                                     </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load suppliers</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
                                 ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center">
@@ -172,6 +180,8 @@ export default function SuppliersPage() {
                                                             variant="ghost"
                                                             size="sm"
                                                             className="text-destructive hover:text-destructive"
+                                                            title="Delete supplier"
+                                                            aria-label="Delete supplier"
                                                             onClick={() => handleDelete(supplier)}
                                                             disabled={deleteSupplier.isPending}
                                                         >
