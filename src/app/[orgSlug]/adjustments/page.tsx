@@ -6,7 +6,7 @@ import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
-import { ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -223,7 +223,7 @@ export default function AdjustmentsPage() {
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
 
-    const { data: adjustments, isLoading } = useAdjustments(orgSlug);
+    const { data: adjustments, isLoading, isError, refetch } = useAdjustments(orgSlug);
 
     const filtered = useMemo(() => {
         if (!search) return adjustments;
@@ -291,6 +291,14 @@ export default function AdjustmentsPage() {
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading history...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load adjustments</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (paginated?.length ?? 0) === 0 ? (

@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { apiClient } from '@/lib/api/client';
 import { useItems } from '@/hooks/useItems';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Eye, Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Eye, Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -107,7 +107,7 @@ export default function UnitsPage() {
     const [formAbbreviation, setFormAbbreviation] = useState('');
     const [formType, setFormType] = useState('');
 
-    const { data: units, isLoading } = useQuery<Unit[]>({
+    const { data: units, isLoading, isError, refetch } = useQuery<Unit[]>({
         queryKey: ['units', orgSlug, search],
         queryFn: () => {
             const p: Record<string, string> = {};
@@ -227,6 +227,14 @@ export default function UnitsPage() {
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading units...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load units</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (units?.length ?? 0) === 0 ? (
