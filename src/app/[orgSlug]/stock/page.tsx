@@ -4,13 +4,13 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { useStock, useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
+import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, Minus, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, BookOpen, Minus, Plus, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -52,11 +52,13 @@ function StockDrawer({
     orgSlug,
     onClose,
     canAdjust,
+    initialAction,
 }: {
     item: StockLevel;
     orgSlug: string;
     onClose: () => void;
     canAdjust: boolean;
+    initialAction?: 'adjust' | 'breakdown';
 }) {
     const [adjType, setAdjType] = useState<'add' | 'remove'>('add');
     const [adjItemSku, setAdjItemSku] = useState(item.sku);
@@ -66,12 +68,21 @@ function StockDrawer({
     const [adjNotes, setAdjNotes] = useState('');
     const [adjWarehouseId, setAdjWarehouseId] = useState(item.warehouse_id ?? '');
     const [adjUnitId, setAdjUnitId] = useState(item.unit_id ?? '');
-    const [showAdjForm, setShowAdjForm] = useState(false);
+    const [showAdjForm, setShowAdjForm] = useState(initialAction === 'adjust');
+
+    // Breakdown (bulk pack -> retail units): the clicked row is the parent SKU.
+    const [showBreakdownForm, setShowBreakdownForm] = useState(initialAction === 'breakdown');
+    const [bdChildSku, setBdChildSku] = useState('');
+    const [bdChildName, setBdChildName] = useState('');
+    const [bdParentQty, setBdParentQty] = useState('');
+    const [bdConversion, setBdConversion] = useState('');
+    const [bdNotes, setBdNotes] = useState('');
 
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const { data: itemAdj } = useAdjustments(orgSlug, { item_id: item.id, limit: 5 });
     const createAdj = useCreateAdjustment(orgSlug);
+    const createBreakdown = useCreateBreakdown(orgSlug);
 
     const status = stockStatus(item.available, item.reorder_point);
 
@@ -100,6 +111,40 @@ function StockDrawer({
                 setShowAdjForm(false);
             },
             onError: () => toast.error('Failed to record adjustment'),
+        });
+    }
+
+    function handleBreakdownSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        const parentQty = parseFloat(bdParentQty);
+        const conversion = parseFloat(bdConversion);
+        if (!bdChildSku || isNaN(parentQty) || parentQty <= 0 || isNaN(conversion) || conversion <= 0) {
+            toast.error('Fill in all required fields');
+            return;
+        }
+        if (bdChildSku === item.sku) {
+            toast.error('Child SKU must differ from the parent');
+            return;
+        }
+
+        createBreakdown.mutate({
+            parent_sku: item.sku,
+            child_sku: bdChildSku,
+            parent_quantity: parentQty,
+            conversion_factor: conversion,
+            warehouse_id: item.warehouse_id || undefined,
+            notes: bdNotes.trim() || undefined,
+        }, {
+            onSuccess: () => {
+                toast.success('Stock broken down');
+                setBdChildSku('');
+                setBdChildName('');
+                setBdParentQty('');
+                setBdConversion('');
+                setBdNotes('');
+                setShowBreakdownForm(false);
+            },
+            onError: () => toast.error('Failed to break down stock'),
         });
     }
 
@@ -272,6 +317,95 @@ function StockDrawer({
                 </SubscriptionGate>
                 )}
 
+                {/* Breakdown — convert this bulk SKU (parent) into retail units of a child SKU.
+                    Same gating as adjustments: stock change permission + stock_tracking feature
+                    (mirrors the backend RequireFeature("stock_tracking") + PermStockChange). */}
+                {canAdjust && (
+                <SubscriptionGate feature="stock_tracking">
+                <div className="border-t border-border pt-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-sm font-semibold">Break Down Stock</h3>
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowBreakdownForm((p) => !p)}
+                        >
+                            {showBreakdownForm ? 'Cancel' : <><Split className="h-3 w-3 mr-1" /> Breakdown</>}
+                        </Button>
+                    </div>
+
+                    {showBreakdownForm && (
+                        <form onSubmit={handleBreakdownSubmit} className="space-y-3">
+                            <p className="text-xs text-muted-foreground">
+                                Converts <span className="font-medium">{item.item_name}</span> (parent) into
+                                retail units of a child item. Decrements this SKU and increments the child.
+                            </p>
+
+                            <ItemSearchInput
+                                orgSlug={orgSlug}
+                                value={bdChildName}
+                                label="Child item *"
+                                placeholder="Search child item..."
+                                onSelect={(found) => {
+                                    setBdChildSku(found.sku);
+                                    setBdChildName(found.name);
+                                }}
+                            />
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-medium">Parent quantity *</label>
+                                    <Input
+                                        type="number"
+                                        placeholder="0"
+                                        min="0"
+                                        step="any"
+                                        value={bdParentQty}
+                                        onChange={(e) => setBdParentQty(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-medium">Units per parent *</label>
+                                    <Input
+                                        type="number"
+                                        placeholder="e.g. 24"
+                                        min="0"
+                                        step="any"
+                                        value={bdConversion}
+                                        onChange={(e) => setBdConversion(e.target.value)}
+                                        required
+                                    />
+                                </div>
+                            </div>
+
+                            {parseFloat(bdParentQty) > 0 && parseFloat(bdConversion) > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    Produces{' '}
+                                    <span className="font-semibold text-foreground tabular-nums">
+                                        {(parseFloat(bdParentQty) * parseFloat(bdConversion)).toLocaleString()}
+                                    </span>{' '}
+                                    child unit(s).
+                                </p>
+                            )}
+
+                            <textarea
+                                placeholder="Notes (optional)..."
+                                value={bdNotes}
+                                onChange={(e) => setBdNotes(e.target.value)}
+                                rows={2}
+                                className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
+                            />
+
+                            <Button type="submit" className="w-full" size="sm" disabled={createBreakdown.isPending}>
+                                {createBreakdown.isPending ? 'Processing...' : 'Break Down Stock'}
+                            </Button>
+                        </form>
+                    )}
+                </div>
+                </SubscriptionGate>
+                )}
+
                 {/* Recent adjustments */}
                 {(itemAdj?.length ?? 0) > 0 && (
                     <div className="border-t border-border pt-4">
@@ -303,6 +437,12 @@ export default function StockPage() {
     const [typeFilter, setTypeFilter] = useState('');
     const [page, setPage] = useState(1);
     const [selectedItem, setSelectedItem] = useState<StockLevel | null>(null);
+    const [drawerAction, setDrawerAction] = useState<'adjust' | 'breakdown' | undefined>(undefined);
+
+    function openItem(item: StockLevel, action?: 'adjust' | 'breakdown') {
+        setSelectedItem(item);
+        setDrawerAction(action);
+    }
 
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.STOCK_CHANGE, P.STOCK_MANAGE]);
@@ -454,7 +594,7 @@ export default function StockPage() {
                                                     item.available <= 0 ? 'bg-red-500/5' :
                                                     (item.reorder_point != null && item.available <= item.reorder_point) ? 'bg-yellow-500/5' : ''
                                                 }`}
-                                                onClick={() => setSelectedItem(item)}
+                                                onClick={() => openItem(item)}
                                             >
                                                 <td className="px-6 py-4 font-medium">{item.item_name}</td>
                                                 <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.sku}</td>
@@ -473,14 +613,24 @@ export default function StockPage() {
                                                 </td>
                                                 <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
                                                     {canAdjust && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            title="Record Adjustment"
-                                                            onClick={() => setSelectedItem(item)}
-                                                        >
-                                                            <SlidersHorizontal className="h-4 w-4" />
-                                                        </Button>
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                title="Record Adjustment"
+                                                                onClick={() => openItem(item, 'adjust')}
+                                                            >
+                                                                <SlidersHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                title="Break Down Stock"
+                                                                onClick={() => openItem(item, 'breakdown')}
+                                                            >
+                                                                <Split className="h-4 w-4" />
+                                                            </Button>
+                                                        </div>
                                                     )}
                                                 </td>
                                             </tr>
@@ -498,10 +648,12 @@ export default function StockPage() {
 
             {selectedItem && (
                 <StockDrawer
+                    key={`${selectedItem.id}-${drawerAction ?? 'view'}`}
                     item={selectedItem}
                     orgSlug={orgSlug}
-                    onClose={() => setSelectedItem(null)}
+                    onClose={() => { setSelectedItem(null); setDrawerAction(undefined); }}
                     canAdjust={canAdjust}
+                    initialAction={drawerAction}
                 />
             )}
         </div>

@@ -40,6 +40,31 @@ export interface CreateAdjustmentInput {
   unit_id?: string;
 }
 
+export interface CreateBreakdownInput {
+  parent_sku: string;
+  child_sku: string;
+  parent_quantity: number;
+  // Provide conversion_factor OR child_quantity; the backend derives child_quantity
+  // from conversion_factor when child_quantity is omitted.
+  conversion_factor?: number;
+  child_quantity?: number;
+  warehouse_id?: string;
+  cost_allocated?: number;
+  reference?: string;
+  notes?: string;
+}
+
+export interface StockBreakdown {
+  id: string;
+  parent_sku: string;
+  child_sku: string;
+  parent_quantity: number;
+  child_quantity: number;
+  parent_on_hand: number;
+  child_on_hand: number;
+  created_at: string;
+}
+
 export interface StockListParams {
   warehouse_id?: string;
   search?: string;
@@ -69,6 +94,9 @@ export const stockApi = {
 
   createAdjustment: (orgSlug: string, data: CreateAdjustmentInput) =>
     apiClient.post<StockAdjustment>(`/api/v1/${orgSlug}/inventory/adjustments`, data),
+
+  createBreakdown: (orgSlug: string, data: CreateBreakdownInput) =>
+    apiClient.post<StockBreakdown>(`/api/v1/${orgSlug}/inventory/breakdowns`, data),
 
   getSummary: (orgSlug: string) =>
     apiClient.get<{
