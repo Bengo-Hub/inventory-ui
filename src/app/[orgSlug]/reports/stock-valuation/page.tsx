@@ -2,7 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useStockValuation } from '@/hooks/useReports';
-import { ArrowLeft, Boxes, DollarSign, Layers, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Layers, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -15,7 +15,7 @@ function fmt(n: number) {
 export default function StockValuationPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
-    const { data, isLoading, refetch, isFetching } = useStockValuation(org);
+    const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org);
     const cur = data?.currency ?? 'KES';
 
     const kpis = [
@@ -67,10 +67,18 @@ export default function StockValuationPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {(data?.by_category?.length ?? 0) === 0 && (
+                                {isError ? (
+                                    <tr>
+                                        <td colSpan={4} className="px-6 py-8 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load stock valuation</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                ) : (data?.by_category?.length ?? 0) === 0 && (
                                     <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No stock on hand.'}</td></tr>
                                 )}
-                                {data?.by_category?.map((c) => (
+                                {!isError && data?.by_category?.map((c) => (
                                     <tr key={c.category_name} className="hover:bg-accent/30 transition-colors">
                                         <td className="px-6 py-3 font-medium">{c.category_name}</td>
                                         <td className="px-6 py-3 text-right tabular-nums">{c.item_count}</td>
@@ -99,10 +107,18 @@ export default function StockValuationPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {(data?.top_items?.length ?? 0) === 0 && (
+                                {isError ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load stock valuation</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                ) : (data?.top_items?.length ?? 0) === 0 && (
                                     <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No valued items.'}</td></tr>
                                 )}
-                                {data?.top_items?.map((it) => (
+                                {!isError && data?.top_items?.map((it) => (
                                     <tr key={it.item_id} className="hover:bg-accent/30 transition-colors">
                                         <td className="px-6 py-3 font-medium">
                                             {it.name}

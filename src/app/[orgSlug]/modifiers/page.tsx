@@ -5,7 +5,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { ModifierGroupDialog } from '@/components/inventory/ModifierGroupDialog';
 import { useModifierGroups, useCreateModifierGroup, useUpdateModifierGroup, useDeleteModifierGroup } from '@/hooks/use-modifiers';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
-import { ChevronDown, ChevronRight, Layers, Plus, Search, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Layers, Plus, Search, Trash2 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -53,7 +53,7 @@ export default function ModifiersPage() {
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [pendingDelete, setPendingDelete] = useState<ModifierGroup | null>(null);
 
-    const { data, isLoading } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createMutation = useCreateModifierGroup(orgSlug);
     const updateMutation = useUpdateModifierGroup(orgSlug);
     const deleteMutation = useDeleteModifierGroup(orgSlug);
@@ -164,6 +164,14 @@ export default function ModifiersPage() {
                                     <tr>
                                         <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading modifier groups...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load modifier groups</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (data?.total ?? 0) === 0 ? (

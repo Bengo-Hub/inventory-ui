@@ -5,7 +5,7 @@ import {
     useAssetCategories, useCreateAssetCategory, useUpdateAssetCategory, useDeleteAssetCategory,
 } from '@/hooks/useAssets';
 import { type AssetCategory, type CreateCategoryInput } from '@/lib/api/assets';
-import { ArrowLeft, FolderTree, Plus, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, FolderTree, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -17,7 +17,7 @@ const selectClass = 'w-full rounded-lg border border-input bg-transparent px-3 p
 export default function AssetCategoriesPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
-    const { data: categories, isLoading } = useAssetCategories(org);
+    const { data: categories, isLoading, isError, refetch } = useAssetCategories(org);
     const createCat = useCreateAssetCategory(org);
     const updateCat = useUpdateAssetCategory(org);
     const deleteCat = useDeleteAssetCategory(org);
@@ -97,8 +97,24 @@ export default function AssetCategoriesPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && (categories?.length ?? 0) === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No categories yet.</td></tr>}
-                                {categories?.map((c) => (
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load categories</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && (categories?.length ?? 0) === 0 && (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <FolderTree className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No categories yet</p>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isError && categories?.map((c) => (
                                     <tr key={c.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium">{c.name}</td>
                                         <td className="px-6 py-3 hidden md:table-cell text-muted-foreground">{c.parent_id ? nameOf(c.parent_id) : '—'}</td>

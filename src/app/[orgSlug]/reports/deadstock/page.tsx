@@ -26,7 +26,7 @@ export default function DeadstockPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [days, setDays] = useState(90);
-    const { data, isLoading, refetch, isFetching } = useDeadstock(org, days);
+    const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days);
     const cur = data?.currency ?? 'KES';
 
     const kpis = [
@@ -92,10 +92,18 @@ export default function DeadstockPage() {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {(data?.items?.length ?? 0) === 0 && (
+                                {isError ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-8 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load deadstock report</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                ) : (data?.items?.length ?? 0) === 0 && (
                                     <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No deadstock — everything is moving.'}</td></tr>
                                 )}
-                                {data?.items?.map((it) => (
+                                {!isError && data?.items?.map((it) => (
                                     <tr key={it.item_id} className="hover:bg-accent/30 transition-colors">
                                         <td className="px-6 py-3 font-medium">
                                             {it.name}

@@ -7,7 +7,7 @@ import {
     useRejectRequest,
 } from '@/hooks/useApprovals';
 import type { ApprovalRequest, ApprovalRequestStatus } from '@/lib/api/approvals';
-import { CheckCircle2, ClipboardList, Inbox, ShieldCheck, X, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardList, Inbox, ShieldCheck, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -60,7 +60,7 @@ export default function ApprovalsInboxPage() {
             : tab === 'pending'
             ? { status: 'pending' as ApprovalRequestStatus }
             : {};
-    const { data: requests, isLoading } = useApprovalRequests(orgSlug, listParams);
+    const { data: requests, isLoading, isError, refetch } = useApprovalRequests(orgSlug, listParams);
 
     const approve = useApproveRequest(orgSlug);
     const reject = useRejectRequest(orgSlug);
@@ -149,6 +149,14 @@ export default function ApprovalsInboxPage() {
                                 <tbody className="divide-y divide-border">
                                     {isLoading ? (
                                         <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading approvals...</td></tr>
+                                    ) : isError ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-12 text-center">
+                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                                <p className="text-muted-foreground">Couldn&apos;t load approvals</p>
+                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                            </td>
+                                        </tr>
                                     ) : rows.length === 0 ? (
                                         <tr>
                                             <td colSpan={5} className="px-6 py-12 text-center">

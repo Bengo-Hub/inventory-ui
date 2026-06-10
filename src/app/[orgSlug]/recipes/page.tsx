@@ -7,7 +7,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
 import { useOutletStore } from '@/store/outlet';
-import { ChefHat, Factory, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChefHat, Factory, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -48,7 +48,7 @@ export default function RecipesPage() {
     const [formMargin, setFormMargin] = useState('30');
     const [formRequiresQC, setFormRequiresQC] = useState(true);
 
-    const { data, isLoading } = useRecipes(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useRecipes(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
     const createMutation = useCreateRecipe(orgSlug);
     const updateMutation = useUpdateRecipe(orgSlug);
     const deleteMutation = useDeleteRecipe(orgSlug);
@@ -189,6 +189,14 @@ export default function RecipesPage() {
                                             Loading recipes...
                                         </td>
                                     </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load recipes</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
                                 ) : (data?.total ?? 0) === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
@@ -222,6 +230,7 @@ export default function RecipesPage() {
                                                         variant="ghost"
                                                         size="sm"
                                                         title="Manage ingredients"
+                                                        aria-label="Manage ingredients"
                                                         onClick={() => router.push(`/${orgSlug}/recipes/${recipe.id}`)}
                                                     >
                                                         <FlaskConical className="h-4 w-4" />
@@ -229,7 +238,7 @@ export default function RecipesPage() {
                                                     <Button variant="ghost" size="sm" onClick={() => openEdit(recipe)}>
                                                         Edit
                                                     </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => setDeleteTarget(recipe)}>
+                                                    <Button variant="ghost" size="sm" aria-label="Delete recipe" onClick={() => setDeleteTarget(recipe)}>
                                                         <Trash2 className="h-4 w-4 text-destructive" />
                                                     </Button>
                                                 </div>

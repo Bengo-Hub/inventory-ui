@@ -6,7 +6,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { usePurchaseReturns, useCreatePurchaseReturn, useApprovePurchaseReturn } from '@/hooks/usePurchaseReturns';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { type ReturnPaymentStatus } from '@/lib/api/purchase-returns';
-import { Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { AlertTriangle, Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -33,7 +33,7 @@ export default function PurchaseReturnsPage() {
     const [reason, setReason] = useState('');
     const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
-    const { data, isLoading } = usePurchaseReturns(org, { payment_status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const create = useCreatePurchaseReturn(org);
     const approve = useApprovePurchaseReturn(org);
     const { data: suppliersPage } = useSuppliers(org);
@@ -92,8 +92,24 @@ export default function PurchaseReturnsPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No returns yet.</td></tr>}
-                                {rows.map((r) => (
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load returns</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <RotateCcw className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No returns yet</p>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isError && rows.map((r) => (
                                     <tr key={r.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium font-mono text-xs">{r.return_number}</td>
                                         <td className="px-6 py-3 hidden md:table-cell">{nameOf(r.supplier_id)}</td>
