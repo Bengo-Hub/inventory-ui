@@ -13,7 +13,7 @@ import {
 import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { ArrowRightLeft, ChevronDown, ChevronUp, Package, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, ChevronDown, ChevronUp, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -153,7 +153,7 @@ export default function TransfersPage() {
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
-    const { data: transfers, isLoading } = useTransfers(orgSlug);
+    const { data: transfers, isLoading, isError, refetch } = useTransfers(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     const createTransfer = useCreateTransfer(orgSlug);
 
@@ -278,6 +278,14 @@ export default function TransfersPage() {
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading transfers...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load transfers</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (filtered?.length ?? 0) === 0 ? (

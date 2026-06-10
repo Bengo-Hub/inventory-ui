@@ -133,7 +133,7 @@ export default function LotsPage() {
     const [formSupplierRef, setFormSupplierRef] = useState('');
     const [formNotes, setFormNotes] = useState('');
 
-    const { data: lots, isLoading } = useLots(orgSlug);
+    const { data: lots, isLoading, isError, refetch } = useLots(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     useSuppliers(orgSlug); // preload suppliers for combobox
     const createLot = useCreateLot(orgSlug);
@@ -298,6 +298,14 @@ export default function LotsPage() {
                                     <tr>
                                         <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading lots...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={7} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load lots</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (filtered?.length ?? 0) === 0 ? (
