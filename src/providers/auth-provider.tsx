@@ -1,6 +1,9 @@
 'use client';
 
 import { apiClient } from '@/lib/api/client';
+import { parseLimitInfo } from '@/lib/api/error-handler';
+import { LimitReachedModal } from '@/components/subscription/limit-reached-modal';
+import { useLimitModal } from '@/store/limit-modal';
 import { useMe } from '@/hooks/useMe';
 import { useAuthStore } from '@/store/auth';
 import { useQueryClient } from '@tanstack/react-query';
@@ -41,6 +44,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => apiClient.setOn401(null);
     }, [queryClient, logout]);
 
+    // Wire 402 plan-limit-reached → limit modal
+    useEffect(() => {
+        apiClient.setOnLimitReached((data) => {
+            const info = parseLimitInfo(data);
+            if (info) useLimitModal.getState().show(info);
+        });
+        return () => apiClient.setOnLimitReached(null);
+    }, []);
+
     useEffect(() => {
         if (status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
             useAuthStore.getState().redirectToSSO(orgSlug, window.location.href);
@@ -67,5 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         );
     }
 
-    return <>{children}</>;
+    return (
+        <>
+            {children}
+            <LimitReachedModal />
+        </>
+    );
 }

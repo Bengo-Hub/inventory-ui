@@ -50,6 +50,7 @@ class ApiClient {
 
     private on401Callback: (() => void) | null = null;
     private onSubscription403Callback: ((data: any) => void) | null = null;
+    private onLimitReachedCallback: ((data: any) => void) | null = null;
 
     /** Register a callback to run when any API response is 401 (e.g. clear session / redirect to auth). */
     public setOn401(callback: (() => void) | null) {
@@ -59,6 +60,11 @@ class ApiClient {
     /** Register a callback for subscription-related 403 errors (code=subscription_inactive, upgrade=true). */
     public setOnSubscription403(callback: ((data: any) => void) | null) {
         this.onSubscription403Callback = callback;
+    }
+
+    /** Register a callback for 402 plan-limit-reached errors (opens the limit-reached modal). */
+    public setOnLimitReached(callback: ((data: any) => void) | null) {
+        this.onLimitReachedCallback = callback;
     }
 
     private handleError = async (error: any) => {
@@ -86,6 +92,10 @@ class ApiClient {
             if (data?.code === 'subscription_inactive' || data?.upgrade === true) {
                 this.onSubscription403Callback(data);
             }
+        }
+        // 402 Payment Required = a plan limit was hit (warehouses, SKUs, suppliers, …).
+        if (error.response?.status === 402 && this.onLimitReachedCallback) {
+            this.onLimitReachedCallback(error.response?.data);
         }
         return Promise.reject(error);
     };
