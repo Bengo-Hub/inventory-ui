@@ -7,7 +7,7 @@ import {
     useProductionBatches, useCreateBatch, useStartBatch, useCompleteBatch, useCancelBatch,
 } from '@/hooks/useProductionBatches';
 import { type CreateBatchInput, type ProductionBatch, type BatchStatus } from '@/lib/api/productionBatches';
-import { BarChart3, Factory, Plus } from 'lucide-react';
+import { AlertTriangle, BarChart3, Factory, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -29,7 +29,7 @@ export default function ProductionBatchesPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    const { data, isLoading } = useProductionBatches(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useProductionBatches(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const createBatch = useCreateBatch(orgSlug);
     const startBatch = useStartBatch(orgSlug);
     const completeBatch = useCompleteBatch(orgSlug);
@@ -120,8 +120,24 @@ export default function ProductionBatchesPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No production batches yet.</td></tr>}
-                                {rows.map((r) => (
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load production batches</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No production batches yet</p>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isError && rows.map((r) => (
                                     <tr key={r.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium">{r.batch_number}</td>
                                         <td className="px-6 py-3 hidden lg:table-cell">{r.scheduled_date ? new Date(r.scheduled_date).toLocaleDateString() : '—'}</td>

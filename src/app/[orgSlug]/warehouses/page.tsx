@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { useWarehouses, useCreateWarehouse, useUpdateWarehouse, useDeleteWarehouse } from '@/hooks/useWarehouses';
 import { type Warehouse, type CreateWarehouseInput } from '@/lib/api/warehouses';
 import { useOutletStore } from '@/store/outlet';
-import { MapPin, Package, Pencil, Plus, Store, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react';
+import { AlertTriangle, MapPin, Package, Pencil, Plus, Store, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -22,7 +22,7 @@ export default function WarehousesPage() {
     const [formAddress, setFormAddress] = useState('');
     const [formIsDefault, setFormIsDefault] = useState(false);
 
-    const { data: warehouses, isLoading } = useWarehouses(orgSlug);
+    const { data: warehouses, isLoading, isError, refetch } = useWarehouses(orgSlug);
     const createWarehouse = useCreateWarehouse(orgSlug);
     const updateWarehouse = useUpdateWarehouse(orgSlug);
     const deleteWarehouse = useDeleteWarehouse(orgSlug);
@@ -102,6 +102,14 @@ export default function WarehousesPage() {
 
             {isLoading ? (
                 <div className="text-center py-12 text-muted-foreground">Loading warehouses...</div>
+            ) : isError ? (
+                <Card>
+                    <CardContent className="py-16 text-center">
+                        <AlertTriangle className="h-12 w-12 mx-auto text-destructive/60 mb-4" />
+                        <p className="text-muted-foreground">Couldn&apos;t load warehouses</p>
+                        <Button variant="outline" className="mt-4" onClick={() => refetch()}>Retry</Button>
+                    </CardContent>
+                </Card>
             ) : (warehouses?.length ?? 0) === 0 ? (
                 <Card>
                     <CardContent className="py-16 text-center">
@@ -158,16 +166,17 @@ export default function WarehousesPage() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                         <Link href={`/${orgSlug}/warehouses/${wh.id}/locations`}>
-                                            <Button variant="ghost" size="sm">
+                                            <Button variant="ghost" size="sm" aria-label="Manage locations">
                                                 <MapPin className="h-4 w-4" />
                                             </Button>
                                         </Link>
-                                        <Button variant="ghost" size="sm" onClick={() => openEdit(wh)}>
+                                        <Button variant="ghost" size="sm" aria-label="Edit warehouse" onClick={() => openEdit(wh)}>
                                             <Pencil className="h-4 w-4" />
                                         </Button>
                                         <Button
                                             variant="ghost"
                                             size="sm"
+                                            aria-label="Delete warehouse"
                                             className="text-destructive hover:text-destructive"
                                             onClick={() => handleDelete(wh)}
                                             disabled={deleteWarehouse.isPending}

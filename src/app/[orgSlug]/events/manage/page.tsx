@@ -7,7 +7,7 @@ import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { useCancelEvent, useEvents, useUpdateEventCapacity } from '@/hooks/use-events';
 import { useUpdateItem } from '@/hooks/useItems';
 import type { CreateItemInput, Item } from '@/lib/api/items';
-import { Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
+import { AlertTriangle, Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -111,7 +111,7 @@ export default function ManageEventsPage() {
     const [cancelTarget, setCancelTarget] = useState<Item | null>(null);
     const [sellEvent, setSellEvent] = useState<Item | null>(null);
 
-    const { data, isLoading, error } = useEvents(orgSlug, { limit: 200 });
+    const { data, isLoading, error, isError, refetch } = useEvents(orgSlug, { limit: 200 });
     const cancelEvent = useCancelEvent(orgSlug);
     const updateCapacity = useUpdateEventCapacity(orgSlug);
 
@@ -203,6 +203,14 @@ export default function ManageEventsPage() {
                                     <tr>
                                         <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading events...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load events</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : filtered.length === 0 ? (

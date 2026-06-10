@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -43,7 +43,7 @@ export default function CategoriesPage() {
     const [formDescription, setFormDescription] = useState('');
     const [formParentId, setFormParentId] = useState('');
 
-    const { data: categories, isLoading } = useQuery<Category[]>({
+    const { data: categories, isLoading, isError, refetch } = useQuery<Category[]>({
         queryKey: ['categories', orgSlug, search],
         queryFn: async () => {
             const p: Record<string, string> = {};
@@ -195,6 +195,14 @@ export default function CategoriesPage() {
                                             Loading categories...
                                         </td>
                                     </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load categories</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
                                 ) : paginatedItems.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="px-6 py-12 text-center">
@@ -228,6 +236,7 @@ export default function CategoriesPage() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        aria-label="Edit category"
                                                         onClick={() => openEdit(cat)}
                                                     >
                                                         <Pencil className="h-4 w-4" />
@@ -235,6 +244,7 @@ export default function CategoriesPage() {
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
+                                                        aria-label="Delete category"
                                                         className="text-destructive hover:text-destructive"
                                                         onClick={() => handleDelete(cat)}
                                                         disabled={deleteMutation.isPending}

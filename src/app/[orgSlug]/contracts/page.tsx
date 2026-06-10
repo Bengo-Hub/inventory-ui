@@ -5,7 +5,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { useContracts, useCreateContract, useUpdateContract, useActivateContract, useTerminateContract } from '@/hooks/useContracts';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { type Contract, type ContractStatus } from '@/lib/api/contracts';
-import { FileSignature, Plus, X } from 'lucide-react';
+import { AlertTriangle, FileSignature, Plus, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -35,7 +35,7 @@ export default function ContractsPage() {
     const [endDate, setEndDate] = useState('');
     const [terms, setTerms] = useState('');
 
-    const { data, isLoading } = useContracts(org, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useContracts(org, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const create = useCreateContract(org);
     const update = useUpdateContract(org);
     const activate = useActivateContract(org);
@@ -113,8 +113,24 @@ export default function ContractsPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No contracts yet.</td></tr>}
-                                {rows.map((c) => (
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load contracts</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <FileSignature className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No contracts yet</p>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isError && rows.map((c) => (
                                     <tr key={c.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium">{c.title}</td>
                                         <td className="px-6 py-3 hidden md:table-cell">{nameOf(c.supplier_id)}</td>

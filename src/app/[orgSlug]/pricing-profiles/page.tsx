@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { DollarSign, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, DollarSign, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -20,7 +20,7 @@ export default function PricingProfilesPage() {
   const params = useParams();
   const orgSlug = params?.orgSlug as string;
 
-  const { data: tiers, isLoading } = usePricingTiers(orgSlug);
+  const { data: tiers, isLoading, isError, refetch } = usePricingTiers(orgSlug);
   const createTier = useCreatePricingTier(orgSlug);
   const updateTier = useUpdatePricingTier(orgSlug);
   const deleteTier = useDeletePricingTier(orgSlug);
@@ -122,6 +122,14 @@ export default function PricingProfilesPage() {
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading profiles...</td>
                   </tr>
+                ) : isError ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center">
+                      <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                      <p className="text-muted-foreground">Couldn&apos;t load pricing profiles</p>
+                      <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                    </td>
+                  </tr>
                 ) : list.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center">
@@ -146,12 +154,13 @@ export default function PricingProfilesPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
+                          <Button variant="ghost" size="sm" aria-label="Edit profile" onClick={() => openEdit(t)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="ghost"
                             size="sm"
+                            aria-label="Deactivate profile"
                             className="text-destructive hover:text-destructive"
                             onClick={() => handleDelete(t)}
                             disabled={deleteTier.isPending}

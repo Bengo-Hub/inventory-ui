@@ -7,7 +7,7 @@ import {
     useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset, useRunDepreciation,
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
-import { BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
+import { AlertTriangle, BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -37,7 +37,7 @@ export default function AssetsPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Asset | null>(null);
 
-    const { data, isLoading } = useAssets(orgSlug, {
+    const { data, isLoading, isError, refetch } = useAssets(orgSlug, {
         status: status || undefined, search: search || undefined, page, limit: ITEMS_PER_PAGE,
     });
     const createAsset = useCreateAsset(orgSlug);
@@ -121,8 +121,24 @@ export default function AssetsPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No assets yet.</td></tr>}
-                                {rows.map((a) => (
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load assets</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <Boxes className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No assets yet</p>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isError && rows.map((a) => (
                                     <tr key={a.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium">{a.asset_tag}</td>
                                         <td className="px-6 py-3">{a.name}</td>

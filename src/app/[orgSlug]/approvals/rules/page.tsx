@@ -9,7 +9,7 @@ import {
 } from '@/hooks/useApprovals';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { ApprovalModule, ApprovalRule, ApprovalStep } from '@/lib/api/approvals';
-import { ArrowLeft, Minus, Plus, Shield, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Minus, Plus, Shield, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -45,7 +45,7 @@ export default function ApprovalRulesPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
 
-    const { data: rules, isLoading } = useApprovalRules(orgSlug);
+    const { data: rules, isLoading, isError, refetch } = useApprovalRules(orgSlug);
     const createRule = useCreateApprovalRule(orgSlug);
     const updateRule = useUpdateApprovalRule(orgSlug);
     const deleteRule = useDeleteApprovalRule(orgSlug);
@@ -193,6 +193,14 @@ export default function ApprovalRulesPage() {
                                 <tbody className="divide-y divide-border">
                                     {isLoading ? (
                                         <tr><td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">Loading rules...</td></tr>
+                                    ) : isError ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-6 py-12 text-center">
+                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                                <p className="text-muted-foreground">Couldn&apos;t load approval rules</p>
+                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                            </td>
+                                        </tr>
                                     ) : rows.length === 0 ? (
                                         <tr>
                                             <td colSpan={6} className="px-6 py-12 text-center">
@@ -221,7 +229,7 @@ export default function ApprovalRulesPage() {
                                                         <Button variant="ghost" size="sm" onClick={() => startEdit(rule)}>Edit</Button>
                                                     )}
                                                     {canDelete && (
-                                                        <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(rule)}>
+                                                        <Button variant="ghost" size="sm" aria-label="Delete rule" className="text-destructive hover:text-destructive" onClick={() => handleDelete(rule)}>
                                                             <Trash2 className="h-4 w-4" />
                                                         </Button>
                                                     )}

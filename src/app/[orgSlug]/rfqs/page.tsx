@@ -6,7 +6,7 @@ import { useRFQs, useCreateRFQ } from '@/hooks/useRFQs';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { RFQStatus } from '@/lib/api/rfq';
-import { FileQuestion, Minus, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, FileQuestion, Minus, Plus, Search, X } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -38,7 +38,7 @@ export default function RFQListPage() {
     const [dueDate, setDueDate] = useState('');
     const [lines, setLines] = useState<LineDraft[]>([{ itemId: '', itemName: '', quantity: '1', uom: '' }]);
 
-    const { data: rfqs, isLoading } = useRFQs(orgSlug);
+    const { data: rfqs, isLoading, isError, refetch } = useRFQs(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     const createRFQ = useCreateRFQ(orgSlug);
 
@@ -141,6 +141,14 @@ export default function RFQListPage() {
                                 <tbody className="divide-y divide-border">
                                     {isLoading ? (
                                         <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading RFQs...</td></tr>
+                                    ) : isError ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                                <p className="text-muted-foreground">Couldn&apos;t load RFQs</p>
+                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                            </td>
+                                        </tr>
                                     ) : (filtered?.length ?? 0) === 0 ? (
                                         <tr>
                                             <td colSpan={4} className="px-6 py-12 text-center">

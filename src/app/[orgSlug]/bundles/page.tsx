@@ -21,7 +21,7 @@ const PRICE_BASES: { value: PriceBasis; label: string }[] = [
     { value: 'per_session', label: 'Per Session' },
 ];
 const bundleSelectCls = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none appearance-none';
-import { Minus, Package, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, Minus, Package, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -349,7 +349,7 @@ export default function BundlesPage() {
     const [editing, setEditing] = useState<Bundle | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Bundle | null>(null);
 
-    const { data, isLoading } = useBundles(orgSlug, { page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useBundles(orgSlug, { page, limit: ITEMS_PER_PAGE });
     const { data: itemsData } = useItems(orgSlug, { limit: 200 });
     const createBundle = useCreateBundle(orgSlug);
     const updateBundle = useUpdateBundle(orgSlug);
@@ -419,6 +419,12 @@ export default function BundlesPage() {
                 <CardContent className="p-0">
                     {isLoading ? (
                         <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
+                    ) : isError ? (
+                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+                            <AlertTriangle className="h-10 w-10 text-destructive/60" />
+                            <p className="text-sm">Couldn&apos;t load bundles</p>
+                            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+                        </div>
                     ) : bundles.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
                             <Package className="h-10 w-10 opacity-30" />
