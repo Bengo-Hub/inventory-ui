@@ -8,7 +8,7 @@ import {
     useReviewRequisition, useApproveRequisition, useRejectRequisition,
 } from '@/hooks/useRequisitions';
 import { type CreateRequisitionInput, type Requisition, type RequisitionStatus } from '@/lib/api/requisitions';
-import { ClipboardList, Plus } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -30,7 +30,7 @@ export default function RequisitionsPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    const { data, isLoading } = useRequisitions(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useRequisitions(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const createReq = useCreateRequisition(orgSlug);
     const submitReq = useSubmitRequisition(orgSlug);
     const reviewReq = useReviewRequisition(orgSlug);
@@ -105,7 +105,23 @@ export default function RequisitionsPage() {
                             </thead>
                             <tbody>
                                 {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && rows.length === 0 && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">No requisitions yet.</td></tr>}
+                                {!isLoading && isError && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load requisitions</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
+                                )}
+                                {!isLoading && !isError && rows.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No requisitions yet</p>
+                                        </td>
+                                    </tr>
+                                )}
                                 {rows.map((r) => (
                                     <tr key={r.id} className="border-b border-border hover:bg-muted/20">
                                         <td className="px-6 py-3 font-medium">{r.reference_number}</td>

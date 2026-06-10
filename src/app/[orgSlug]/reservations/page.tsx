@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
-import { Filter, Package, Search } from 'lucide-react';
+import { AlertTriangle, Filter, Package, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
@@ -45,7 +45,7 @@ export default function ReservationsPage() {
     const [statusFilter, setStatusFilter] = useState('All');
     const [page, setPage] = useState(1);
 
-    const { data: reservations, isLoading } = useQuery<Reservation[]>({
+    const { data: reservations, isLoading, isError, refetch } = useQuery<Reservation[]>({
         queryKey: ['reservations', orgSlug, search, statusFilter],
         queryFn: () => {
             const p: Record<string, string> = {};
@@ -115,6 +115,14 @@ export default function ReservationsPage() {
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading reservations...
+                                        </td>
+                                    </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={6} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load reservations</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
                                 ) : (reservations?.length ?? 0) === 0 ? (

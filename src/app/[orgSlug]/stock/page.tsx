@@ -155,6 +155,7 @@ function StockDrawer({
                 <button
                     type="button"
                     onClick={onClose}
+                    aria-label="Close panel"
                     className="p-1 rounded-lg hover:bg-accent text-muted-foreground transition-colors"
                 >
                     ✕
@@ -456,7 +457,7 @@ export default function StockPage() {
         category_id: categoryId || undefined,
         type: typeFilter || undefined,
     };
-    const { data: stock, isLoading } = useStock(orgSlug, listParams);
+    const { data: stock, isLoading, isError, refetch } = useStock(orgSlug, listParams);
 
     const lowStockCount = stock?.filter((s) => s.reorder_point != null && s.available <= s.reorder_point && s.available > 0).length ?? 0;
     const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
@@ -576,6 +577,14 @@ export default function StockPage() {
                                             Loading stock levels...
                                         </td>
                                     </tr>
+                                ) : isError ? (
+                                    <tr>
+                                        <td colSpan={8} className="px-6 py-12 text-center">
+                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
+                                            <p className="text-muted-foreground">Couldn&apos;t load stock levels</p>
+                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
+                                        </td>
+                                    </tr>
                                 ) : filteredStock.length === 0 ? (
                                     <tr>
                                         <td colSpan={8} className="px-6 py-12 text-center">
@@ -618,6 +627,7 @@ export default function StockPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 title="Record Adjustment"
+                                                                aria-label="Record adjustment"
                                                                 onClick={() => openItem(item, 'adjust')}
                                                             >
                                                                 <SlidersHorizontal className="h-4 w-4" />
@@ -626,6 +636,7 @@ export default function StockPage() {
                                                                 variant="ghost"
                                                                 size="sm"
                                                                 title="Break Down Stock"
+                                                                aria-label="Break down stock"
                                                                 onClick={() => openItem(item, 'breakdown')}
                                                             >
                                                                 <Split className="h-4 w-4" />
