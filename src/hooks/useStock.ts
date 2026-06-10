@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockApi, type CreateAdjustmentInput, type StockListParams, type AdjustmentListParams } from '@/lib/api/stock';
+import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams } from '@/lib/api/stock';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
@@ -32,6 +32,20 @@ export function useCreateAdjustment(orgSlug: string) {
   return useMutation({
     mutationFn: (data: CreateAdjustmentInput) => stockApi.createAdjustment(orgSlug, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
+    },
+  });
+}
+
+export function useCreateBreakdown(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateBreakdownInput) => stockApi.createBreakdown(orgSlug, data),
+    onSuccess: () => {
+      // A breakdown touches both parent + child balances and writes two adjustments,
+      // so invalidate the same queries the adjustment mutation does.
       queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
