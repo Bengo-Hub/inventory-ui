@@ -58,7 +58,9 @@ export async function GET(
 
   const manifest = {
     name: `${name} Inventory`,
-    short_name: name,
+    // Home-screen label = tenant first word + service, e.g. "Urban Inventory",
+    // so a tenant's several installed Bengo apps stay distinguishable.
+    short_name: `${name.trim().split(/\s+/)[0] || 'Bengo'} Inventory`,
     description: 'Manage inventory, stock levels and purchase orders.',
     start_url: `/${orgSlug}/`,
     scope: `/${orgSlug}/`,
