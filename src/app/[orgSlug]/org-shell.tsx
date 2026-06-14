@@ -6,7 +6,7 @@ import { AuthProvider } from '@/providers/auth-provider';
 import { BrandingProvider } from '@/providers/branding-provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, usePathname } from 'next/navigation';
 import { Footer } from '@/components/footer';
 import { SubscriptionBanner } from '@/components/subscription/subscription-banner';
 import { PWAUpdateBanner } from '@/components/pwa-update-banner';
@@ -49,6 +49,24 @@ export function OrgShell({ children }: { children: ReactNode }) {
         },
     }));
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const pathname = usePathname();
+    // Pre-dashboard auth screens (SSO callback, outlet-select gate) render with
+    // their own bare layout — no sidebar/header — matching the POS pin-login and
+    // TruLoad station-select gates.
+    const isAuthRoute = !!pathname && pathname.includes('/auth/');
+
+    if (isAuthRoute) {
+        return (
+            <QueryClientProvider client={queryClient}>
+                <AuthProvider>
+                    <BrandingProvider>
+                        <ManifestInjector />
+                        <div className="min-h-screen bg-background">{children}</div>
+                    </BrandingProvider>
+                </AuthProvider>
+            </QueryClientProvider>
+        );
+    }
 
     return (
         <QueryClientProvider client={queryClient}>

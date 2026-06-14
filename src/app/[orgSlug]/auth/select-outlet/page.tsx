@@ -62,20 +62,38 @@ function SelectOutletContent() {
 
   useEffect(() => {
     if (!tenantRef) return;
+    // my-outlets is assignment-filtered server-side: non-HQ users receive ONLY
+    // the outlets they are assigned to; HQ/admins receive the full tenant list
+    // (with is_hq=true). This is the login gate — a user can only enter an
+    // outlet they are tied to.
     apiClient
-      .get<OutletInfo[]>(`/api/v1/${tenantRef}/inventory/outlets`)
-      .then((data) => {
+      .get<{ data: OutletInfo[]; is_hq?: boolean }>(`/api/v1/${tenantRef}/inventory/my-outlets`)
+      .then((resp) => {
+        const data = Array.isArray(resp) ? (resp as unknown as OutletInfo[]) : (resp?.data ?? []);
+        const serverIsHQ = Array.isArray(resp) ? isHQUser : !!resp?.is_hq;
         const active = data.filter((o) => o.status !== 'inactive');
+        const hq = serverIsHQ || isHQUser;
 
-        // Staff (non-HQ): auto-select their assigned outlet, no UI
-        if (!isHQUser) {
-          const assigned = active.find((o) => o.id === (user as any)?.outlet_id) ?? active[0];
-          if (assigned) {
-            handleSelect(assigned);
-          } else {
-            setOutlets(active);
+        // Staff (non-HQ): may only enter an assigned outlet.
+        if (!hq) {
+          if (active.length === 0) {
+            // No assignment → cannot enter any outlet; show contact-admin message.
+            setOutlets([]);
             setLoading(false);
+            return;
           }
+          if (active.length === 1) {
+            handleSelect(active[0]);
+            return;
+          }
+          // Multiple assigned outlets — let them choose (sort last-used first).
+          const sorted = [...active].sort((a, b) => {
+            if (a.id === lastOutletId) return -1;
+            if (b.id === lastOutletId) return 1;
+            return 0;
+          });
+          setOutlets(sorted);
+          setLoading(false);
           return;
         }
 
