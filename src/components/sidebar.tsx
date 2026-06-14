@@ -31,6 +31,7 @@ import {
   DollarSign,
   Tag,
   Truck,
+  Users,
   Warehouse,
   X,
 } from 'lucide-react';
@@ -285,6 +286,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Approvals', icon: ShieldCheck, href: '/approvals', moduleKey: 'approvals' },
         { label: 'Approval Rules', icon: Shield, href: '/approvals/rules', moduleKey: 'approvals' },
         { label: 'Pricing Profiles', icon: DollarSign, href: '/pricing-profiles', moduleKey: 'settings' },
+        { label: 'Team & Roles', icon: Users, href: '/team', moduleKey: 'settings' },
         { label: 'Settings', icon: Settings, href: '/settings', moduleKey: 'settings' },
       ],
     },
