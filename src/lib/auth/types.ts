@@ -121,7 +121,13 @@ export type Permission =
   | "inventory.config.view"
   | "inventory.config.manage"
   // Users
-  | "inventory.users.manage";
+  | "inventory.users.manage"
+  // Audit + stock counts
+  | "inventory.audit.view"
+  | "inventory.stock_count.view"
+  | "inventory.stock_count.add"
+  | "inventory.stock_count.change"
+  | "inventory.stock_count.approve";
 
 export interface UserProfile {
   id: string;
