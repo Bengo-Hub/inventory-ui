@@ -8,7 +8,11 @@ import { Globe, Package, Warehouse, ChevronRight } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
-const HQ_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
+// HQ = can access all outlets. Driven by the server (the /my-outlets `is_hq` flag, which
+// reflects the JWT is_hq_user / admin claim) — this role list is only a client-side fallback
+// for when the server omits the flag. `manager`/`store_manager` are intentionally NOT here:
+// a manager assigned to a single outlet is scoped to it, so per-use-case gating applies.
+const HQ_ROLES = ['admin', 'inventory_admin', 'superuser', 'super_admin'];
 
 const USE_CASE_LABELS: Record<string, string> = {
   hospitality: 'Hospitality',

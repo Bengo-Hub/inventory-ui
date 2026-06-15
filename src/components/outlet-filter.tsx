@@ -2,6 +2,7 @@
 
 import { useAuthStore } from '@/store/auth';
 import { useOutletFilterStore, type OutletOption } from '@/store/outlet-filter';
+import { useOutletStore, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, Store, X } from 'lucide-react';
@@ -34,8 +35,12 @@ async function fetchOutlets(accessToken: string, tenantSlug: string): Promise<Ou
 
 /**
  * OutletFilter — branch/outlet selector for inventory-ui.
- * Visible for HQ users, admins, and managers. Hidden for regular staff.
- * Syncs the selected outlet to X-Outlet-ID header on every API request.
+ *
+ * HQ-only (platform owner, superuser, tenant admin). Hidden for scoped staff/managers,
+ * whose outlet access is fixed at login via the select-outlet gate (and enforced server-side
+ * by /my-outlets). Selecting here drives the whole app — it updates the shared outlet store,
+ * so the sidebar modules + page nomenclature re-render for the chosen outlet's use_case, and
+ * syncs the X-Outlet-ID header on every API request. "All Outlets" restores the HQ superset.
  */
 export function OutletFilter({ className }: { className?: string }) {
   const user = useAuthStore((s) => s.user);
@@ -44,13 +49,33 @@ export function OutletFilter({ className }: { className?: string }) {
   const canFilter = !!(
     user?.isPlatformOwner ||
     user?.isSuperUser ||
-    user?.roles?.some((r) => ['admin', 'superuser', 'manager', 'inventory_admin', 'warehouse_manager'].includes(r))
+    user?.roles?.some((r) => ['admin', 'superuser', 'inventory_admin', 'super_admin'].includes(r))
   );
 
   const { selectedOutlet, outlets, setOutlets, selectOutlet, clearOutlet } = useOutletFilterStore();
+  const setHomeOutlet = useOutletStore((s) => s.setOutlet);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
+
+  // Apply a drill-down selection to the whole app: the filter store (dropdown highlight),
+  // the shared outlet store (drives sidebar gating + nomenclature + X-Outlet-ID header).
+  function applyOutlet(o: OutletOption) {
+    selectOutlet(o);
+    setHomeOutlet({ id: o.id, code: o.code, name: o.name, use_case: o.useCase, is_hq: o.isHq });
+    setOpen(false);
+    setSearch('');
+  }
+
+  // "All Outlets" — clear the drill-down and show the full HQ superset. The localStorage
+  // marker is set to 'all' so the outlet-selection gate treats this as an explicit choice.
+  function applyAll() {
+    clearOutlet();
+    setHomeOutlet(null);
+    try { localStorage.setItem(INVENTORY_SELECTED_OUTLET_KEY, 'all'); } catch { /* ignore */ }
+    setOpen(false);
+    setSearch('');
+  }
 
   const slug = (user as any)?.tenantSlug || (user as any)?.tenant_slug || '';
 
@@ -97,7 +122,7 @@ export function OutletFilter({ className }: { className?: string }) {
         {selectedOutlet && (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); clearOutlet(); }}
+            onClick={(e) => { e.stopPropagation(); applyAll(); }}
             className="p-0.5 rounded hover:bg-muted-foreground/20"
             aria-label="Clear outlet filter"
           >
@@ -125,7 +150,7 @@ export function OutletFilter({ className }: { className?: string }) {
 
             <button
               type="button"
-              onClick={() => { clearOutlet(); setOpen(false); setSearch(''); }}
+              onClick={applyAll}
               className={cn(
                 'flex items-center gap-2 w-full text-left px-3 py-2.5 text-sm font-medium hover:bg-muted transition-colors',
                 !selectedOutlet && 'bg-primary/10 text-primary',
@@ -142,7 +167,7 @@ export function OutletFilter({ className }: { className?: string }) {
                   <button
                     key={o.id}
                     type="button"
-                    onClick={() => { selectOutlet(o); setOpen(false); setSearch(''); }}
+                    onClick={() => applyOutlet(o)}
                     className={cn(
                       'flex items-center gap-2 w-full text-left px-3 py-2.5 text-sm hover:bg-muted transition-colors',
                       selected && 'bg-primary/5',

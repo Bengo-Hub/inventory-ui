@@ -66,6 +66,7 @@ export interface Item {
 
 export type ItemUseCase =
   | 'RETAIL'
+  | 'PHARMACY'
   | 'FOOD_BEVERAGE'
   | 'HOSPITALITY_ROOM'
   | 'HOSPITALITY_FACILITY'

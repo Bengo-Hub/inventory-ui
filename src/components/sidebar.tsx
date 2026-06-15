@@ -43,6 +43,7 @@ import { useAuthStore } from '@/store/auth';
 import { isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
+import { nomenclatureFor } from '@/lib/use-case-nomenclature';
 
 interface SidebarProps {
   open?: boolean;
@@ -78,8 +79,6 @@ const USE_CASE_MODULES: Record<string, string[]> = {
   manufacturing: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs', 'suppliers', 'production_batches', 'assets', 'requisitions', 'approvals', 'settings'],
 };
 
-const ADMIN_ROLES = ['admin', 'inventory_admin', 'manager', 'store_manager', 'superuser', 'super_admin'];
-
 // Maps a sidebar module key to the subscription feature the backend enforces for it.
 // Only modules whose endpoints are feature-gated server-side are listed, so the UI and
 // API stay consistent. Modules without an entry are always shown (subject to use_case).
@@ -89,10 +88,15 @@ const MODULE_FEATURE: Record<string, string> = {
   purchase_orders: 'purchase_orders',
 };
 
-function hasModule(key: string | undefined, useCase: string | undefined, isAdmin: boolean): boolean {
+// Gating is driven by the SELECTED outlet's use_case for everyone (admins included).
+// When no specific outlet is selected — the HQ "All Outlets" view, where useCase is
+// undefined — the full module superset is shown. An unrecognised use_case also falls
+// through to "show all" so a new use_case never silently hides modules.
+function hasModule(key: string | undefined, useCase: string | undefined): boolean {
   if (!key) return true; // no key = always visible
-  if (isAdmin) return true; // admins see all modules
-  const modules = USE_CASE_MODULES[useCase ?? ''] ?? USE_CASE_MODULES.hospitality;
+  if (!useCase) return true; // no outlet selected (HQ aggregate) → full superset
+  const modules = USE_CASE_MODULES[useCase];
+  if (!modules) return true; // unknown use_case → don't hide anything
   return modules.includes(key);
 }
 
@@ -177,10 +181,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const { outlet, clearOutlet } = useOutletStore();
   // Owner-only (Platform nav). Derived from the server profile, never the URL orgSlug.
   const isPlatformOwner = checkPlatformOwner(user);
-  const isAdmin =
-    !!user?.isPlatformOwner ||
-    !!user?.isSuperUser ||
-    !!(user?.roles ?? []).some((r) => ADMIN_ROLES.includes(r));
 
   // Subscription-feature gating: hide nav items whose feature the current plan lacks.
   // Bypassed for platform/demo/service-charge tenants and while the plan is still loading,
@@ -213,7 +213,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     {
       label: 'Catalog',
       items: [
-        { label: 'Items', icon: Package, href: '/catalog', moduleKey: 'catalog' },
+        { label: nomenclatureFor(useCase).catalog, icon: Package, href: '/catalog', moduleKey: 'catalog' },
         { label: 'Categories', icon: Tag, href: '/categories', moduleKey: 'categories' },
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
         // Manufacturing outlets get "Bill of Materials" under the Manufacturing group instead.
@@ -298,7 +298,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     .map((group) => ({
       ...group,
       items: group.items.filter(
-        (item) => hasModule(item.moduleKey, useCase, isAdmin) && hasFeatureAccess(item.moduleKey),
+        (item) => hasModule(item.moduleKey, useCase) && hasFeatureAccess(item.moduleKey),
       ),
     }))
     .filter((group) => group.items.length > 0);

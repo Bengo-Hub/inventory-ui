@@ -6,6 +6,8 @@ import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { apiClient } from '@/lib/api/client';
+import { useOutletStore } from '@/store/outlet';
+import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
@@ -56,8 +58,6 @@ interface Props {
   isPending: boolean;
 }
 
-const ITEM_TYPES = ['GOODS', 'SERVICE', 'RECIPE', 'INGREDIENT', 'VOUCHER', 'EQUIPMENT'] as const;
-
 const inputCls =
   'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 const selectCls = `${inputCls} appearance-none`;
@@ -68,10 +68,23 @@ function toLocalDatetimeValue(iso?: string | null): string {
 }
 
 export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClose, onSubmit, isPending }: Props) {
+  // Selected-outlet use_case drives which item types / use-cases / sections are offered.
+  // Event mode (the Events pages) is unrestricted: type is fixed to SERVICE regardless.
+  const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
+  const scope = catalogScopeFor(lockToEvent ? null : outletUseCase);
+  const itemNoun = nomenclatureFor(outletUseCase).item;
+  // Type options scoped to the outlet; always keep the item's own type when editing so an
+  // out-of-scope legacy item stays editable.
+  const baseTypes: string[] = lockToEvent ? ['SERVICE'] : scope.itemTypes;
+  const typeOptions = item?.type && !baseTypes.includes(item.type) ? [item.type, ...baseTypes] : baseTypes;
+  const hospitalityUseCases = ITEM_USE_CASES.filter((u) => scope.itemUseCases.includes(u.value));
+
   const [name, setName] = useState(item?.name ?? '');
   const [sku, setSku] = useState(item?.sku ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
-  const [type, setType] = useState<string>(item?.type ?? (lockToEvent ? 'SERVICE' : 'GOODS'));
+  const [type, setType] = useState<string>(
+    item?.type ?? (lockToEvent ? 'SERVICE' : (catalogScopeFor(useOutletStore.getState().outlet?.use_case).itemTypes[0] ?? 'GOODS')),
+  );
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
@@ -96,8 +109,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   const [eventVenue, setEventVenue] = useState(item?.event_venue ?? '');
   const [totalCapacity, setTotalCapacity] = useState(item?.total_capacity != null ? String(item.total_capacity) : '');
 
-  // Hospitality fields (SERVICE items: rooms / facilities / amenities)
-  const [useCase, setUseCase] = useState<ItemUseCase>(item?.use_case ?? 'RETAIL');
+  // Hospitality fields (SERVICE items: rooms / facilities / amenities). Default to the
+  // outlet's item use_case (e.g. services → SALON_SERVICE) so new entries are scoped.
+  const [useCase, setUseCase] = useState<ItemUseCase>(
+    item?.use_case ?? (catalogScopeFor(useOutletStore.getState().outlet?.use_case).defaultItemUseCase ?? 'RETAIL'),
+  );
   const [mealPlan, setMealPlan] = useState<string>(item?.meal_plan ?? '');
   const [occupancyBasis, setOccupancyBasis] = useState<string>(item?.occupancy_basis ?? '');
   const [maxAdults, setMaxAdults] = useState(item?.max_adults != null ? String(item.max_adults) : '');
@@ -313,8 +329,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
       event_start_at: eventStartAt ? new Date(eventStartAt).toISOString() : undefined,
       event_end_at: eventEndAt ? new Date(eventEndAt).toISOString() : undefined,
       event_venue: eventVenue.trim() || undefined,
-      // Hospitality (SERVICE items)
-      use_case: isService && useCase !== 'RETAIL' ? useCase : undefined,
+      // Use-case tag: SERVICE items carry the chosen hospitality/service use_case; other
+      // items inherit the outlet's default (e.g. pharmacy goods → PHARMACY) so they surface
+      // on the right per-use-case page. RETAIL is the backend default, so it's left implicit.
+      use_case: isService
+        ? (useCase && useCase !== 'RETAIL' ? useCase : undefined)
+        : (!isEventMode && scope.defaultItemUseCase && scope.defaultItemUseCase !== 'RETAIL' ? scope.defaultItemUseCase : undefined),
       meal_plan: isService && useCase === 'HOSPITALITY_ROOM' && mealPlan ? (mealPlan as CreateItemInput['meal_plan']) : undefined,
       occupancy_basis: isService && useCase === 'HOSPITALITY_ROOM' && occupancyBasis ? (occupancyBasis as CreateItemInput['occupancy_basis']) : undefined,
       max_adults: isService && useCase === 'HOSPITALITY_ROOM' && maxAdults ? parseInt(maxAdults, 10) : undefined,
@@ -337,7 +357,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{lockToEvent ? (item ? 'Edit Event' : 'New Event') : (item ? 'Edit Item' : 'New Item')}</h2>
+              <h2 className="text-lg font-semibold">{lockToEvent ? (item ? 'Edit Event' : 'New Event') : (item ? `Edit ${itemNoun}` : `New ${itemNoun}`)}</h2>
               <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent transition-colors">
                 <X className="h-5 w-5 text-muted-foreground" />
               </button>
@@ -361,7 +381,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type *</label>
                   <select value={type} onChange={(e) => setType(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    {ITEM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
@@ -568,14 +588,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 </div>
               )}
 
-              {/* Hospitality — non-event SERVICE items only (rooms / facilities / amenities) */}
-              {isService && !isEventMode && (
+              {/* Hospitality — non-event SERVICE items in hospitality/services outlets only
+                  (rooms / facilities / amenities / salon services). Hidden for retail, pharmacy,
+                  manufacturing etc. where SERVICE items carry no hospitality semantics. */}
+              {isService && !isEventMode && scope.showHospitality && (
                 <div className="space-y-4 border-t border-border pt-4">
-                  <p className="text-sm font-semibold">Hospitality</p>
+                  <p className="text-sm font-semibold">Service Details</p>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Use Case</label>
                     <select value={useCase} onChange={(e) => setUseCase(e.target.value as ItemUseCase)} className={selectCls}>
-                      {ITEM_USE_CASES.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                      {(hospitalityUseCases.length > 0 ? hospitalityUseCases : ITEM_USE_CASES).map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
                     <p className="text-xs text-muted-foreground">Drives how this service is sold &amp; priced in POS. Rates are set under Pricing tiers.</p>
                   </div>

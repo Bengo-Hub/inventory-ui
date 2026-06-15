@@ -12,6 +12,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
 import { AlertTriangle, Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
+import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
@@ -157,6 +158,11 @@ export default function CatalogPage() {
   const orgSlug = params?.orgSlug as string;
   const queryClient = useQueryClient();
   const { outlet } = useOutletStore();
+  // Per-use-case scoping driven by the selected outlet: catalog nomenclature
+  // (Items/Products/Drugs/Services), the item types & use-cases offered, and a
+  // default use-case filter so each outlet's page surfaces its own items.
+  const nomenclature = useNomenclature();
+  const scope = useCatalogScope();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { hasFeature } = useSubscription();
   const canBulkImport = hasFeature('bulk_import');
@@ -168,7 +174,12 @@ export default function CatalogPage() {
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [useCaseFilter, setUseCaseFilter] = useState('');
+  // Preselect the outlet's default item use_case (e.g. pharmacy → PHARMACY) so the
+  // page opens on its own items. Mixed-use outlets (hospitality) and HQ have no
+  // default and open on "All Use Cases".
+  const [useCaseFilter, setUseCaseFilter] = useState(
+    () => catalogScopeFor(useOutletStore.getState().outlet?.use_case).defaultItemUseCase ?? '',
+  );
   const [statusFilter, setStatusFilter] = useState('active');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
@@ -236,12 +247,12 @@ export default function CatalogPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           {/* Title */}
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">Stock Catalog</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{nomenclature.catalog}</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {outlet ? (
-                <>Showing items for <span className="font-medium text-foreground">{outlet.name}</span></>
+                <>Showing {nomenclature.itemPlural.toLowerCase()} for <span className="font-medium text-foreground">{outlet.name}</span></>
               ) : (
-                'Manage your inventory items'
+                `Manage your inventory ${nomenclature.itemPlural.toLowerCase()}`
               )}
             </p>
           </div>
@@ -297,11 +308,14 @@ export default function CatalogPage() {
             {canAdd && (
               <>
                 <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
-                  <Plus className="h-4 w-4 mr-1.5" />New Item
+                  <Plus className="h-4 w-4 mr-1.5" />New {nomenclature.item}
                 </Button>
-                <Button size="sm" onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
-                  <Plus className="h-4 w-4 mr-1.5" />New Menu Item
-                </Button>
+                {/* Menu/recipe composite — only for recipe-capable use cases (hospitality, QSR, manufacturing). */}
+                {scope.showRecipe && (
+                  <Button size="sm" onClick={() => router.push(`/${orgSlug}/catalog/new-menu-item`)}>
+                    <Plus className="h-4 w-4 mr-1.5" />New Menu Item
+                  </Button>
+                )}
               </>
             )}
           </div>
@@ -380,9 +394,9 @@ export default function CatalogPage() {
                   </button>
                 ))}
               </div>
-              {/* Type filter */}
+              {/* Type filter — scoped to the item types relevant to this outlet's use_case */}
               <div className="flex items-center gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {(['', 'GOODS', 'INGREDIENT', 'RECIPE', 'SERVICE', 'VOUCHER', 'EQUIPMENT'] as const).map((t) => (
+                {['', ...scope.itemTypes].map((t) => (
                   <Button
                     key={t || 'all'}
                     variant={typeFilter === t ? 'primary' : 'outline'}
@@ -394,22 +408,21 @@ export default function CatalogPage() {
                   </Button>
                 ))}
               </div>
-              {/* Use-case filter (hospitality) */}
-              <select
-                value={useCaseFilter}
-                onChange={(e) => { setUseCaseFilter(e.target.value); setPage(1); }}
-                className="shrink-0 rounded-lg border border-input bg-transparent px-3 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
-                title="Filter by hospitality use-case"
-              >
-                <option value="">All Use Cases</option>
-                <option value="RETAIL">Retail</option>
-                <option value="FOOD_BEVERAGE">Food &amp; Beverage</option>
-                <option value="HOSPITALITY_ROOM">Hotel Rooms</option>
-                <option value="HOSPITALITY_FACILITY">Facilities</option>
-                <option value="CONFERENCE">Conference</option>
-                <option value="SALON_SERVICE">Salon / Spa</option>
-                <option value="AMENITY">Amenities</option>
-              </select>
+              {/* Use-case filter — options scoped to this outlet's use_case. Hidden when the
+                  outlet has a single use-case (already preselected, nothing to choose). */}
+              {scope.itemUseCases.length > 1 && (
+                <select
+                  value={useCaseFilter}
+                  onChange={(e) => { setUseCaseFilter(e.target.value); setPage(1); }}
+                  className="shrink-0 rounded-lg border border-input bg-transparent px-3 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
+                  title="Filter by use-case"
+                >
+                  <option value="">All Use Cases</option>
+                  {scope.itemUseCases.map((uc) => (
+                    <option key={uc} value={uc}>{ITEM_USE_CASE_LABEL[uc]}</option>
+                  ))}
+                </select>
+              )}
             </div>
 
             {/* Category filter pills row */}
@@ -469,11 +482,11 @@ export default function CatalogPage() {
                     <tr>
                       <td colSpan={6} className="px-6 py-12 text-center">
                         <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                        <p className="text-muted-foreground">No items found</p>
+                        <p className="text-muted-foreground">No {nomenclature.itemPlural.toLowerCase()} found</p>
                         {(search || categoryId || typeFilter || statusFilter !== 'active') && (
                           <button
                             className="text-sm text-primary hover:underline mt-1"
-                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setUseCaseFilter(''); setStatusFilter('active'); setPage(1); }}
+                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setUseCaseFilter(scope.defaultItemUseCase ?? ''); setStatusFilter('active'); setPage(1); }}
                           >
                             Clear filters
                           </button>
