@@ -28,11 +28,13 @@ const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error'
     cancelled: 'error',
 };
 
+// UI vocabulary mirrors the standard stock-transfer lifecycle (Pending → In Transit → Completed).
+// The API enum (draft/in_transit/received/cancelled) is unchanged — only the display labels map.
 const STATUS_LABEL: Record<string, string> = {
-    draft: 'Draft',
+    draft: 'Pending',
     pending: 'Pending',
     in_transit: 'In Transit',
-    received: 'Received',
+    received: 'Completed',
     cancelled: 'Cancelled',
 };
 
@@ -101,12 +103,20 @@ function TransferDetailRow({ orgSlug, transferId, onClose }: { orgSlug: string; 
                                 Cancel Transfer
                             </Button>
                         )}
-                        {transfer.note && (
-                            <span className="text-xs text-muted-foreground ml-2">Note: {transfer.note}</span>
+                        {transfer.notes && (
+                            <span className="text-xs text-muted-foreground ml-2">Note: {transfer.notes}</span>
                         )}
                     </div>
 
-                    {(transfer.items?.length ?? 0) > 0 && (
+                    {(transfer.reference_no || transfer.carrier || (transfer.shipping_charges ?? 0) > 0) && (
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                            {transfer.reference_no && <span>Ref: <span className="text-foreground font-medium">{transfer.reference_no}</span></span>}
+                            {transfer.carrier && <span>Carrier: <span className="text-foreground font-medium">{transfer.carrier}</span></span>}
+                            {(transfer.shipping_charges ?? 0) > 0 && <span>Shipping: <span className="text-foreground font-medium tabular-nums">{transfer.shipping_charges?.toLocaleString()}</span></span>}
+                        </div>
+                    )}
+
+                    {(transfer.lines?.length ?? 0) > 0 && (
                         <table className="w-full text-xs border border-border rounded-lg overflow-hidden">
                             <thead>
                                 <tr className="bg-muted/30">
@@ -119,7 +129,7 @@ function TransferDetailRow({ orgSlug, transferId, onClose }: { orgSlug: string; 
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {transfer.items.map((line) => (
+                                {transfer.lines.map((line) => (
                                     <tr key={line.id}>
                                         <td className="px-4 py-2">{line.item_name || '—'}</td>
                                         <td className="px-4 py-2 font-mono text-muted-foreground">{line.item_sku || '—'}</td>
@@ -149,6 +159,9 @@ export default function TransfersPage() {
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
     const [note, setNote] = useState('');
+    const [referenceNo, setReferenceNo] = useState('');
+    const [shippingCharges, setShippingCharges] = useState('');
+    const [carrier, setCarrier] = useState('');
     const [transferItems, setTransferItems] = useState<{ itemId: string; itemName: string; quantity: string; availableQty?: number }[]>([
         { itemId: '', itemName: '', quantity: '' },
     ]);
@@ -174,6 +187,9 @@ export default function TransfersPage() {
         setFromWarehouse('');
         setToWarehouse('');
         setNote('');
+        setReferenceNo('');
+        setShippingCharges('');
+        setCarrier('');
         setTransferItems([{ itemId: '', itemName: '', quantity: '', availableQty: undefined }]);
         setDialogOpen(true);
     }
@@ -220,9 +236,12 @@ export default function TransfersPage() {
         }
 
         createTransfer.mutate({
-            from_warehouse_id: fromWarehouse,
-            to_warehouse_id: toWarehouse,
-            note: note.trim() || undefined,
+            source_warehouse_id: fromWarehouse,
+            destination_warehouse_id: toWarehouse,
+            notes: note.trim() || undefined,
+            reference_no: referenceNo.trim() || undefined,
+            shipping_charges: parseFloat(shippingCharges) > 0 ? parseFloat(shippingCharges) : undefined,
+            carrier: carrier.trim() || undefined,
             items: validItems,
         }, {
             onSuccess: () => {
@@ -395,6 +414,37 @@ export default function TransfersPage() {
                                             value={note}
                                             onChange={(e) => setNote(e.target.value)}
                                         />
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Reference No.</label>
+                                            <Input
+                                                placeholder="Waybill / dispatch no."
+                                                value={referenceNo}
+                                                onChange={(e) => setReferenceNo(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Carrier</label>
+                                            <Input
+                                                placeholder="Courier / carrier"
+                                                value={carrier}
+                                                onChange={(e) => setCarrier(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Shipping Charges</label>
+                                            <Input
+                                                type="number"
+                                                placeholder="0.00"
+                                                min="0"
+                                                step="any"
+                                                value={shippingCharges}
+                                                onChange={(e) => setShippingCharges(e.target.value)}
+                                            />
+                                            <p className="text-xs text-muted-foreground">Posted as a freight expense in treasury on completion.</p>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-3">

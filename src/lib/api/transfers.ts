@@ -23,24 +23,39 @@ export interface TransferItem {
   received_qty?: number;
 }
 
+export interface TransferWarehouse {
+  id: string;
+  name: string;
+  code?: string;
+  address?: string;
+}
+
 export interface Transfer {
   id: string;
-  reference: string;
-  from_warehouse_id: string;
-  from_warehouse_name?: string;
-  to_warehouse_id: string;
-  to_warehouse_name?: string;
+  transfer_number: string;
+  source_warehouse: TransferWarehouse;
+  destination_warehouse: TransferWarehouse;
   status: TransferStatus;
-  note?: string;
-  items: TransferItem[];
+  notes?: string;
+  reference_no?: string;
+  shipping_charges?: number;
+  carrier?: string;
+  freight_notes?: string;
+  lines: TransferItem[];
+  shipped_at?: string;
+  received_at?: string;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateTransferInput {
-  from_warehouse_id: string;
-  to_warehouse_id: string;
-  note?: string;
+  source_warehouse_id: string;
+  destination_warehouse_id: string;
+  notes?: string;
+  reference_no?: string;
+  shipping_charges?: number;
+  carrier?: string;
+  freight_notes?: string;
   items: { item_id: string; quantity: number }[];
 }
 
