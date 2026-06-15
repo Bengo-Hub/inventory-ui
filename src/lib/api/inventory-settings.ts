@@ -24,6 +24,7 @@ export interface InventorySettings {
   enable_facility_booking: boolean;
   enable_conference_packages: boolean;
   // Costing & tax / compliance
+  costing_method: 'wavg' | 'fifo' | 'lifo' | 'fefo';
   default_target_margin_percent?: number | null;
   prices_inclusive_of_tax: boolean;
   default_tax_code: string;

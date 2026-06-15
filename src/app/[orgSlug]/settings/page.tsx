@@ -192,6 +192,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     criticalStockPct: 5,
     defaultReorderLevel: 10,
     defaultTargetMargin: 30,
+    costingMethod: 'wavg' as 'wavg' | 'fifo' | 'lifo' | 'fefo',
     enableLotTracking: false,
     enableExpiryTracking: false,
     purchaseOrderApprovalRequired: false,
@@ -208,6 +209,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         criticalStockPct: settings.critical_stock_threshold_pct,
         defaultReorderLevel: settings.default_reorder_level,
         defaultTargetMargin: settings.default_target_margin_percent ?? 30,
+        costingMethod: settings.costing_method ?? 'wavg',
         enableLotTracking: settings.enable_lot_tracking,
         enableExpiryTracking: settings.enable_expiry_tracking,
         purchaseOrderApprovalRequired: settings.purchase_order_approval_required,
@@ -223,6 +225,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       critical_stock_threshold_pct: form.criticalStockPct,
       default_reorder_level: form.defaultReorderLevel,
       default_target_margin_percent: form.defaultTargetMargin,
+      costing_method: form.costingMethod,
       unit_reorder_defaults: unitDefaults,
       enable_lot_tracking: form.enableLotTracking,
       enable_expiry_tracking: form.enableExpiryTracking,
@@ -368,6 +371,26 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                 </Button>
               </div>
             )}
+          </div>
+
+          {/* Costing / consumption method */}
+          <div className="space-y-2">
+            <label className={labelClass}>Inventory Costing Method</label>
+            <select
+              value={form.costingMethod}
+              onChange={(e) => setForm((f) => ({ ...f, costingMethod: e.target.value as 'wavg' | 'fifo' | 'lifo' | 'fefo' }))}
+              disabled={!canEdit}
+              className={`${inputClass} max-w-md`}
+            >
+              <option value="wavg">Weighted Average (no lot ordering)</option>
+              <option value="fifo">FIFO — First In, First Out (oldest stock consumed first)</option>
+              <option value="lifo">LIFO — Last In, First Out (newest stock consumed first)</option>
+              <option value="fefo">FEFO — First Expired, First Out (earliest expiry consumed first)</option>
+            </select>
+            <p className="text-xs text-muted-foreground">
+              Determines which lot is drawn down first on every sale/consumption and how stock is valued.
+              FIFO/LIFO/FEFO require lot tracking; FEFO additionally needs expiry tracking. Weighted average uses item-level cost with no lot ordering.
+            </p>
           </div>
 
           {[
