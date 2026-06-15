@@ -25,10 +25,13 @@ export interface Item {
   barcode?: string;
   barcode_type?: string;
   requires_age_verification: boolean;
+  is_controlled_substance?: boolean;
   is_perishable: boolean;
   track_lots: boolean;
   track_serial_numbers: boolean;
+  shelf_life_days?: number | null;
   weight_kg?: number;
+  duration_minutes?: number | null;
   reorder_level?: number;
   reorder_quantity?: number;
   cost_price?: number | null;
@@ -109,9 +112,14 @@ export interface CreateItemInput {
   tax_inclusive?: boolean;
   is_active?: boolean;
   requires_age_verification?: boolean;
+  is_controlled_substance?: boolean;
   is_perishable?: boolean;
   track_lots?: boolean;
   track_serial_numbers?: boolean;
+  shelf_life_days?: number;
+  barcode_type?: string;
+  weight_kg?: number;
+  duration_minutes?: number;
   initial_quantity?: number;
   tags?: string[];
   image_url?: string;

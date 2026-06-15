@@ -66,6 +66,19 @@ export interface CatalogScope {
   showHospitality: boolean;
   /** Whether RECIPE/BOM is offered (drives the "New Menu Item" action). */
   showRecipe: boolean;
+  // ── Per-use-case item-form field gates (true = relevant to this use_case) ──
+  /** Controlled-substance flag — pharmacy. */
+  showControlledSubstance?: boolean;
+  /** Serial-number tracking — retail/manufacturing/warehouse (electronics, equipment). */
+  showSerialTracking?: boolean;
+  /** Weight & dimensions — retail/manufacturing/warehouse (shipping/logistics). */
+  showWeightDimensions?: boolean;
+  /** Service duration — services (salon/barber appointment length). */
+  showServiceDuration?: boolean;
+  /** Barcode symbology select — packaged-goods use_cases that scan at POS. */
+  showBarcodeType?: boolean;
+  /** Default shelf-life (days) for perishables — every goods use_case except services. */
+  showShelfLife?: boolean;
 }
 
 const DEFAULT_SCOPE: CatalogScope = {
@@ -73,6 +86,12 @@ const DEFAULT_SCOPE: CatalogScope = {
   itemUseCases: ALL_USE_CASES,
   showHospitality: true,
   showRecipe: true,
+  showControlledSubstance: true,
+  showSerialTracking: true,
+  showWeightDimensions: true,
+  showServiceDuration: true,
+  showBarcodeType: true,
+  showShelfLife: true,
 };
 
 // Each outlet use_case exposes only the item types / use-cases / sections that belong to it.
@@ -82,6 +101,8 @@ const SCOPES: Record<string, CatalogScope> = {
     itemUseCases: ['FOOD_BEVERAGE', 'HOSPITALITY_ROOM', 'HOSPITALITY_FACILITY', 'CONFERENCE', 'AMENITY', 'RETAIL'],
     showHospitality: true,
     showRecipe: true,
+    showBarcodeType: true,
+    showShelfLife: true,
   },
   quick_service: {
     itemTypes: ['RECIPE', 'INGREDIENT', 'GOODS'],
@@ -89,6 +110,8 @@ const SCOPES: Record<string, CatalogScope> = {
     defaultItemUseCase: 'FOOD_BEVERAGE',
     showHospitality: false,
     showRecipe: true,
+    showBarcodeType: true,
+    showShelfLife: true,
   },
   retail: {
     itemTypes: ['GOODS', 'EQUIPMENT', 'VOUCHER'],
@@ -96,6 +119,10 @@ const SCOPES: Record<string, CatalogScope> = {
     defaultItemUseCase: 'RETAIL',
     showHospitality: false,
     showRecipe: false,
+    showSerialTracking: true,
+    showWeightDimensions: true,
+    showBarcodeType: true,
+    showShelfLife: true,
   },
   manufacturing: {
     itemTypes: ['GOODS', 'INGREDIENT', 'RECIPE', 'EQUIPMENT'],
@@ -103,6 +130,9 @@ const SCOPES: Record<string, CatalogScope> = {
     defaultItemUseCase: 'RETAIL',
     showHospitality: false,
     showRecipe: true,
+    showSerialTracking: true,
+    showWeightDimensions: true,
+    showShelfLife: true,
   },
   pharmacy: {
     itemTypes: ['GOODS'],
@@ -110,6 +140,9 @@ const SCOPES: Record<string, CatalogScope> = {
     defaultItemUseCase: 'PHARMACY',
     showHospitality: false,
     showRecipe: false,
+    showControlledSubstance: true,
+    showBarcodeType: true,
+    showShelfLife: true,
   },
   services: {
     itemTypes: ['SERVICE', 'GOODS', 'VOUCHER'],
@@ -117,18 +150,35 @@ const SCOPES: Record<string, CatalogScope> = {
     defaultItemUseCase: 'SALON_SERVICE',
     showHospitality: true,
     showRecipe: false,
+    showServiceDuration: true,
   },
   warehouse: {
     itemTypes: ALL_TYPES,
     itemUseCases: ['RETAIL', 'FOOD_BEVERAGE', 'PHARMACY'],
     showHospitality: false,
     showRecipe: true,
+    showSerialTracking: true,
+    showWeightDimensions: true,
+    showBarcodeType: true,
+    showShelfLife: true,
   },
 };
 
 export function catalogScopeFor(useCase?: string | null): CatalogScope {
   if (!useCase) return DEFAULT_SCOPE;
   return SCOPES[useCase] ?? DEFAULT_SCOPE;
+}
+
+// Outlet use_cases relevant to inventory (those that get a warehouse mirror) — mirrors the
+// backend `inventoryAcceptedUseCases` / auth `ApplicableServices` for inventory-api. Used to
+// keep non-inventory outlets (logistics, commercial_weighing, axle_load_enforcement) out of
+// the outlet picker. Empty/unknown use_case is treated as applicable (don't hide).
+export const INVENTORY_APPLICABLE_USE_CASES = new Set([
+  'hospitality', 'retail', 'quick_service', 'pharmacy', 'services', 'warehouse', 'manufacturing',
+]);
+
+export function isInventoryApplicableUseCase(useCase?: string | null): boolean {
+  return !useCase || INVENTORY_APPLICABLE_USE_CASES.has(useCase);
 }
 
 // Master label map for item-level use_case (catalog filter dropdown).

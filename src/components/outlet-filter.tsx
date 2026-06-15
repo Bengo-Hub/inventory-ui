@@ -3,6 +3,7 @@
 import { useAuthStore } from '@/store/auth';
 import { useOutletFilterStore, type OutletOption } from '@/store/outlet-filter';
 import { useOutletStore, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
+import { isInventoryApplicableUseCase } from '@/lib/use-case-nomenclature';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, Store, X } from 'lucide-react';
@@ -88,7 +89,13 @@ export function OutletFilter({ className }: { className?: string }) {
 
   useEffect(() => {
     if (fetched.length > 0) {
-      setOutlets(fetched.map((o) => ({ id: o.id, code: o.code, name: o.name, useCase: o.use_case, isHq: o.is_hq })));
+      // Only show outlets relevant to inventory — logistics/weighbridge/enforcement outlets
+      // belong to other services and must not appear in the inventory outlet switcher.
+      setOutlets(
+        fetched
+          .filter((o) => isInventoryApplicableUseCase(o.use_case))
+          .map((o) => ({ id: o.id, code: o.code, name: o.name, useCase: o.use_case, isHq: o.is_hq })),
+      );
     }
   }, [fetched, setOutlets]);
 

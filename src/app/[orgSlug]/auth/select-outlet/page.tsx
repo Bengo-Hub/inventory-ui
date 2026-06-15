@@ -4,6 +4,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore, type OutletInfo, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
 import { useBranding } from '@/providers/branding-provider';
+import { isInventoryApplicableUseCase } from '@/lib/use-case-nomenclature';
 import { Globe, Package, Warehouse, ChevronRight } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
@@ -75,7 +76,11 @@ function SelectOutletContent() {
       .then((resp) => {
         const data = Array.isArray(resp) ? (resp as unknown as OutletInfo[]) : (resp?.data ?? []);
         const serverIsHQ = Array.isArray(resp) ? isHQUser : !!resp?.is_hq;
-        const active = data.filter((o) => o.status !== 'inactive');
+        // Defense-in-depth: only show outlets whose use_case is relevant to inventory
+        // (the server already filters, but never surface logistics/weighbridge/enforcement).
+        const active = data
+          .filter((o) => o.status !== 'inactive')
+          .filter((o) => isInventoryApplicableUseCase(o.use_case));
         const hq = serverIsHQ || isHQUser;
 
         // Staff (non-HQ): may only enter an assigned outlet.
@@ -129,6 +134,16 @@ function SelectOutletContent() {
             handleSelect(lastOutlet);
             return;
           }
+        }
+
+        // First login (no prior choice): preselect the outlet the HQ user is logged into —
+        // their HQ outlet if present, otherwise the first applicable outlet — so they land
+        // scoped to a real outlet (not the cross-outlet "All Outlets" aggregate). They can
+        // switch outlets, or pick "All Outlets", from the header at any time.
+        const home = sorted.find((o) => o.is_hq) ?? sorted[0];
+        if (home) {
+          handleSelect(home);
+          return;
         }
 
         setLoading(false);

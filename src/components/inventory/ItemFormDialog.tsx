@@ -94,8 +94,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   const [taxCode, setTaxCode] = useState(item?.tax_code_id ?? '');
   const [taxInclusive, setTaxInclusive] = useState(item?.tax_inclusive ?? false);
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
+  const [isControlledSubstance, setIsControlledSubstance] = useState(item?.is_controlled_substance ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
   const [trackLots, setTrackLots] = useState(item?.track_lots ?? false);
+  const [trackSerial, setTrackSerial] = useState(item?.track_serial_numbers ?? false);
+  const [shelfLifeDays, setShelfLifeDays] = useState(item?.shelf_life_days != null ? String(item.shelf_life_days) : '');
+  const [barcodeType, setBarcodeType] = useState(item?.barcode_type ?? '');
+  const [weightKg, setWeightKg] = useState(item?.weight_kg != null ? String(item.weight_kg) : '');
+  const [durationMinutes, setDurationMinutes] = useState(item?.duration_minutes != null ? String(item.duration_minutes) : '');
   const [isActive, setIsActive] = useState(item?.is_active !== false);
 
   // Image
@@ -178,8 +184,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
       setTaxCode(item.tax_code_id ?? '');
       setTaxInclusive(item.tax_inclusive ?? false);
       setRequiresAge(item.requires_age_verification);
+      setIsControlledSubstance(item.is_controlled_substance ?? false);
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
+      setTrackSerial(item.track_serial_numbers ?? false);
+      setShelfLifeDays(item.shelf_life_days != null ? String(item.shelf_life_days) : '');
+      setBarcodeType(item.barcode_type ?? '');
+      setWeightKg(item.weight_kg != null ? String(item.weight_kg) : '');
+      setDurationMinutes(item.duration_minutes != null ? String(item.duration_minutes) : '');
       setIsActive(item.is_active !== false);
       setImageUrl(item.image_url ?? '');
       setEventStartAt(toLocalDatetimeValue(item.event_start_at));
@@ -319,9 +331,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
       cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
+      barcode_type: barcodeType || undefined,
       requires_age_verification: requiresAge,
+      is_controlled_substance: isControlledSubstance,
       is_perishable: isPerishable,
       track_lots: trackLots,
+      track_serial_numbers: trackSerial,
+      shelf_life_days: shelfLifeDays !== '' ? parseInt(shelfLifeDays, 10) : undefined,
+      weight_kg: weightKg !== '' ? parseFloat(weightKg) : undefined,
+      duration_minutes: isService && durationMinutes !== '' ? parseInt(durationMinutes, 10) : undefined,
       is_active: isActive,
       image_url: imageUrl || undefined,
       metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
@@ -387,6 +405,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Barcode</label>
                   <Input placeholder="Barcode (optional)" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                  {scope.showBarcodeType && (
+                    <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className={`${selectCls} mt-2`}>
+                      <option value="">Barcode type (auto)</option>
+                      <option value="EAN13">EAN-13</option>
+                      <option value="UPC">UPC</option>
+                      <option value="CODE128">CODE128</option>
+                      <option value="QR">QR</option>
+                    </select>
+                  )}
                 </div>
               </div>
 
@@ -498,10 +525,48 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                     </label>
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={trackLots} onChange={(e) => setTrackLots(e.target.checked)} className="rounded" />
-                      Track Lots
+                      Track Lots / Batches
                     </label>
+                    {scope.showControlledSubstance && (
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={isControlledSubstance} onChange={(e) => setIsControlledSubstance(e.target.checked)} className="rounded" />
+                        Controlled Substance
+                      </label>
+                    )}
+                    {scope.showSerialTracking && (
+                      <label className="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" checked={trackSerial} onChange={(e) => setTrackSerial(e.target.checked)} className="rounded" />
+                        Track Serial Numbers
+                      </label>
+                    )}
                   </div>
+
+                  {/* Shelf life — only meaningful for perishable / lot-tracked goods. Per-batch
+                      expiry dates are entered at goods receipt (Lots); this seeds them. */}
+                  {scope.showShelfLife && (isPerishable || trackLots) && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Default Shelf Life (days)</label>
+                      <Input type="number" min="0" placeholder="e.g. 365" value={shelfLifeDays} onChange={(e) => setShelfLifeDays(e.target.value)} />
+                      <p className="text-xs text-muted-foreground">Used to auto-fill a batch&apos;s expiry date at goods receipt when none is entered. Exact expiry is set per lot on the Lots &amp; Batches page.</p>
+                    </div>
+                  )}
+
+                  {scope.showWeightDimensions && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Weight (kg)</label>
+                      <Input type="number" min="0" step="0.001" placeholder="Unit weight for shipping/logistics" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                    </div>
+                  )}
                 </>
+              )}
+
+              {/* Service duration — services (salon/barber) appointment length */}
+              {isService && !isEventMode && scope.showServiceDuration && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Service Duration (minutes)</label>
+                  <Input type="number" min="0" placeholder="e.g. 45" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} />
+                  <p className="text-xs text-muted-foreground">Used for appointment scheduling at POS.</p>
+                </div>
               )}
 
               {/* Recipe section — RECIPE type only */}
