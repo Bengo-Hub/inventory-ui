@@ -25,6 +25,8 @@ export interface PurchaseOrder {
   expected_date?: string;
   received_date?: string;
   notes?: string;
+  pay_term_days?: number | null;
+  additional_shipping_charges?: number;
   line_items: POLineItem[];
   total_amount: number;
   created_at: string;
@@ -36,6 +38,8 @@ export interface CreatePOInput {
   warehouse_id: string;
   expected_date?: string;
   notes?: string;
+  pay_term_days?: number;
+  additional_shipping_charges?: number;
   line_items: { item_id: string; quantity: number; unit_cost: number }[];
 }
 

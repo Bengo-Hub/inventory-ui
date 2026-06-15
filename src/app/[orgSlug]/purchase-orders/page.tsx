@@ -63,6 +63,8 @@ export default function PurchaseOrdersPage() {
     const [warehouseId, setWarehouseId] = useState('');
     const [expectedDate, setExpectedDate] = useState('');
     const [poNotes, setPoNotes] = useState('');
+    const [payTermDays, setPayTermDays] = useState('');
+    const [additionalShipping, setAdditionalShipping] = useState('');
     const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
@@ -115,6 +117,8 @@ export default function PurchaseOrdersPage() {
         setWarehouseId('');
         setExpectedDate('');
         setPoNotes('');
+        setPayTermDays('');
+        setAdditionalShipping('');
         setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
     }
 
@@ -139,6 +143,8 @@ export default function PurchaseOrdersPage() {
         setWarehouseId(po.warehouse_id);
         setExpectedDate(po.expected_date ? po.expected_date.slice(0, 10) : '');
         setPoNotes(po.notes ?? '');
+        setPayTermDays(po.pay_term_days != null ? String(po.pay_term_days) : '');
+        setAdditionalShipping((po.additional_shipping_charges ?? 0) > 0 ? String(po.additional_shipping_charges) : '');
         setPoLines(
             (po.line_items ?? []).map((li) => ({
                 itemId: li.item_id,
@@ -171,6 +177,8 @@ export default function PurchaseOrdersPage() {
             warehouse_id: warehouseId,
             expected_date: expectedDate || undefined,
             notes: poNotes.trim() || undefined,
+            pay_term_days: parseInt(payTermDays) > 0 ? parseInt(payTermDays) : undefined,
+            additional_shipping_charges: parseFloat(additionalShipping) > 0 ? parseFloat(additionalShipping) : undefined,
             line_items: lines,
         };
 
@@ -315,6 +323,8 @@ export default function PurchaseOrdersPage() {
                                             <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
                                             <th className="text-left px-6 py-3 font-medium text-muted-foreground">SKU</th>
                                             <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
+                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Received</th>
+                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Outstanding</th>
                                             <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Cost</th>
                                             <th className="text-right px-6 py-3 font-medium text-muted-foreground">Total</th>
                                         </tr>
@@ -322,26 +332,32 @@ export default function PurchaseOrdersPage() {
                                     <tbody className="divide-y divide-border">
                                         {(poDetail.line_items?.length ?? 0) === 0 ? (
                                             <tr>
-                                                <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
+                                                <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
                                                     No line items
                                                 </td>
                                             </tr>
                                         ) : (
-                                            poDetail.line_items?.map((line) => (
+                                            poDetail.line_items?.map((line) => {
+                                                const recv = line.received_qty ?? 0;
+                                                const outstanding = Math.max(0, line.quantity - recv);
+                                                return (
                                                 <tr key={line.id} className="hover:bg-accent/30 transition-colors">
                                                     <td className="px-6 py-3 font-medium">{line.item_name ?? '—'}</td>
                                                     <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{line.item_sku ?? '—'}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums">{line.quantity}</td>
+                                                    <td className="px-6 py-3 text-right tabular-nums">{recv}</td>
+                                                    <td className={`px-6 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>{outstanding}</td>
                                                     <td className="px-6 py-3 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
                                                     <td className="px-6 py-3 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
                                                 </tr>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </tbody>
                                     {(poDetail.line_items?.length ?? 0) > 0 && (
                                         <tfoot>
                                             <tr className="border-t-2 border-border bg-muted/30">
-                                                <td colSpan={4} className="px-6 py-3 text-right font-semibold">Grand Total</td>
+                                                <td colSpan={6} className="px-6 py-3 text-right font-semibold">Grand Total</td>
                                                 <td className="px-6 py-3 text-right font-bold tabular-nums">{poDetail.total_amount.toLocaleString()}</td>
                                             </tr>
                                         </tfoot>
@@ -549,13 +565,37 @@ export default function PurchaseOrdersPage() {
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Expected Delivery</label>
-                                    <Input
-                                        type="date"
-                                        value={expectedDate}
-                                        onChange={(e) => setExpectedDate(e.target.value)}
-                                    />
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Expected Delivery</label>
+                                        <Input
+                                            type="date"
+                                            value={expectedDate}
+                                            onChange={(e) => setExpectedDate(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Pay Term (days)</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            placeholder="30"
+                                            value={payTermDays}
+                                            onChange={(e) => setPayTermDays(e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Supplier bill due date = receipt + pay term.</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Additional Shipping</label>
+                                        <Input
+                                            type="number"
+                                            min="0"
+                                            step="0.01"
+                                            placeholder="0.00"
+                                            value={additionalShipping}
+                                            onChange={(e) => setAdditionalShipping(e.target.value)}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="space-y-3">

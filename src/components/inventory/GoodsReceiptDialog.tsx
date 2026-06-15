@@ -19,7 +19,9 @@ const selectClass = 'w-full rounded-lg border border-input bg-transparent px-3 p
 export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [poId, setPoId] = useState('');
     const [notes, setNotes] = useState('');
-    const [accepted, setAccepted] = useState<Record<string, string>>({});
+    const [received, setReceived] = useState<Record<string, string>>({});
+    const [rejected, setRejected] = useState<Record<string, string>>({});
+    const [reason, setReason] = useState<Record<string, string>>({});
 
     const { data: orders } = usePurchaseOrders(org);
     const receivablePOs = (orders ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
@@ -27,16 +29,31 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const create = useCreateGoodsReceipt(org, poId);
 
     const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
+    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); };
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
         if (!poId || !po) { toast.error('Select a purchase order'); return; }
+        let invalid = false;
         const lines: CreateGRNLineInput[] = (po.line_items ?? [])
             .map((l) => {
-                const acc = accepted[l.id] !== undefined ? Number(accepted[l.id]) : outstanding(l.quantity, l.received_qty);
-                return { purchase_order_line_id: l.id, item_id: l.item_id, quantity_received: acc, quantity_accepted: acc, unit_cost: l.unit_cost };
+                const out = outstanding(l.quantity, l.received_qty);
+                const rec = received[l.id] !== undefined ? Number(received[l.id]) : out;
+                const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
+                const acc = rec - rej;
+                if (rej > rec || acc < 0) invalid = true;
+                return {
+                    purchase_order_line_id: l.id,
+                    item_id: l.item_id,
+                    quantity_received: rec,
+                    quantity_accepted: acc,
+                    quantity_rejected: rej,
+                    rejection_reason: rej > 0 ? (reason[l.id]?.trim() || undefined) : undefined,
+                    unit_cost: l.unit_cost,
+                };
             })
             .filter((l) => l.quantity_received > 0);
+        if (invalid) { toast.error('Rejected quantity cannot exceed received quantity'); return; }
         if (lines.length === 0) { toast.error('Enter at least one received quantity'); return; }
         create.mutate({ notes: notes.trim() || undefined, lines }, {
             onSuccess: () => { toast.success('Goods receipt created (draft) — post it to update stock'); onCreated(); },
@@ -59,7 +76,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                         <form onSubmit={submit} className="space-y-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Purchase Order *</label>
-                                <select className={selectClass} value={poId} onChange={(e) => { setPoId(e.target.value); setAccepted({}); }} required>
+                                <select className={selectClass} value={poId} onChange={(e) => { setPoId(e.target.value); resetLines(); }} required>
                                     <option value="">— Select a sent / partially-received PO —</option>
                                     {receivablePOs.map((o) => <option key={o.id} value={o.id}>{o.po_number} — {o.supplier_name ?? ''} ({o.status})</option>)}
                                 </select>
@@ -68,22 +85,33 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                             {po && (
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Receive Lines</label>
+                                    <div className="hidden sm:grid grid-cols-12 gap-2 px-3 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                                        <span className="col-span-5">Item</span>
+                                        <span className="col-span-2 text-right">Received</span>
+                                        <span className="col-span-2 text-right">Rejected</span>
+                                        <span className="col-span-3">Reject reason</span>
+                                    </div>
                                     <div className="rounded-lg border border-border divide-y divide-border">
                                         {(po.line_items ?? []).map((l) => {
                                             const out = outstanding(l.quantity, l.received_qty);
+                                            const rec = received[l.id] !== undefined ? Number(received[l.id]) : out;
+                                            const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
+                                            const acc = Math.max(0, rec - rej);
                                             return (
                                                 <div key={l.id} className="grid grid-cols-12 gap-2 items-center px-3 py-2">
-                                                    <div className="col-span-6">
+                                                    <div className="col-span-5">
                                                         <p className="text-sm font-medium truncate">{l.item_name ?? l.item_sku ?? l.item_id.slice(0, 8)}</p>
-                                                        <p className="text-xs text-muted-foreground">ordered {l.quantity} · received {l.received_qty ?? 0}</p>
+                                                        <p className="text-xs text-muted-foreground">ordered {l.quantity} · prev. received {l.received_qty ?? 0} · outstanding {out} · accepted {acc}</p>
                                                     </div>
-                                                    <div className="col-span-3 text-xs text-muted-foreground text-right">outstanding {out}</div>
-                                                    <Input className="col-span-3" type="number" min="0" max={out} value={accepted[l.id] ?? String(out)} onChange={(e) => setAccepted((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" max={rec} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                 </div>
                                             );
                                         })}
                                         {(po.line_items?.length ?? 0) === 0 && <p className="px-3 py-4 text-sm text-muted-foreground text-center">This PO has no line items.</p>}
                                     </div>
+                                    <p className="text-xs text-muted-foreground">Accepted = Received − Rejected. Rejected units are recorded for the purchase-return flow and are excluded from the supplier bill.</p>
                                 </div>
                             )}
 
