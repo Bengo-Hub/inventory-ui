@@ -82,6 +82,24 @@ function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: (
             <p className="text-xs text-muted-foreground mb-1">Reorder Quantity</p>
             <p className="text-sm font-medium">{item.reorder_quantity ?? '—'}</p>
           </div>
+          {item.shelf_life_days != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Shelf Life</p>
+              <p className="text-sm font-medium">{item.shelf_life_days} days</p>
+            </div>
+          )}
+          {item.weight_kg != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Weight</p>
+              <p className="text-sm font-medium">{item.weight_kg} kg</p>
+            </div>
+          )}
+          {item.duration_minutes != null && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Service Duration</p>
+              <p className="text-sm font-medium">{item.duration_minutes} min</p>
+            </div>
+          )}
         </div>
 
         {item.description && (
@@ -91,11 +109,13 @@ function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: (
           </div>
         )}
 
-        {(item.is_perishable || item.requires_age_verification || item.track_lots) && (
+        {(item.is_perishable || item.requires_age_verification || item.track_lots || item.is_controlled_substance || item.track_serial_numbers) && (
           <div className="flex flex-wrap gap-2">
             {item.is_perishable && <Badge variant="warning">Perishable</Badge>}
             {item.requires_age_verification && <Badge variant="warning">Age Verification</Badge>}
+            {item.is_controlled_substance && <Badge variant="warning">Controlled Substance</Badge>}
             {item.track_lots && <Badge variant="outline">Track Lots</Badge>}
+            {item.track_serial_numbers && <Badge variant="outline">Serial Tracked</Badge>}
           </div>
         )}
 
