@@ -5,7 +5,9 @@ import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
 import { useAnalyticsSummary, useStockTrends, useInventoryDistribution, useReorderAlerts, useTopItems } from '@/hooks/useAnalytics';
 import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
+import { Pagination } from '@/components/ui/pagination';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   AlertTriangle,
   ArrowDownRight,
@@ -35,6 +37,16 @@ interface ActivityItem {
   delta?: number;
 }
 
+interface PaginatedActivity {
+  data: ActivityItem[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}
+
+const ACTIVITY_PAGE_SIZE = 10;
+
 const ACTIVITY_ICONS: Record<string, typeof BoxIcon> = {
   adjustment: ArrowUpRight,
   reservation: Clock,
@@ -54,11 +66,14 @@ export default function DashboardPage() {
   const { data: reorderAlerts = [], isLoading: alertsLoading } = useReorderAlerts(orgSlug);
   const { data: topItems = [], isLoading: topLoading } = useTopItems(orgSlug, 10, 30);
 
-  const { data: activityData = [], isLoading: activityLoading } = useQuery<ActivityItem[]>({
-    queryKey: ['dashboard', 'activity', orgSlug],
-    queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/activity?limit=10`),
-    placeholderData: [],
+  const [activityPage, setActivityPage] = useState(1);
+  const { data: activity, isLoading: activityLoading } = useQuery<PaginatedActivity>({
+    queryKey: ['dashboard', 'activity', orgSlug, activityPage],
+    queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/activity?page=${activityPage}&limit=${ACTIVITY_PAGE_SIZE}`),
+    placeholderData: keepPreviousData,
   });
+  const activityData = activity?.data ?? [];
+  const activityTotalPages = Math.max(1, Math.ceil((activity?.total ?? 0) / ACTIVITY_PAGE_SIZE));
 
   const kpiCards = [
     {
@@ -219,6 +234,11 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
+            </div>
+          )}
+          {activityTotalPages > 1 && (
+            <div className="border-t border-border">
+              <Pagination page={activityPage} totalPages={activityTotalPages} onPageChange={setActivityPage} />
             </div>
           )}
         </CardContent>
