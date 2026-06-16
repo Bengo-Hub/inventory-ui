@@ -136,6 +136,16 @@ class ApiClient {
     public delete<T>(url: string): Promise<T> {
         return this.instance.delete<T>(url).then((res: AxiosResponse<T>) => res.data);
     }
+
+    /**
+     * GET a binary payload (e.g. a backup archive) as a Blob, carrying the same
+     * auth + tenant headers as every other request via the shared interceptors.
+     */
+    public getBlob(url: string, params?: any): Promise<Blob> {
+        return this.instance
+            .get(url, { params, responseType: 'blob' })
+            .then((res: AxiosResponse<Blob>) => res.data);
+    }
 }
 
 export const apiClient = new ApiClient();
