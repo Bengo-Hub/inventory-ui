@@ -3,6 +3,7 @@
 import { apiClient } from '@/lib/api/client';
 import { parseLimitInfo } from '@/lib/api/error-handler';
 import { LimitReachedModal } from '@/components/subscription/limit-reached-modal';
+import { OfflineBar } from '@bengo-hub/shared-ui-lib/offline';
 import { useLimitModal } from '@/store/limit-modal';
 import { useMe } from '@/hooks/useMe';
 import { useAuthStore } from '@/store/auth';
@@ -81,6 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return (
         <>
+            <OfflineBar availableOffline={['View cached records']} disabledOffline={['Edits', 'Stock moves', 'Reports']} />
             {children}
             <LimitReachedModal />
         </>
