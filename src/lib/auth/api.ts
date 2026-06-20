@@ -85,6 +85,19 @@ export function buildLogoutUrl(postLogoutRedirectUri?: string): string {
     return url.toString();
 }
 
+export async function revokeServerSession(accessToken?: string | null): Promise<void> {
+  try {
+    await fetch(new URL('/api/v1/auth/logout', SSO_BASE_URL).toString(), {
+      method: 'POST',
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      credentials: 'include',
+      keepalive: true,
+    });
+  } catch {
+    /* best-effort: still clear local state + redirect below */
+  }
+}
+
 export async function exchangeCodeForTokens(params: TokenExchangeParams) {
     const body = new URLSearchParams({
         grant_type: 'authorization_code',
