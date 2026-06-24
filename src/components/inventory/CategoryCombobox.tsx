@@ -143,7 +143,7 @@ export function CategoryCombobox({ orgSlug, value, onChange, placeholder = 'Sele
 
 // ── Inline create-category dialog (mirrors the Categories page form) ─────────────
 
-function AddCategoryDialog({
+export function AddCategoryDialog({
   orgSlug, initialName, categories, onClose, onCreated,
 }: {
   orgSlug:     string;

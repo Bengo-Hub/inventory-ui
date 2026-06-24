@@ -3,6 +3,9 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
+import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import {
     usePurchaseOrders,
@@ -14,7 +17,7 @@ import {
     useCancelPurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
 import { AlertTriangle, ArrowLeft, BarChart3, FileText, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
@@ -70,6 +73,9 @@ export default function PurchaseOrdersPage() {
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data;
     const { data: warehouses } = useWarehouses(orgSlug);
+    const createSupplier = useCreateSupplier(orgSlug);
+    const [addSupplierOpen, setAddSupplierOpen] = useState(false);
+    const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
     const { data: orders, isLoading, isError, refetch } = usePurchaseOrders(orgSlug);
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
     const createPO = useCreatePurchaseOrder(orgSlug);
@@ -537,31 +543,27 @@ export default function PurchaseOrdersPage() {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Supplier *</label>
-                                        <select
+                                        <CreatableSelect
                                             value={supplierId}
-                                            onChange={(e) => setSupplierId(e.target.value)}
-                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                            onChange={setSupplierId}
+                                            options={(suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+                                            placeholder="Select supplier..."
                                             required
-                                        >
-                                            <option value="">Select supplier...</option>
-                                            {suppliers?.map((s) => (
-                                                <option key={s.id} value={s.id}>{s.name}</option>
-                                            ))}
-                                        </select>
+                                            onAddClick={() => setAddSupplierOpen(true)}
+                                            addLabel="Add supplier"
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Warehouse *</label>
-                                        <select
+                                        <CreatableSelect
                                             value={warehouseId}
-                                            onChange={(e) => setWarehouseId(e.target.value)}
-                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                            onChange={setWarehouseId}
+                                            options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+                                            placeholder="Select warehouse..."
                                             required
-                                        >
-                                            <option value="">Select warehouse...</option>
-                                            {warehouses?.map((wh) => (
-                                                <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                            ))}
-                                        </select>
+                                            onAddClick={() => setAddWarehouseOpen(true)}
+                                            addLabel="Add warehouse"
+                                        />
                                     </div>
                                 </div>
 
@@ -690,6 +692,26 @@ export default function PurchaseOrdersPage() {
                     </Card>
                 </div>
             </div>
+        )}
+
+        {addSupplierOpen && (
+            <SupplierFormDialog
+                editing={null}
+                isPending={createSupplier.isPending}
+                onClose={() => setAddSupplierOpen(false)}
+                onSubmit={(data) => createSupplier.mutate(data, {
+                    onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setAddSupplierOpen(false); },
+                    onError: () => toast.error('Failed to create supplier'),
+                })}
+            />
+        )}
+
+        {addWarehouseOpen && (
+            <WarehouseQuickCreateDialog
+                orgSlug={orgSlug}
+                onClose={() => setAddWarehouseOpen(false)}
+                onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
+            />
         )}
         </>
     );

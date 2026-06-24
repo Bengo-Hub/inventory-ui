@@ -2,8 +2,12 @@
 
 import { Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
+import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
+import { useCreateItem } from '@/hooks/useItems';
+import type { CreateItemInput, Item } from '@/lib/api/items';
 import { useQuery } from '@tanstack/react-query';
-import { Search } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
+import { toast } from 'sonner';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export interface ItemResult {
@@ -25,14 +29,30 @@ interface Props {
   label?: string;
   /** Use fixed positioning for the dropdown so it escapes overflow:auto parents (e.g. modals) */
   fixedDropdown?: boolean;
+  /** Allow creating a new item inline when no match is found (default: true). */
+  allowCreate?: boolean;
 }
 
-export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown }: Props) {
+function itemToResult(i: Item): ItemResult {
+  return {
+    id: i.id,
+    sku: i.sku,
+    name: i.name,
+    cost_price: i.cost_price ?? null,
+    suggested_price: i.suggested_price ?? null,
+    unit_id: i.unit_id ?? undefined,
+    type: i.type,
+  };
+}
+
+export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
+  const [createOpen, setCreateOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
+  const createItem = useCreateItem(orgSlug);
 
   const { data: results } = useQuery<ItemResult[]>({
     queryKey: ['item-search', orgSlug, query],
@@ -47,6 +67,17 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
     placeholderData: [],
     staleTime: 30_000,
   });
+
+  function handleCreateSubmit(data: CreateItemInput) {
+    createItem.mutate(data, {
+      onSuccess: (created) => {
+        toast.success('Item created');
+        setCreateOpen(false);
+        handleSelect(itemToResult(created));
+      },
+      onError: () => toast.error('Failed to create item'),
+    });
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -76,7 +107,21 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
     setOpen(false);
   }
 
-  const dropdownVisible = open && (results?.length ?? 0) > 0;
+  const trimmed = query.trim();
+  const exactMatch = (results ?? []).some((r) => r.name.toLowerCase() === trimmed.toLowerCase());
+  const showCreate = allowCreate && trimmed.length >= 2 && !exactMatch;
+  const dropdownVisible = open && ((results?.length ?? 0) > 0 || showCreate);
+
+  const createButton = showCreate ? (
+    <button
+      type="button"
+      className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2.5 text-sm text-primary hover:bg-accent"
+      onMouseDown={(e) => { e.preventDefault(); setOpen(false); setCreateOpen(true); }}
+    >
+      <Plus className="h-4 w-4" />
+      Create &quot;{trimmed}&quot;
+    </button>
+  ) : null;
 
   return (
     <div className="space-y-2" ref={ref}>
@@ -99,7 +144,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
               <button
                 key={item.id}
                 type="button"
-                className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg"
+                className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors first:rounded-t-lg"
                 onMouseDown={() => handleSelect(item)}
               >
                 <span className="font-medium">{item.name}</span>
@@ -109,6 +154,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
                 )}
               </button>
             ))}
+            {createButton}
           </div>
         )}
       </div>
@@ -121,7 +167,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
             <button
               key={item.id}
               type="button"
-              className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors first:rounded-t-lg last:rounded-b-lg"
+              className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors first:rounded-t-lg"
               onMouseDown={() => handleSelect(item)}
             >
               <span className="font-medium">{item.name}</span>
@@ -131,7 +177,18 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
               )}
             </button>
           ))}
+          {createButton}
         </div>
+      )}
+
+      {createOpen && (
+        <ItemFormDialog
+          orgSlug={orgSlug}
+          initialName={trimmed}
+          onClose={() => setCreateOpen(false)}
+          onSubmit={handleCreateSubmit}
+          isPending={createItem.isPending}
+        />
       )}
     </div>
   );

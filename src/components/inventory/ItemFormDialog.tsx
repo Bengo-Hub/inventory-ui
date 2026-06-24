@@ -5,6 +5,9 @@ import { RecurrenceEditor, generateRecurrencePattern } from '@/components/invent
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
+import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
@@ -51,6 +54,8 @@ interface Props {
   orgSlug: string;
   item?: Item | null;
   defaultDate?: string;
+  /** Seed the name in create mode (e.g. from a "Create <typed text>" inline-create flow). */
+  initialName?: string;
   /** Lock the form to event editing: type fixed to SERVICE; category/unit/type read-only (predefined). */
   lockToEvent?: boolean;
   onClose: () => void;
@@ -67,7 +72,7 @@ function toLocalDatetimeValue(iso?: string | null): string {
   return iso.slice(0, 16); // "YYYY-MM-DDTHH:mm"
 }
 
-export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClose, onSubmit, isPending }: Props) {
+export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockToEvent, onClose, onSubmit, isPending }: Props) {
   // Selected-outlet use_case drives which item types / use-cases / sections are offered.
   // Event mode (the Events pages) is unrestricted: type is fixed to SERVICE regardless.
   const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
@@ -79,7 +84,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   const typeOptions = item?.type && !baseTypes.includes(item.type) ? [item.type, ...baseTypes] : baseTypes;
   const hospitalityUseCases = ITEM_USE_CASES.filter((u) => scope.itemUseCases.includes(u.value));
 
-  const [name, setName] = useState(item?.name ?? '');
+  const [name, setName] = useState(item?.name ?? initialName ?? '');
   const [sku, setSku] = useState(item?.sku ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
   const [type, setType] = useState<string>(
@@ -87,6 +92,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   );
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
+  const [addCategoryOpen, setAddCategoryOpen] = useState(false);
+  const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
@@ -443,17 +450,27 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    <option value="">No category</option>
-                    {visibleCategories?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
+                  <CreatableSelect
+                    value={categoryId}
+                    onChange={setCategoryId}
+                    options={(visibleCategories ?? []).map((c) => ({ id: c.id, name: c.name }))}
+                    placeholder="No category"
+                    disabled={lockToEvent}
+                    onAddClick={lockToEvent ? undefined : () => setAddCategoryOpen(true)}
+                    addLabel="Add category"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Unit</label>
-                  <select value={unitId} onChange={(e) => setUnitId(e.target.value)} disabled={lockToEvent} className={`${selectCls} ${lockToEvent ? 'opacity-60 cursor-not-allowed' : ''}`}>
-                    <option value="">No unit</option>
-                    {units?.map((u) => <option key={u.id} value={u.id}>{u.name} ({u.abbreviation})</option>)}
-                  </select>
+                  <CreatableSelect
+                    value={unitId}
+                    onChange={setUnitId}
+                    options={(units ?? []).map((u) => ({ id: u.id, name: `${u.name}${u.abbreviation ? ` (${u.abbreviation})` : ''}` }))}
+                    placeholder="No unit"
+                    disabled={lockToEvent}
+                    onAddClick={lockToEvent ? undefined : () => setAddUnitOpen(true)}
+                    addLabel="Add unit"
+                  />
                 </div>
               </div>
 
@@ -856,6 +873,23 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
           </CardContent>
         </Card>
       </div>
+
+      {addCategoryOpen && (
+        <AddCategoryDialog
+          orgSlug={orgSlug}
+          initialName=""
+          categories={[]}
+          onClose={() => setAddCategoryOpen(false)}
+          onCreated={(cat) => { setCategoryId(cat.id); setAddCategoryOpen(false); }}
+        />
+      )}
+      {addUnitOpen && (
+        <UnitQuickCreateDialog
+          orgSlug={orgSlug}
+          onClose={() => setAddUnitOpen(false)}
+          onCreated={(u) => { setUnitId(u.id); setAddUnitOpen(false); }}
+        />
+      )}
     </div>
   );
 }
