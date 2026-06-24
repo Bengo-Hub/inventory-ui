@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { pricingApi, type CreateTierInput, type UpsertItemPricingEntry } from '@/lib/api/pricing';
+import { pricingApi, type CreateTierInput, type GenerateTierPricingInput, type UpsertItemPricingEntry } from '@/lib/api/pricing';
 
 const TIERS_KEY = 'pricing-tiers';
 const PRICING_KEY = 'item-pricing';
@@ -63,6 +63,17 @@ export function useUpsertItemPricing(orgSlug: string) {
       pricingApi.upsertItemPricing(orgSlug, itemId, entries),
     onSuccess: (_, { itemId }) => {
       queryClient.invalidateQueries({ queryKey: [PRICING_KEY, orgSlug, itemId] });
+      queryClient.invalidateQueries({ queryKey: [PRICING_KEY, orgSlug] });
+    },
+  });
+}
+
+export function useGenerateTierPricing(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tierId, body }: { tierId: string; body: GenerateTierPricingInput }) =>
+      pricingApi.generateTierPricing(orgSlug, tierId, body),
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [PRICING_KEY, orgSlug] });
     },
   });

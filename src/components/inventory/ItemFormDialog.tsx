@@ -91,6 +91,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
   const [costPrice, setCostPrice] = useState(item?.cost_price != null ? String(item.cost_price) : '');
+  const [minSellingPrice, setMinSellingPrice] = useState(item?.min_selling_price != null ? String(item.min_selling_price) : '');
+  const [maxSellingPrice, setMaxSellingPrice] = useState(item?.max_selling_price != null ? String(item.max_selling_price) : '');
+  const [targetMargin, setTargetMargin] = useState(item?.target_margin_percent != null ? String(item.target_margin_percent) : '');
   const [taxCode, setTaxCode] = useState(item?.tax_code_id ?? '');
   const [taxInclusive, setTaxInclusive] = useState(item?.tax_inclusive ?? false);
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
@@ -181,6 +184,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
       setReorderLevel(String(item.reorder_level ?? ''));
       setReorderQty(String(item.reorder_quantity ?? ''));
       setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
+      setMinSellingPrice(item.min_selling_price != null ? String(item.min_selling_price) : '');
+      setMaxSellingPrice(item.max_selling_price != null ? String(item.max_selling_price) : '');
+      setTargetMargin(item.target_margin_percent != null ? String(item.target_margin_percent) : '');
       setTaxCode(item.tax_code_id ?? '');
       setTaxInclusive(item.tax_inclusive ?? false);
       setRequiresAge(item.requires_age_verification);
@@ -272,6 +278,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
+    if (minSellingPrice !== '' && maxSellingPrice !== '' && parseFloat(minSellingPrice) > parseFloat(maxSellingPrice)) {
+      toast.error('Min selling price cannot exceed max selling price.');
+      return;
+    }
 
     // Ticket tiers can never allocate more seats than the event's total capacity.
     if (type === 'SERVICE') {
@@ -329,6 +339,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
       cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
+      min_selling_price: minSellingPrice !== '' ? parseFloat(minSellingPrice) : undefined,
+      max_selling_price: maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : undefined,
+      target_margin_percent: targetMargin !== '' ? parseFloat(targetMargin) : undefined,
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
       barcode_type: barcodeType || undefined,
@@ -363,6 +376,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
   }
 
   const isService = type === 'SERVICE';
+  // Selling-price guardrail helpers (GOODS/EQUIPMENT): live margin→price hint + min≤max check.
+  const minNum = minSellingPrice !== '' ? parseFloat(minSellingPrice) : null;
+  const maxNum = maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : null;
+  const minMaxInvalid = minNum != null && maxNum != null && minNum > maxNum;
+  const marginNum = targetMargin !== '' ? parseFloat(targetMargin) : null;
+  const costNum = costPrice !== '' ? parseFloat(costPrice) : null;
+  const suggestedFromMargin =
+    costNum != null && costNum > 0 && marginNum != null && marginNum > 0 && marginNum < 100
+      ? costNum / (1 - marginNum / 100)
+      : null;
   // Ticket-tier capacity gating: the sum of tier capacities must never exceed the event total.
   const totalCapNum = totalCapacity !== '' ? parseInt(totalCapacity, 10) || 0 : 0;
   const tiersAllocated = tiers.reduce((sum, t) => sum + (t.capacity || 0), 0);
@@ -482,6 +505,37 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
                   <label className="text-sm font-medium">Cost Price (KES)</label>
                   <Input type="number" min="0" step="0.01" placeholder="Unit cost from supplier" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
                   <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports</p>
+                </div>
+              )}
+
+              {/* Selling-price guardrails + goods margin (GOODS/EQUIPMENT) */}
+              {['GOODS', 'EQUIPMENT'].includes(type) && (
+                <div className="space-y-3 border border-border rounded-lg p-3">
+                  <p className="text-sm font-semibold">Selling-price guardrails</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Min Selling Price (KES)</label>
+                      <Input type="number" min="0" step="0.01" placeholder="Floor" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Max Selling Price (KES)</label>
+                      <Input type="number" min="0" step="0.01" placeholder="Ceiling" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Target Margin (%)</label>
+                      <Input type="number" min="0" max="99.9" step="0.1" placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
+                    </div>
+                  </div>
+                  {minMaxInvalid && (
+                    <p className="text-xs text-destructive">Min selling price cannot exceed max selling price.</p>
+                  )}
+                  {suggestedFromMargin != null && (
+                    <p className="text-xs text-muted-foreground">
+                      At {targetMargin}% margin, suggested price ≈ <span className="font-semibold">KES {suggestedFromMargin.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      {' '}(price = cost ÷ (1 − margin)). Tier prices are set per profile on the product page and are hard-capped to this band.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Prices outside [min, max] are rejected on price updates and require a manager override at POS.</p>
                 </div>
               )}
 
@@ -794,7 +848,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, lockToEvent, onClos
 
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-                <Button type="submit" className="flex-1" disabled={isPending || tiersOverCapacity}>
+                <Button type="submit" className="flex-1" disabled={isPending || tiersOverCapacity || minMaxInvalid}>
                   {isPending ? 'Saving...' : item ? 'Update' : 'Create'}
                 </Button>
               </div>

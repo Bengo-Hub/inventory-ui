@@ -36,6 +36,9 @@ export interface Item {
   reorder_quantity?: number;
   cost_price?: number | null;
   suggested_price?: number | null;
+  min_selling_price?: number | null;
+  max_selling_price?: number | null;
+  target_margin_percent?: number | null;
   // Tax / compliance (treasury-api is the rate source of truth)
   tax_code_id?: string;
   tax_inclusive?: boolean;
@@ -108,6 +111,9 @@ export interface CreateItemInput {
   reorder_level?: number;
   reorder_quantity?: number;
   cost_price?: number;
+  min_selling_price?: number;
+  max_selling_price?: number;
+  target_margin_percent?: number;
   tax_code_id?: string;
   tax_inclusive?: boolean;
   is_active?: boolean;

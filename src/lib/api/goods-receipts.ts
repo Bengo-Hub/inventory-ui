@@ -33,6 +33,8 @@ export interface CreateGRNLineInput {
   quantity_rejected?: number;
   unit_cost?: number;
   rejection_reason?: string;
+  /** Serial numbers for serial-tracked items: one per accepted unit. */
+  serials?: string[];
 }
 
 export interface CreateGRNInput {

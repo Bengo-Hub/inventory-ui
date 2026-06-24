@@ -73,4 +73,25 @@ export const pricingApi = {
 
   listAllItemPricing: (orgSlug: string) =>
     apiClient.get<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/pricing`),
+
+  // Bulk-generate every item's price for a tier from the default tier (× factor) or cost+margin.
+  generateTierPricing: (orgSlug: string, tierId: string, body: GenerateTierPricingInput) =>
+    apiClient.post<GenerateTierPricingResult>(
+      `/api/v1/${orgSlug}/inventory/pricing-tiers/${tierId}/generate`,
+      body,
+    ),
 };
+
+export interface GenerateTierPricingInput {
+  source: 'default_tier' | 'cost_margin';
+  factor?: number;          // multiplier for default_tier (e.g. 0.9)
+  margin_percent?: number;  // margin for cost_margin
+  overwrite?: boolean;
+}
+
+export interface GenerateTierPricingResult {
+  generated: number;
+  skipped: number;
+  clamped: number;
+  warnings?: string[];
+}

@@ -22,6 +22,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [received, setReceived] = useState<Record<string, string>>({});
     const [rejected, setRejected] = useState<Record<string, string>>({});
     const [reason, setReason] = useState<Record<string, string>>({});
+    // Free-text serials per line (comma / space / newline separated). Optional — only for
+    // serial-tracked items, where the backend requires one unique serial per accepted unit.
+    const [serials, setSerials] = useState<Record<string, string>>({});
 
     const { data: orders } = usePurchaseOrders(org);
     const receivablePOs = (orders ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
@@ -29,7 +32,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const create = useCreateGoodsReceipt(org, poId);
 
     const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
-    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); };
+    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); };
+    const parseSerials = (raw: string | undefined) =>
+        (raw ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -42,6 +47,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                 const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
                 const acc = rec - rej;
                 if (rej > rec || acc < 0) invalid = true;
+                const sn = parseSerials(serials[l.id]);
                 return {
                     purchase_order_line_id: l.id,
                     item_id: l.item_id,
@@ -50,6 +56,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                     quantity_rejected: rej,
                     rejection_reason: rej > 0 ? (reason[l.id]?.trim() || undefined) : undefined,
                     unit_cost: l.unit_cost,
+                    serials: sn.length > 0 ? sn : undefined,
                 };
             })
             .filter((l) => l.quantity_received > 0);
@@ -97,8 +104,11 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                             const rec = received[l.id] !== undefined ? Number(received[l.id]) : out;
                                             const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
                                             const acc = Math.max(0, rec - rej);
+                                            const snCount = parseSerials(serials[l.id]).length;
+                                            const snMismatch = snCount > 0 && snCount !== acc;
                                             return (
-                                                <div key={l.id} className="grid grid-cols-12 gap-2 items-center px-3 py-2">
+                                                <div key={l.id} className="px-3 py-2 space-y-1.5">
+                                                  <div className="grid grid-cols-12 gap-2 items-center">
                                                     <div className="col-span-5">
                                                         <p className="text-sm font-medium truncate">{l.item_name ?? l.item_sku ?? l.item_id.slice(0, 8)}</p>
                                                         <p className="text-xs text-muted-foreground">ordered {l.quantity} · prev. received {l.received_qty ?? 0} · outstanding {out} · accepted {acc}</p>
@@ -106,6 +116,22 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                     <Input className="col-span-2" type="number" min="0" value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-2" type="number" min="0" max={rec} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                  </div>
+                                                  <details className="text-xs">
+                                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                                                      Serial numbers {snCount > 0 ? `(${snCount}/${acc})` : '(optional — serial-tracked items)'}
+                                                    </summary>
+                                                    <textarea
+                                                      className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none"
+                                                      rows={2}
+                                                      placeholder="One serial per accepted unit — separate by comma, space, or new line"
+                                                      value={serials[l.id] ?? ''}
+                                                      onChange={(e) => setSerials((s) => ({ ...s, [l.id]: e.target.value }))}
+                                                    />
+                                                    {snMismatch && (
+                                                      <p className="text-destructive">Enter exactly {acc} serial(s) to match accepted units (serial-tracked items), or leave blank.</p>
+                                                    )}
+                                                  </details>
                                                 </div>
                                             );
                                         })}

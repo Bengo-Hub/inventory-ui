@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { AlertTriangle, DollarSign, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, DollarSign, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import {
   useCreatePricingTier,
   useDeletePricingTier,
+  useGenerateTierPricing,
   usePricingTiers,
   useUpdatePricingTier,
 } from '@/hooks/usePricing';
@@ -24,6 +25,7 @@ export default function PricingProfilesPage() {
   const createTier = useCreatePricingTier(orgSlug);
   const updateTier = useUpdatePricingTier(orgSlug);
   const deleteTier = useDeletePricingTier(orgSlug);
+  const generatePricing = useGenerateTierPricing(orgSlug);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<PricingTier | null>(null);
@@ -31,6 +33,31 @@ export default function PricingProfilesPage() {
   const [formCode, setFormCode] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formIsDefault, setFormIsDefault] = useState(false);
+
+  // Bulk price-generation dialog state.
+  const [genTier, setGenTier] = useState<PricingTier | null>(null);
+  const [genSource, setGenSource] = useState<'default_tier' | 'cost_margin'>('default_tier');
+  const [genFactor, setGenFactor] = useState('0.9');
+  const [genMargin, setGenMargin] = useState('20');
+  const [genOverwrite, setGenOverwrite] = useState(false);
+
+  function runGenerate() {
+    if (!genTier) return;
+    const body =
+      genSource === 'default_tier'
+        ? { source: 'default_tier' as const, factor: parseFloat(genFactor) || 0, overwrite: genOverwrite }
+        : { source: 'cost_margin' as const, margin_percent: parseFloat(genMargin) || 0, overwrite: genOverwrite };
+    generatePricing.mutate(
+      { tierId: genTier.id, body },
+      {
+        onSuccess: (res) => {
+          toast.success(`Generated ${res.generated} prices${res.skipped ? `, skipped ${res.skipped}` : ''}${res.clamped ? `, ${res.clamped} clamped to min/max` : ''}`);
+          setGenTier(null);
+        },
+        onError: () => toast.error('Failed to generate prices'),
+      },
+    );
+  }
 
   const list = (tiers ?? []) as PricingTier[];
   const saving = createTier.isPending || updateTier.isPending;
@@ -154,6 +181,9 @@ export default function PricingProfilesPage() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
+                          <Button variant="ghost" size="sm" aria-label="Generate prices" title="Bulk-generate item prices for this profile" onClick={() => { setGenTier(t); setGenSource(t.is_default ? 'cost_margin' : 'default_tier'); }}>
+                            <Sparkles className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" aria-label="Edit profile" onClick={() => openEdit(t)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -231,6 +261,66 @@ export default function PricingProfilesPage() {
                     </Button>
                   </div>
                 </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk price-generation dialog */}
+      {genTier && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setGenTier(null)} />
+          <div className="relative z-50 w-full max-w-lg mx-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold">Generate {genTier.name} prices</h2>
+                  <button onClick={() => setGenTier(null)} className="p-1 rounded-lg hover:bg-accent transition-colors">
+                    <X className="h-5 w-5 text-muted-foreground" />
+                  </button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Bulk-set every item&apos;s price for this profile. Generated prices are clamped to each item&apos;s min/max selling price.
+                  </p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Derive from</label>
+                    <select
+                      value={genSource}
+                      onChange={(e) => setGenSource(e.target.value as 'default_tier' | 'cost_margin')}
+                      className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                    >
+                      <option value="default_tier">Default profile price × factor</option>
+                      <option value="cost_margin">Cost price + margin</option>
+                    </select>
+                  </div>
+                  {genSource === 'default_tier' ? (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Factor</label>
+                      <Input type="number" min="0" step="0.01" value={genFactor} onChange={(e) => setGenFactor(e.target.value)} />
+                      <p className="text-xs text-muted-foreground">e.g. 0.9 = 10% below the default (Retail) price.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Margin (%)</label>
+                      <Input type="number" min="0" max="99.9" step="0.1" value={genMargin} onChange={(e) => setGenMargin(e.target.value)} />
+                      <p className="text-xs text-muted-foreground">price = cost ÷ (1 − margin). Items without a cost price are skipped.</p>
+                    </div>
+                  )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" checked={genOverwrite} onChange={(e) => setGenOverwrite(e.target.checked)} className="rounded" />
+                    Overwrite existing prices on this profile
+                  </label>
+                  <div className="flex gap-3 pt-2">
+                    <Button type="button" variant="outline" className="flex-1" onClick={() => setGenTier(null)}>Cancel</Button>
+                    <Button type="button" className="flex-1" onClick={runGenerate} disabled={generatePricing.isPending}>
+                      {generatePricing.isPending ? 'Generating...' : 'Generate'}
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>

@@ -46,6 +46,14 @@ interface StockHistoryEntry {
     createdBy: string;
 }
 
+interface SerialRow {
+    id: string;
+    serial_number: string;
+    status: 'available' | 'reserved' | 'sold' | 'returned' | 'defective';
+    received_at?: string;
+    sold_at?: string | null;
+}
+
 export default function ItemDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -65,6 +73,14 @@ export default function ItemDetailPage() {
     const { data: history } = useQuery<StockHistoryEntry[]>({
         queryKey: ['catalog', 'history', orgSlug, id],
         queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/history`),
+        enabled: !!id,
+        placeholderData: [],
+    });
+
+    // Per-unit serials (serial-tracked items). The section renders only when rows exist.
+    const { data: serialRows } = useQuery<SerialRow[]>({
+        queryKey: ['catalog', 'serials', orgSlug, id],
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/serials`),
         enabled: !!id,
         placeholderData: [],
     });
@@ -299,6 +315,49 @@ export default function ItemDetailPage() {
                     )}
                 </CardContent>
             </Card>
+
+            {/* Serial units — only for serial-tracked items that have received units */}
+            {(serialRows?.length ?? 0) > 0 && (
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">Serial Units</h2>
+                            <div className="flex gap-1.5">
+                                {(['available', 'sold', 'returned', 'defective'] as const).map((st) => {
+                                    const n = (serialRows ?? []).filter((s) => s.status === st).length;
+                                    return n > 0 ? <Badge key={st} variant={st === 'available' ? 'success' : 'outline'}>{n} {st}</Badge> : null;
+                                })}
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto max-h-96">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Serial Number</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Received</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Sold</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {(serialRows ?? []).map((s) => (
+                                        <tr key={s.id} className="hover:bg-accent/30 transition-colors">
+                                            <td className="px-6 py-3 font-mono">{s.serial_number}</td>
+                                            <td className="px-6 py-3">
+                                                <Badge variant={s.status === 'available' ? 'success' : 'outline'} className="capitalize">{s.status}</Badge>
+                                            </td>
+                                            <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{s.received_at ? new Date(s.received_at).toLocaleDateString() : '—'}</td>
+                                            <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{s.sold_at ? new Date(s.sold_at).toLocaleDateString() : '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {pricingEditOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center">

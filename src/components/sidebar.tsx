@@ -89,12 +89,21 @@ const MODULE_FEATURE: Record<string, string> = {
   purchase_orders: 'purchase_orders',
 };
 
+// Procurement is a universal capability, not a use_case-specific one: any business — even a
+// pure-services or mixed goods+services tenant — can buy from suppliers and raise LPOs/RFQs.
+// These keys are therefore never hidden by use_case (they remain subject to subscription gating
+// via MODULE_FEATURE, e.g. purchase_orders).
+const UNIVERSAL_MODULES = new Set<string>([
+  'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers',
+]);
+
 // Gating is driven by the SELECTED outlet's use_case for everyone (admins included).
 // When no specific outlet is selected — the HQ "All Outlets" view, where useCase is
 // undefined — the full module superset is shown. An unrecognised use_case also falls
 // through to "show all" so a new use_case never silently hides modules.
 function hasModule(key: string | undefined, useCase: string | undefined): boolean {
   if (!key) return true; // no key = always visible
+  if (UNIVERSAL_MODULES.has(key)) return true; // procurement is available to every business type
   if (!useCase) return true; // no outlet selected (HQ aggregate) → full superset
   const modules = USE_CASE_MODULES[useCase];
   if (!modules) return true; // unknown use_case → don't hide anything
