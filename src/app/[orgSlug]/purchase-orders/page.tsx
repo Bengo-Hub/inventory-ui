@@ -20,12 +20,14 @@ import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { AlertTriangle, ArrowLeft, BarChart3, FileText, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, BarChart3, Eye, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -90,6 +92,16 @@ export default function PurchaseOrdersPage() {
     const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
     const canChangePO = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
     const canCancelPO = canAny([P.PURCHASES_DELETE, P.PURCHASES_MANAGE]);
+
+    // Document preview (Print/Export) — reuses the shared-ui-lib PDF previewer (same as treasury-ui),
+    // streaming the PO PDF from inventory-api's GET /purchase-orders/{id}/pdf.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewPO(po: PurchaseOrder) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/purchase-orders/${po.id}/pdf`),
+            { fileName: `${po.po_number}.pdf`, title: po.po_number },
+        );
+    }
 
     const filtered = (orders ?? []).filter((o) => {
         const matchesSearch = !search ||
@@ -240,6 +252,10 @@ export default function PurchaseOrdersPage() {
                         </Badge>
                     )}
                     <div className="ml-auto flex flex-wrap gap-2">
+                        <Button size="sm" variant="outline" onClick={() => previewPO(poDetail)}>
+                            <Printer className="h-4 w-4 mr-2" />
+                            Print / Export
+                        </Button>
                         {showSubmit && (
                             <Button
                                 size="sm"
@@ -465,18 +481,19 @@ export default function PurchaseOrdersPage() {
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                                     <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Total</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
+                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
                                             Loading purchase orders...
                                         </td>
                                     </tr>
                                 ) : isError ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                        <td colSpan={6} className="px-6 py-12 text-center">
                                             <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
                                             <p className="text-muted-foreground">Couldn&apos;t load purchase orders</p>
                                             <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
@@ -484,7 +501,7 @@ export default function PurchaseOrdersPage() {
                                     </tr>
                                 ) : (filtered?.length ?? 0) === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
+                                        <td colSpan={6} className="px-6 py-12 text-center">
                                             <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                                             <p className="text-muted-foreground">No purchase orders found</p>
                                         </td>
@@ -508,6 +525,16 @@ export default function PurchaseOrdersPage() {
                                             </td>
                                             <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
                                                 {new Date(po.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                                                    <Button variant="ghost" size="sm" aria-label="View" title="View details" onClick={() => setSelectedPO(po.id)}>
+                                                        <Eye className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" aria-label="Print / Export" title="Print / Export PDF" onClick={() => previewPO(po)}>
+                                                        <Printer className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))
@@ -713,6 +740,8 @@ export default function PurchaseOrdersPage() {
                 onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
             />
         )}
+
+        <PdfPreview {...previewProps} />
         </>
     );
 }
