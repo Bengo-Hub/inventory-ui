@@ -79,7 +79,8 @@ export type ItemUseCase =
   | 'HOSPITALITY_FACILITY'
   | 'CONFERENCE'
   | 'SALON_SERVICE'
-  | 'AMENITY';
+  | 'AMENITY'
+  | 'PROFESSIONAL_SERVICE';
 
 export type MealPlan = 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
 
@@ -89,6 +90,7 @@ export const ITEM_USE_CASES: { value: ItemUseCase; label: string }[] = [
   { value: 'HOSPITALITY_ROOM', label: 'Hotel Room Type' },
   { value: 'HOSPITALITY_FACILITY', label: 'Facility' },
   { value: 'CONFERENCE', label: 'Conference Hall' },
+  { value: 'PROFESSIONAL_SERVICE', label: 'Professional Service' },
   { value: 'SALON_SERVICE', label: 'Salon / Spa Service' },
   { value: 'AMENITY', label: 'Amenity' },
 ];

@@ -146,8 +146,11 @@ const SCOPES: Record<string, CatalogScope> = {
   },
   services: {
     itemTypes: ['SERVICE', 'GOODS', 'VOUCHER'],
-    itemUseCases: ['SALON_SERVICE', 'AMENITY'],
-    defaultItemUseCase: 'SALON_SERVICE',
+    // Generic professional service leads (legal, consulting, IT, etc.); salon/amenity remain
+    // for service tenants that actually offer them. Avoids forcing "Salon / Spa" on every
+    // services tenant.
+    itemUseCases: ['PROFESSIONAL_SERVICE', 'SALON_SERVICE', 'AMENITY'],
+    defaultItemUseCase: 'PROFESSIONAL_SERVICE',
     showHospitality: true,
     showRecipe: false,
     showServiceDuration: true,
