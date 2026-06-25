@@ -194,6 +194,7 @@ export const ITEM_USE_CASE_LABEL: Record<ItemUseCase, string> = {
   CONFERENCE: 'Conference',
   SALON_SERVICE: 'Salon / Spa',
   AMENITY: 'Amenities',
+  PROFESSIONAL_SERVICE: 'Professional Services',
 };
 
 // ── Hooks (read the active outlet from the store) ───────────────────────────────
