@@ -5,11 +5,12 @@ type Operator = "and" | "or";
 /**
  * isPlatformOwner — single source of truth for "is this the SaaS platform operator".
  *
- * Platform-level pages are owner-only. A tenant `admin` / `inventory_admin` is NOT a
- * platform owner — only the `is_platform_owner` claim, the `superuser` role, or
- * membership in the codevertex tenant qualifies. Codevertex membership is verified via
- * the SERVER-returned tenant slug (`tenant_slug`/`tenantSlug`), never the URL `orgSlug`,
- * so navigating to `/codevertex/...` does not grant platform access to another tenant.
+ * Platform-level pages are owner-only. A tenant `admin` / `inventory_admin` / `superuser` is
+ * NOT a platform owner — a tenant superuser is just that tenant's top admin and must never
+ * reach platform-level pages/configs. ONLY the `is_platform_owner` claim or membership in the
+ * codevertex platform tenant qualifies. Codevertex membership is verified via the SERVER-returned
+ * tenant slug (`tenant_slug`/`tenantSlug`), never the URL `orgSlug`, so navigating to
+ * `/codevertex/...` does not grant platform access to another tenant.
  *
  * Accepts both the auth-store user shape (`tenant_slug`) and the typed UserProfile.
  */
@@ -17,8 +18,6 @@ export function isPlatformOwner(
   user:
     | {
         isPlatformOwner?: boolean;
-        isSuperUser?: boolean;
-        roles?: string[];
         tenant_slug?: string;
         tenantSlug?: string;
       }
@@ -27,12 +26,9 @@ export function isPlatformOwner(
 ): boolean {
   if (!user) return false;
   const slug = user.tenant_slug ?? user.tenantSlug ?? "";
-  return (
-    user.isPlatformOwner === true ||
-    user.isSuperUser === true ||
-    (user.roles?.includes("superuser") ?? false) ||
-    slug === "codevertex"
-  );
+  // Tenant superusers are intentionally excluded — platform access requires the platform-owner
+  // claim or the codevertex platform tenant.
+  return user.isPlatformOwner === true || slug === "codevertex";
 }
 
 // Roles that grant full access to TENANT-level resources (settings, items, warehouses,
