@@ -15,6 +15,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -59,19 +60,19 @@ export default function AssetsPage() {
     useMemo(() => { setPage(1); }, [status, search]);
 
     function act(label: string, p: Promise<unknown>) {
-        p.then(() => toast.success(label)).catch(() => toast.error(`Failed to ${label.toLowerCase()}`));
+        p.then(() => toast.success(label)).catch(async (e) => toast.error(await apiErrorMessage(e, `Failed to ${label.toLowerCase()}`)));
     }
 
     function handleSubmit(input: CreateAssetInput) {
         if (editing) {
             updateAsset.mutate({ id: editing.id, data: input }, {
                 onSuccess: () => { toast.success('Asset updated'); closeDialog(); },
-                onError: () => toast.error('Failed to update asset'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update asset')),
             });
         } else {
             createAsset.mutate(input, {
                 onSuccess: () => { toast.success('Asset created'); closeDialog(); },
-                onError: () => toast.error('Failed to create asset'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create asset')),
             });
         }
     }

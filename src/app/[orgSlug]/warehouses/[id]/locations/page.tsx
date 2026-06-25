@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const LOCATION_TYPES = ['zone', 'aisle', 'shelf', 'bin', 'other'] as const;
 
@@ -90,7 +91,7 @@ export default function WarehouseLocationsPage() {
                 toast.success('Location created');
                 setDialogOpen(false);
             },
-            onError: () => toast.error('Failed to create location'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create location')),
         });
     }
 
@@ -98,7 +99,7 @@ export default function WarehouseLocationsPage() {
         if (!confirm('Delete this location?')) return;
         deleteLocation.mutate(id, {
             onSuccess: () => toast.success('Location deleted'),
-            onError: () => toast.error('Failed to delete location'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete location')),
         });
     }
 

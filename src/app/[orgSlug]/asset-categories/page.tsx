@@ -11,6 +11,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
@@ -57,15 +58,15 @@ export default function AssetCategoriesPage() {
         };
         const done = () => { toast.success(editing ? 'Category updated' : 'Category created'); setOpen(false); };
         if (editing) {
-            updateCat.mutate({ id: editing.id, data }, { onSuccess: done, onError: () => toast.error('Failed to update') });
+            updateCat.mutate({ id: editing.id, data }, { onSuccess: done, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update')) });
         } else {
-            createCat.mutate(data, { onSuccess: done, onError: () => toast.error('Failed to create') });
+            createCat.mutate(data, { onSuccess: done, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create')) });
         }
     }
 
     function handleDelete(c: AssetCategory) {
         if (!window.confirm(`Delete category "${c.name}"?`)) return;
-        deleteCat.mutate(c.id, { onSuccess: () => toast.success('Category deleted'), onError: () => toast.error('Failed to delete') });
+        deleteCat.mutate(c.id, { onSuccess: () => toast.success('Category deleted'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete')) });
     }
 
     const nameOf = (id?: string | null) => categories?.find((c) => c.id === id)?.name ?? '—';

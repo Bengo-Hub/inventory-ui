@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const MODULE_LABEL: Record<string, string> = {
     purchase_order: 'Purchase Order',
@@ -132,12 +133,12 @@ export default function ApprovalRulesPage() {
         if (editingId) {
             updateRule.mutate({ id: editingId, data: payload }, {
                 onSuccess: () => { toast.success('Rule updated'); closeDialog(); },
-                onError: () => toast.error('Failed to update rule'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update rule')),
             });
         } else {
             createRule.mutate(payload, {
                 onSuccess: () => { toast.success('Rule created'); closeDialog(); },
-                onError: () => toast.error('Failed to create rule'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create rule')),
             });
         }
     }
@@ -146,7 +147,7 @@ export default function ApprovalRulesPage() {
         if (!confirm(`Delete approval rule "${rule.name}"?`)) return;
         deleteRule.mutate(rule.id, {
             onSuccess: () => toast.success('Rule deleted'),
-            onError: () => toast.error('Failed to delete rule'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete rule')),
         });
     }
 

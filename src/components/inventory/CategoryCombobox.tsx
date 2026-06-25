@@ -7,6 +7,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 interface Props {
   orgSlug:      string;
@@ -171,7 +172,7 @@ export function AddCategoryDialog({
       queryClient.invalidateQueries({ queryKey: ['categories'] });
       onCreated(cat);
     },
-    onError: () => toast.error('Failed to create category'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create category')),
   });
 
   function submit(e: React.FormEvent) {

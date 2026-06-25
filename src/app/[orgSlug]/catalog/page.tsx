@@ -20,6 +20,7 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -237,7 +238,7 @@ export default function CatalogPage() {
         const total = data.items.created + data.items.updated + data.recipes.created + data.recipes.updated;
         toast.success(`Import complete — ${total} records processed`);
       },
-      onError: () => toast.error('Import failed. Check file format and try again.'),
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Import failed. Check file format and try again.')),
     }, selectedWarehouseCode || undefined);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -250,7 +251,7 @@ export default function CatalogPage() {
         setDeleteItem(null);
         if (viewItem?.id === deleteItem.id) setViewItem(null);
       },
-      onError: () => toast.error('Failed to delete item'),
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete item')),
     });
   }
 
@@ -614,7 +615,7 @@ export default function CatalogPage() {
           onSubmit={(data: CreateItemInput) => {
             createItem.mutate(data, {
               onSuccess: () => { toast.success('Item created'); setCreateOpen(false); },
-              onError: () => toast.error('Failed to create item'),
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create item')),
             });
           }}
         />
@@ -632,7 +633,7 @@ export default function CatalogPage() {
               { sku: editItem.sku, data },
               {
                 onSuccess: () => { toast.success('Item updated'); setEditItem(null); },
-                onError: () => toast.error('Failed to update item'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update item')),
               },
             );
           }}

@@ -14,6 +14,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const REASON_OPTIONS = [
     { value: 'correction', label: 'Count Correction' },
@@ -73,8 +74,8 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                 toast.success('Stock adjustment recorded');
                 onClose();
             },
-            onError: () => {
-                toast.error('Failed to record adjustment');
+            onError: async (e) => {
+                toast.error(await apiErrorMessage(e, 'Failed to record adjustment'));
             },
         });
     }

@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 export default function AssetDetailPage() {
     const params = useParams();
@@ -49,7 +50,7 @@ export default function AssetDetailPage() {
                         size="sm"
                         variant="outline"
                         disabled={depreciate.isPending}
-                        onClick={() => depreciate.mutate(assetId, { onSuccess: () => toast.success('Depreciation run queued'), onError: () => toast.error('Failed to run depreciation') })}
+                        onClick={() => depreciate.mutate(assetId, { onSuccess: () => toast.success('Depreciation run queued'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to run depreciation')) })}
                     >
                         Run Depreciation
                     </Button>

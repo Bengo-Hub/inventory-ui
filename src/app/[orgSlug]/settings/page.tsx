@@ -11,6 +11,7 @@ import {
   useUpdateInventoryModules,
 } from '@/hooks/useInventorySettings';
 import { apiClient } from '@/lib/api/client';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import {
   Bell,
   BookOpen,
@@ -633,7 +634,7 @@ function IntegrationsTab() {
     try {
       await apiClient.put('/api/v1/admin/config/allowed_origins', { config_value: allowedOrigins, config_type: 'string' });
       toast.success('Saved');
-    } catch { toast.error('Failed to save'); }
+    } catch (e) { toast.error(await apiErrorMessage(e, 'Failed to save')); }
     finally { setSaving(false); }
   };
 
@@ -717,7 +718,7 @@ function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentS
   function save() {
     update.mutate(
       { docType: seq.doc_type, data: { prefix: prefix.trim(), separator: separator || '-', date_format: dateFormat, padding: parseInt(padding, 10) || 6, reset_freq: seq.reset_freq } },
-      { onSuccess: () => toast.success(`${DOC_TYPE_LABELS[seq.doc_type] ?? seq.doc_type} numbering updated`), onError: () => toast.error('Failed to update numbering') },
+      { onSuccess: () => toast.success(`${DOC_TYPE_LABELS[seq.doc_type] ?? seq.doc_type} numbering updated`), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update numbering')) },
     );
   }
 

@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -46,13 +47,13 @@ export default function RequisitionsPage() {
     useMemo(() => { setPage(1); }, [status]);
 
     function act(label: string, p: Promise<unknown>) {
-        p.then(() => toast.success(label)).catch(() => toast.error(`Failed to ${label.toLowerCase()}`));
+        p.then(() => toast.success(label)).catch(async (e) => toast.error(await apiErrorMessage(e, `Failed to ${label.toLowerCase()}`)));
     }
 
     function handleSubmit(input: CreateRequisitionInput) {
         createReq.mutate(input, {
             onSuccess: () => { toast.success('Requisition created'); setDialogOpen(false); },
-            onError: () => toast.error('Failed to create requisition'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create requisition')),
         });
     }
 

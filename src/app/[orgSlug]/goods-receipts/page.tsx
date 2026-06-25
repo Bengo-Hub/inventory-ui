@@ -12,6 +12,7 @@ import { AlertTriangle, ClipboardCheck, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 20;
@@ -99,7 +100,7 @@ export default function GoodsReceiptsPage() {
                                             <RowActions
                                                 onView={() => setViewId(g.id)}
                                                 extra={canChange && g.status === 'draft' && (
-                                                    <Button variant="outline" size="sm" disabled={post.isPending} onClick={(e: React.MouseEvent) => { e.stopPropagation(); post.mutate(g.id, { onSuccess: () => toast.success('GRN posted — stock updated'), onError: () => toast.error('Failed to post GRN') }); }}>Post</Button>
+                                                    <Button variant="outline" size="sm" disabled={post.isPending} onClick={(e: React.MouseEvent) => { e.stopPropagation(); post.mutate(g.id, { onSuccess: () => toast.success('GRN posted — stock updated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) }); }}>Post</Button>
                                                 )}
                                             />
                                         </td>
@@ -127,7 +128,7 @@ export default function GoodsReceiptsPage() {
                     { label: 'Notes', value: viewGRN.notes, full: true, hideIfEmpty: true },
                 ] : []}
                 actions={viewGRN && canChange && viewGRN.status === 'draft' && (
-                    <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: () => toast.error('Failed to post GRN') })}>Post — update stock</Button>
+                    <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) })}>Post — update stock</Button>
                 )}
             >
                 {viewGRN && (viewGRN.lines?.length ?? 0) > 0 && (

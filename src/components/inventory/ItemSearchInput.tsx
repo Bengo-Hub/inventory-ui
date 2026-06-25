@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { useCreateItem } from '@/hooks/useItems';
 import type { CreateItemInput, Item } from '@/lib/api/items';
@@ -75,7 +76,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
         setCreateOpen(false);
         handleSelect(itemToResult(created));
       },
-      onError: () => toast.error('Failed to create item'),
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create item')),
     });
   }
 

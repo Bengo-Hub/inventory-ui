@@ -14,6 +14,7 @@ import {
   useUpdatePricingTier,
 } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 // PricingProfilesPage lets admins / store managers manage price tiers (e.g. Retail, Wholesale).
 // Per-item prices for each profile are set from the product detail page.
@@ -54,7 +55,7 @@ export default function PricingProfilesPage() {
           toast.success(`Generated ${res.generated} prices${res.skipped ? `, skipped ${res.skipped}` : ''}${res.clamped ? `, ${res.clamped} clamped to min/max` : ''}`);
           setGenTier(null);
         },
-        onError: () => toast.error('Failed to generate prices'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to generate prices')),
       },
     );
   }
@@ -102,7 +103,7 @@ export default function PricingProfilesPage() {
         toast.success(editing ? 'Pricing profile updated' : 'Pricing profile created');
         closeDialog();
       },
-      onError: () => toast.error(editing ? 'Failed to update profile' : 'Failed to create profile'),
+      onError: async (e: unknown) => toast.error(await apiErrorMessage(e, editing ? 'Failed to update profile' : 'Failed to create profile')),
     };
     if (editing) updateTier.mutate({ id: editing.id, data }, cb);
     else createTier.mutate(data, cb);
@@ -112,7 +113,7 @@ export default function PricingProfilesPage() {
     if (!confirm(`Deactivate pricing profile "${t.name}"? Items priced on it fall back to the default profile.`)) return;
     deleteTier.mutate(t.id, {
       onSuccess: () => toast.success('Pricing profile deactivated'),
-      onError: () => toast.error('Failed to deactivate profile'),
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to deactivate profile')),
     });
   }
 

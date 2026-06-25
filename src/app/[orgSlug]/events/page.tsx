@@ -26,6 +26,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 // ── Recurrence helpers ────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ export default function EventsPage() {
         { sku: modalEvent.sku, data },
         {
           onSuccess: () => { toast.success('Event updated'); setModalEvent(undefined); },
-          onError: () => toast.error('Failed to update event'),
+          onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update event')),
         },
       );
     } else {
@@ -116,7 +117,7 @@ export default function EventsPage() {
         { ...data, type: 'SERVICE', tags: [...(data.tags ?? []), 'event'] },
         {
           onSuccess: () => { toast.success('Event created'); setModalEvent(undefined); },
-          onError: () => toast.error('Failed to create event'),
+          onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create event')),
         },
       );
     }

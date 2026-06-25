@@ -8,6 +8,7 @@ import { Camera, CheckCircle2, Keyboard, Loader2, QrCode, Search, Ticket as Tick
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const STATUS_STYLES: Record<string, string> = {
   issued: 'bg-green-500/10 text-green-700 dark:text-green-400',
@@ -45,9 +46,9 @@ export default function TicketCheckInPage() {
     try {
       const t = await ticketsApi.getByCode(orgSlug, c);
       setTicket(t);
-    } catch {
+    } catch (e) {
       setTicket(null);
-      toast.error('Ticket not found');
+      toast.error(await apiErrorMessage(e, 'Ticket not found'));
     } finally {
       setLooking(false);
     }

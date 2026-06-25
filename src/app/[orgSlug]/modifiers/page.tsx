@@ -9,6 +9,7 @@ import { AlertTriangle, ChevronDown, ChevronRight, Layers, Plus, Search, Trash2 
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -86,13 +87,13 @@ export default function ModifiersPage() {
                 { id: editing.id, data: payload },
                 {
                     onSuccess: () => { toast.success('Modifier group updated'); closeDialog(); },
-                    onError: () => { toast.error('Failed to update modifier group'); },
+                    onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to update modifier group')); },
                 },
             );
         } else {
             createMutation.mutate(payload, {
                 onSuccess: () => { toast.success('Modifier group created'); closeDialog(); },
-                onError: () => { toast.error('Failed to create modifier group'); },
+                onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to create modifier group')); },
             });
         }
     }
@@ -105,7 +106,7 @@ export default function ModifiersPage() {
         if (!pendingDelete) return;
         deleteMutation.mutate(pendingDelete.id, {
             onSuccess: () => { toast.success('Modifier group deleted'); setPendingDelete(null); },
-            onError: () => { toast.error('Failed to delete modifier group'); setPendingDelete(null); },
+            onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to delete modifier group')); setPendingDelete(null); },
         });
     }
 

@@ -5,6 +5,7 @@ import { useEventAvailability, useIssueTicket } from '@/hooks/use-tickets';
 import { Loader2, Ticket, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 interface SellTicketModalProps {
   orgSlug: string;
@@ -59,8 +60,8 @@ export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTi
       });
       toast.success(`Issued ${quantity} ticket${quantity !== 1 ? 's' : ''}`);
       onClose();
-    } catch {
-      toast.error('Failed to issue ticket (sold out or capacity exceeded?)');
+    } catch (e) {
+      toast.error(await apiErrorMessage(e, 'Failed to issue ticket (sold out or capacity exceeded?)'));
     }
   }
 

@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { useCreateWarehouse } from '@/hooks/useWarehouses';
 import type { Warehouse } from '@/lib/api/warehouses';
 import { X } from 'lucide-react';
@@ -30,7 +31,7 @@ export function WarehouseQuickCreateDialog({ orgSlug, initialName = '', onClose,
       { name: name.trim(), code: derivedCode, address: address.trim() || undefined },
       {
         onSuccess: (wh) => { toast.success('Warehouse created'); onCreated(wh); },
-        onError: () => toast.error('Failed to create warehouse'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create warehouse')),
       },
     );
   }

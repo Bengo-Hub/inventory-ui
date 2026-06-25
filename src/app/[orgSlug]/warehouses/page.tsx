@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 export default function WarehousesPage() {
     const params = useParams();
@@ -69,12 +70,12 @@ export default function WarehousesPage() {
         if (editing) {
             updateWarehouse.mutate({ id: editing.id, data: payload }, {
                 onSuccess: () => { toast.success('Warehouse updated'); closeDialog(); },
-                onError: () => toast.error('Failed to update warehouse'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update warehouse')),
             });
         } else {
             createWarehouse.mutate(payload, {
                 onSuccess: () => { toast.success('Warehouse created'); closeDialog(); },
-                onError: () => toast.error('Failed to create warehouse'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create warehouse')),
             });
         }
     }
@@ -83,7 +84,7 @@ export default function WarehousesPage() {
         if (!confirm(`Delete warehouse "${wh.name}"? This cannot be undone.`)) return;
         deleteWarehouse.mutate(wh.id, {
             onSuccess: () => toast.success('Warehouse deleted'),
-            onError: () => toast.error('Failed to delete warehouse'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete warehouse')),
         });
     }
 

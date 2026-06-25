@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const STATUS_VARIANT: Record<BatchStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     planned: 'outline', in_progress: 'warning', completed: 'success', cancelled: 'error', failed: 'error',
@@ -49,7 +50,7 @@ export default function BatchDetailPage() {
     function doStart(force: boolean) {
         start.mutate({ id: batchId, force }, {
             onSuccess: () => toast.success('Batch started — materials consumed'),
-            onError: () => toast.error(force ? 'Failed to start' : 'Insufficient materials — use Force Start to override'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, force ? 'Failed to start' : 'Insufficient materials — use Force Start to override')),
         });
     }
     function doComplete() {
@@ -57,7 +58,7 @@ export default function BatchDetailPage() {
         if (!Number.isFinite(qty) || qty <= 0) { toast.error('Enter a valid actual quantity'); return; }
         complete.mutate({ id: batchId, actualQuantity: qty, scrapQuantity: Number(scrapQty) || 0 }, {
             onSuccess: () => toast.success('Batch completed — finished goods received'),
-            onError: () => toast.error('Failed to complete (a passing QC may be required)'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to complete (a passing QC may be required)')),
         });
     }
 
@@ -77,7 +78,7 @@ export default function BatchDetailPage() {
                         {batch.status === 'planned' && <Button size="sm" disabled={start.isPending} onClick={() => doStart(false)}>Start</Button>}
                         {hasShortage && <Button size="sm" variant="outline" disabled={start.isPending} onClick={() => doStart(true)}>Force Start</Button>}
                         {(batch.status === 'planned' || batch.status === 'in_progress') && (
-                            <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('Reason for cancellation:'); if (reason) cancel.mutate({ id: batchId, reason }, { onSuccess: () => toast.success('Batch cancelled'), onError: () => toast.error('Failed') }); }}>Cancel</Button>
+                            <Button size="sm" variant="outline" onClick={() => { const reason = window.prompt('Reason for cancellation:'); if (reason) cancel.mutate({ id: batchId, reason }, { onSuccess: () => toast.success('Batch cancelled'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }); }}>Cancel</Button>
                         )}
                     </div>
                 )}
@@ -160,7 +161,7 @@ export default function BatchDetailPage() {
                                         <option value="pending">Pending</option>
                                     </select>
                                     <Input className="flex-1 min-w-40" placeholder="Notes (optional)" value={qcNotes} onChange={(e) => setQcNotes(e.target.value)} />
-                                    <Button size="sm" disabled={addQC.isPending} onClick={() => addQC.mutate({ result: qcResult, notes: qcNotes.trim() || undefined }, { onSuccess: () => { toast.success('QC recorded'); setQcNotes(''); }, onError: () => toast.error('Failed to record QC') })}>Add QC</Button>
+                                    <Button size="sm" disabled={addQC.isPending} onClick={() => addQC.mutate({ result: qcResult, notes: qcNotes.trim() || undefined }, { onSuccess: () => { toast.success('QC recorded'); setQcNotes(''); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record QC')) })}>Add QC</Button>
                                 </div>
                             )}
                             <div className="overflow-x-auto">

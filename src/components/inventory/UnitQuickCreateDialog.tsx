@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { useCreateUnit } from '@/hooks/useUnits';
 import type { Unit } from '@/lib/api/units';
 import { X } from 'lucide-react';
@@ -27,7 +28,7 @@ export function UnitQuickCreateDialog({ orgSlug, initialName = '', onClose, onCr
       { name: name.trim(), abbreviation: (abbreviation.trim() || name.trim().slice(0, 4)).toLowerCase() },
       {
         onSuccess: (u) => { toast.success('Unit created'); onCreated(u); },
-        onError: () => toast.error('Failed to create unit'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create unit')),
       },
     );
   }

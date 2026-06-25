@@ -14,6 +14,7 @@ import { AlertTriangle, BookOpen, Minus, Plus, Search, SlidersHorizontal, Split 
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 25;
@@ -110,7 +111,7 @@ function StockDrawer({
                 setAdjNotes('');
                 setShowAdjForm(false);
             },
-            onError: () => toast.error('Failed to record adjustment'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record adjustment')),
         });
     }
 
@@ -144,7 +145,7 @@ function StockDrawer({
                 setBdNotes('');
                 setShowBreakdownForm(false);
             },
-            onError: () => toast.error('Failed to break down stock'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to break down stock')),
         });
     }
 

@@ -5,6 +5,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { type CreateRequisitionInput, type Priority, type RequestType, type RequisitionLine } from '@/lib/api/requisitions';
@@ -317,7 +318,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                             setExt(addSupplierForLine, { supplierId: s.id });
                             setAddSupplierForLine(null);
                         },
-                        onError: () => toast.error('Failed to create supplier'),
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
                     })}
                 />
             )}

@@ -12,6 +12,7 @@ import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, Search, Trash2, X } f
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
@@ -197,7 +198,7 @@ export default function LotsPage() {
         if (!pendingDelete) return;
         deleteLot.mutate(pendingDelete.id, {
             onSuccess: () => { toast.success('Lot deleted'); setPendingDelete(null); },
-            onError: () => { toast.error('Failed to delete lot'); setPendingDelete(null); },
+            onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to delete lot')); setPendingDelete(null); },
         });
     }
 
@@ -221,7 +222,7 @@ export default function LotsPage() {
                 },
             }, {
                 onSuccess: () => { toast.success('Lot updated'); closeDialog(); },
-                onError: () => toast.error('Failed to update lot'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update lot')),
             });
         } else {
             if (!formItemId) { toast.error('Select an item'); return; }
@@ -238,7 +239,7 @@ export default function LotsPage() {
             };
             createLot.mutate(data, {
                 onSuccess: () => { toast.success('Lot created'); closeDialog(); },
-                onError: () => toast.error('Failed to create lot'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create lot')),
             });
         }
     }

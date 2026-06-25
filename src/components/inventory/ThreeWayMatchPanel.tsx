@@ -2,6 +2,7 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { goodsReceiptsApi, type MatchResult } from '@/lib/api/goods-receipts';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -26,8 +27,8 @@ export function ThreeWayMatchPanel({ org, poId }: Props) {
         try {
             const res = await goodsReceiptsApi.match(org, poId, invQty ? Number(invQty) : undefined, invTotal ? Number(invTotal) : undefined);
             setResult(res);
-        } catch {
-            toast.error('Failed to run 3-way match');
+        } catch (e) {
+            toast.error(await apiErrorMessage(e, 'Failed to run 3-way match'));
         } finally {
             setLoading(false);
         }

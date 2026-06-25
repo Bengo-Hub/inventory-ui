@@ -7,6 +7,7 @@ import { ArrowLeft, ClipboardList, DollarSign, RefreshCw, ShoppingCart, Users } 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const PO_STATUS_LABEL: Record<string, string> = {
     draft: 'Draft', sent: 'Sent', partially_received: 'Partial', received: 'Received', cancelled: 'Cancelled',
@@ -84,7 +85,7 @@ export default function ProcurementAnalyticsPage() {
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">Supplier Performance</h2>
                         <Button variant="outline" size="sm" disabled={recompute.isPending}
-                            onClick={() => recompute.mutate(undefined, { onSuccess: (res) => toast.success(`Recomputed ${res?.computed ?? 0} suppliers`), onError: () => toast.error('Failed to recompute') })}>
+                            onClick={() => recompute.mutate(undefined, { onSuccess: (res) => toast.success(`Recomputed ${res?.computed ?? 0} suppliers`), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to recompute')) })}>
                             <RefreshCw className="h-4 w-4 mr-2" /> Recompute
                         </Button>
                     </div>

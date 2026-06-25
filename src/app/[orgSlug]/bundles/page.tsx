@@ -25,6 +25,7 @@ import { AlertTriangle, Minus, Package, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -378,14 +379,14 @@ export default function BundlesPage() {
     function handleCreate(data: CreateBundleInput) {
         createBundle.mutate(data, {
             onSuccess: () => { toast.success('Bundle created'); closeModal(); },
-            onError: () => toast.error('Failed to create bundle'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create bundle')),
         });
     }
 
     function handleUpdate(id: string, data: Partial<CreateBundleInput>) {
         updateBundle.mutate({ id, data }, {
             onSuccess: () => { toast.success('Bundle updated'); closeModal(); },
-            onError: () => toast.error('Failed to update bundle'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update bundle')),
         });
     }
 
@@ -393,7 +394,7 @@ export default function BundlesPage() {
         if (!deleteTarget) return;
         deleteBundle.mutate(deleteTarget.id, {
             onSuccess: () => { toast.success('Bundle deleted'); setDeleteTarget(null); },
-            onError: () => toast.error('Failed to delete bundle'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete bundle')),
         });
     }
 

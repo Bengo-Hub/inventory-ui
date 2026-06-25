@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 interface ItemDetail {
     id: string;
@@ -112,7 +113,7 @@ export default function ItemDetailPage() {
             { itemId: id, entries },
             {
                 onSuccess: () => { toast.success('Pricing updated'); setPricingEditOpen(false); },
-                onError: () => toast.error('Failed to update pricing'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update pricing')),
             },
         );
     }
@@ -136,7 +137,7 @@ export default function ItemDetailPage() {
             toast.success('Reorder configuration saved');
             setReorderEditMode(false);
         },
-        onError: () => toast.error('Failed to save reorder configuration'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save reorder configuration')),
     });
 
     if (isLoading) {
@@ -197,7 +198,7 @@ export default function ItemDetailPage() {
                                     toast.success('Item deleted');
                                     router.push(`/${orgSlug}/catalog`);
                                 },
-                                onError: () => toast.error('Failed to delete item'),
+                                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete item')),
                             });
                         }}
                     >
@@ -550,7 +551,7 @@ export default function ItemDetailPage() {
                             toast.success('Item updated');
                             setEditOpen(false);
                         },
-                        onError: () => toast.error('Failed to update item'),
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update item')),
                     });
                 }}
             />

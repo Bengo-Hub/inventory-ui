@@ -8,6 +8,7 @@ import { AlertTriangle, FolderTree, Pencil, Plus, Search, Trash2, X } from 'luci
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -64,8 +65,8 @@ export default function CategoriesPage() {
             queryClient.invalidateQueries({ queryKey: ['categories'] });
             closeDialog();
         },
-        onError: () => {
-            toast.error(editing ? 'Failed to update category' : 'Failed to create category');
+        onError: async (e) => {
+            toast.error(await apiErrorMessage(e, editing ? 'Failed to update category' : 'Failed to create category'));
         },
     });
 
@@ -75,7 +76,7 @@ export default function CategoriesPage() {
             toast.success('Category deleted');
             queryClient.invalidateQueries({ queryKey: ['categories'] });
         },
-        onError: () => toast.error('Failed to delete category'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete category')),
     });
 
     function handleDelete(cat: Category) {
