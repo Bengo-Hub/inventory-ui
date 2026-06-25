@@ -17,9 +17,13 @@ export type UpdateDocumentSequenceInput = Pick<
 >;
 
 export const DOC_TYPE_LABELS: Record<string, string> = {
-  purchase_order: 'Purchase Order',
+  purchase_order: 'Purchase Order (LPO)',
   grn: 'Goods Receipt (GRN)',
+  rfq: 'Request for Quotation (RFQ)',
+  requisition: 'Purchase Requisition',
   purchase_return: 'Purchase Return',
+  stock_transfer: 'Stock Transfer',
+  stock_adjustment: 'Stock Adjustment',
   event_ticket: 'Event Ticket',
 };
 
