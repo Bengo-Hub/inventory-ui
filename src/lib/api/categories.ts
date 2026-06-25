@@ -19,8 +19,12 @@ export interface CategoryPayload {
 }
 
 export const categoriesApi = {
-  list: async (orgSlug: string): Promise<Category[]> => {
-    const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`);
+  // Pass { hasItems: true } to return only categories that have at least one item
+  // linked to them — used by selection surfaces (e.g. label printing) so picking a
+  // category can never produce an empty selection.
+  list: async (orgSlug: string, opts?: { hasItems?: boolean }): Promise<Category[]> => {
+    const params = opts?.hasItems ? { has_items: true } : undefined;
+    const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`, params);
     return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
   },
 

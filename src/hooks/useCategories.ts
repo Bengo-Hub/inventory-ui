@@ -5,10 +5,11 @@ import { categoriesApi } from '@/lib/api/categories';
 
 const CATEGORIES_KEY = 'categories';
 
-export function useCategories(orgSlug: string) {
+export function useCategories(orgSlug: string, opts?: { hasItems?: boolean }) {
+  const hasItems = opts?.hasItems ?? false;
   return useQuery({
-    queryKey: [CATEGORIES_KEY, orgSlug],
-    queryFn: () => categoriesApi.list(orgSlug),
+    queryKey: [CATEGORIES_KEY, orgSlug, hasItems ? 'with-items' : 'all'],
+    queryFn: () => categoriesApi.list(orgSlug, { hasItems }),
     enabled: !!orgSlug,
     placeholderData: [],
     staleTime: 120_000,

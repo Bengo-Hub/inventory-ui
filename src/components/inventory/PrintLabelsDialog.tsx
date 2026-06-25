@@ -9,6 +9,7 @@ import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { Download, Printer, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 type SelectionMode = 'category' | 'supplier' | 'purchase_order' | 'item_ids';
 
@@ -48,7 +49,9 @@ export function PrintLabelsDialog({
   const [includePrice, setIncludePrice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
-  const { data: categories } = useCategories(orgSlug);
+  // Only offer categories that actually have items linked — picking an empty
+  // category would otherwise fail server-side with EMPTY_SELECTION.
+  const { data: categories } = useCategories(orgSlug, { hasItems: true });
   const suppliersQuery = useSuppliers(orgSlug, { limit: 200 });
   const suppliers = suppliersQuery.data?.data ?? [];
   const { data: purchaseOrders } = usePurchaseOrders(orgSlug);
@@ -88,15 +91,17 @@ export function PrintLabelsDialog({
     }
     setSubmitting(true);
     try {
+      // Fetch the blob up-front so any backend error (EMPTY_SELECTION / NO_LABELS …)
+      // is caught here and shown verbatim, rather than being swallowed by the preview.
+      const blob = await barcodeApi.printLabels(orgSlug, req);
       if (format === 'avery_a4') {
-        // Preview the Avery PDF inline (reuses shared PdfPreview).
-        await openPreview(() => barcodeApi.printLabels(orgSlug, req), {
+        // Preview the already-generated Avery PDF inline (reuses shared PdfPreview).
+        await openPreview(() => Promise.resolve(blob), {
           fileName: `labels-${Date.now()}.pdf`,
           title: 'Labels',
         });
       } else {
         // Thermal/Dymo → download the printer text.
-        const blob = await barcodeApi.printLabels(orgSlug, req);
         const ext = format === 'thermal_zpl' ? 'zpl' : 'txt';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -108,8 +113,8 @@ export function PrintLabelsDialog({
         URL.revokeObjectURL(url);
         toast.success('Labels generated');
       }
-    } catch {
-      toast.error('Failed to generate labels');
+    } catch (err) {
+      toast.error(await apiErrorMessage(err, 'Failed to generate labels'));
     } finally {
       setSubmitting(false);
     }

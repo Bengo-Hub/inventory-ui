@@ -97,6 +97,15 @@ class ApiClient {
         if (error.response?.status === 402 && this.onLimitReachedCallback) {
             this.onLimitReachedCallback(error.response?.data);
         }
+        // Normalize the real backend message onto the error so call sites can show it
+        // (instead of a generic "Failed to …"). Handles Blob bodies from responseType:'blob'.
+        try {
+            const { apiErrorMessage } = await import('./error-message');
+            const msg = await apiErrorMessage(error, '');
+            if (msg) (error as { normalizedMessage?: string }).normalizedMessage = msg;
+        } catch {
+            /* never let normalization mask the original error */
+        }
         return Promise.reject(error);
     };
 
