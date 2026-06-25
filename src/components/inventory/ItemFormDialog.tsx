@@ -8,13 +8,14 @@ import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
+import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, ChevronUp, Image as ImageIcon, Loader2, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Category {
@@ -117,10 +118,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [durationMinutes, setDurationMinutes] = useState(item?.duration_minutes != null ? String(item.duration_minutes) : '');
   const [isActive, setIsActive] = useState(item?.is_active !== false);
 
-  // Image
+  // Image — primary image URL (mirrored to image_url). The multi-image gallery is managed
+  // by ItemImagesManager; this holds the create-mode single-image fallback / primary URL.
   const [imageUrl, setImageUrl] = useState(item?.image_url ?? '');
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Event fields
   const [eventStartAt, setEventStartAt] = useState(toLocalDatetimeValue(item?.event_start_at ?? defaultDate));
@@ -258,23 +258,6 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     const evt = categories?.find(isEventCategory);
     if (evt) setCategoryId(evt.id);
   }, [isEventMode, item, categories, categoryId]);
-
-  async function handleImageFile(file: File) {
-    if (!file.type.startsWith('image/')) return;
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Image must be under 2 MB');
-      return;
-    }
-    setUploadingImage(true);
-    try {
-      const form = new FormData();
-      form.append('file', file);
-      const res = await apiClient.post<{ url: string }>('/api/v1/media/upload', form);
-      setImageUrl(res.url);
-    } finally {
-      setUploadingImage(false);
-    }
-  }
 
   function addTier() {
     setTiers((prev) => [...prev, { name: '', price: 0, capacity: 0 }]);
@@ -498,36 +481,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 />
               </div>
 
-              {/* Image */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Item Image</label>
-                <div className="flex items-center gap-3">
-                  {imageUrl ? (
-                    <div className="relative h-16 w-16 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={imageUrl} alt="Item" className="h-16 w-16 rounded-lg object-cover border border-input" />
-                      <button
-                        type="button"
-                        onClick={() => setImageUrl('')}
-                        className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="h-16 w-16 shrink-0 rounded-lg border border-dashed border-input flex items-center justify-center">
-                      <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                    </div>
-                  )}
-                  <div className="flex-1">
-                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleImageFile(e.target.files[0]); }} />
-                    <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}>
-                      {uploadingImage ? <><Loader2 className="h-4 w-4 animate-spin mr-2" />Uploading…</> : 'Upload Image'}
-                    </Button>
-                    <p className="text-xs text-muted-foreground mt-1">JPEG or PNG · max 2 MB</p>
-                  </div>
-                </div>
-              </div>
+              {/* Images — multi-image gallery (edit mode) with single-image fallback (create mode).
+                  The primary image is mirrored to image_url for backward compatibility. */}
+              <ItemImagesManager
+                orgSlug={orgSlug}
+                itemId={item?.id}
+                primaryUrl={imageUrl}
+                onPrimaryChange={setImageUrl}
+              />
 
               {/* Cost Price */}
               {['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type) && (

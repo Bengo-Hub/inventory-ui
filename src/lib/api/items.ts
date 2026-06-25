@@ -22,6 +22,9 @@ export interface Item {
   unit_id?: string;
   is_active: boolean;
   image_url?: string;
+  // Multi-image gallery (ItemAsset). image_url above stays the PRIMARY image for
+  // backward compatibility; images[] is the full ordered set (primary first).
+  images?: ItemImage[];
   barcode?: string;
   barcode_type?: string;
   requires_age_verification: boolean;
@@ -151,6 +154,23 @@ export interface CreateItemInput {
 
 export type UpdateItemInput = Partial<CreateItemInput>;
 
+// ── Multi-image (ItemAsset) ────────────────────────────────────────────────────
+
+export interface ItemImage {
+  id: string;
+  url: string;
+  file_name?: string;
+  mime_type?: string;
+  display_order: number;
+  is_primary: boolean;
+  created_at: string;
+}
+
+export interface UpdateItemImageInput {
+  display_order?: number;
+  is_primary?: boolean;
+}
+
 function itemsBase(orgSlug: string) {
   return `/api/v1/${orgSlug}/inventory/items`;
 }
@@ -211,6 +231,25 @@ export const itemsApi = {
 
   createMenuItemComposite: (orgSlug: string, payload: MenuItemCompositeRequest) =>
     apiClient.post<MenuItemCompositeResult>(`/api/v1/${orgSlug}/inventory/items/menu-item`, payload),
+
+  // ── Item images (multi-image gallery) ──────────────────────────────────────
+  listImages: async (orgSlug: string, itemId: string): Promise<ItemImage[]> => {
+    const res = await apiClient.get<{ images: ItemImage[] } | ItemImage[]>(`${itemsBase(orgSlug)}/${itemId}/images`);
+    return Array.isArray(res) ? res : (res.images ?? []);
+  },
+
+  uploadImage: (orgSlug: string, itemId: string, file: File, setPrimary = false): Promise<ItemImage> => {
+    const form = new FormData();
+    form.append('file', file);
+    if (setPrimary) form.append('set_primary', 'true');
+    return apiClient.post<ItemImage>(`${itemsBase(orgSlug)}/${itemId}/images`, form);
+  },
+
+  updateImage: (orgSlug: string, itemId: string, imageId: string, input: UpdateItemImageInput): Promise<ItemImage> =>
+    apiClient.patch<ItemImage>(`${itemsBase(orgSlug)}/${itemId}/images/${imageId}`, input),
+
+  deleteImage: (orgSlug: string, itemId: string, imageId: string): Promise<void> =>
+    apiClient.delete<void>(`${itemsBase(orgSlug)}/${itemId}/images/${imageId}`),
 };
 
 // ── Composite menu item types ─────────────────────────────────────────────────
