@@ -3,9 +3,10 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useCreateGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders, usePurchaseOrder } from '@/hooks/usePurchaseOrders';
+import { useItems } from '@/hooks/useItems';
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -25,14 +26,29 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     // Free-text serials per line (comma / space / newline separated). Optional — only for
     // serial-tracked items, where the backend requires one unique serial per accepted unit.
     const [serials, setSerials] = useState<Record<string, string>>({});
+    // Per-line lot/batch capture: lot number + expiry date. Required-ish for lot-tracked or
+    // perishable items (backend creates an InventoryLot layer for FIFO/FEFO costing on post),
+    // optional otherwise.
+    const [lotNumber, setLotNumber] = useState<Record<string, string>>({});
+    const [expiryDate, setExpiryDate] = useState<Record<string, string>>({});
 
     const { data: orders } = usePurchaseOrders(org);
     const receivablePOs = (orders ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
     const { data: po } = usePurchaseOrder(org, poId);
     const create = useCreateGoodsReceipt(org, poId);
 
+    // Map item_id -> lot-tracking flags so we can surface lot/expiry inputs only where relevant.
+    const { data: itemsPage } = useItems(org, { limit: 500 });
+    const lotInfo = useMemo(() => {
+        const m = new Map<string, { track: boolean }>();
+        for (const it of itemsPage?.data ?? []) {
+            m.set(it.id, { track: !!it.track_lots || !!it.is_perishable });
+        }
+        return m;
+    }, [itemsPage]);
+
     const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
-    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); };
+    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); };
     const parseSerials = (raw: string | undefined) =>
         (raw ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
@@ -48,6 +64,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                 const acc = rec - rej;
                 if (rej > rec || acc < 0) invalid = true;
                 const sn = parseSerials(serials[l.id]);
+                const lot = lotNumber[l.id]?.trim();
+                const exp = expiryDate[l.id];
                 return {
                     purchase_order_line_id: l.id,
                     item_id: l.item_id,
@@ -57,6 +75,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                     rejection_reason: rej > 0 ? (reason[l.id]?.trim() || undefined) : undefined,
                     unit_cost: l.unit_cost,
                     serials: sn.length > 0 ? sn : undefined,
+                    lot_number: lot || undefined,
+                    // <input type="date"> gives YYYY-MM-DD; backend expects RFC3339.
+                    expiry_date: exp ? new Date(exp).toISOString() : undefined,
                 };
             })
             .filter((l) => l.quantity_received > 0);
@@ -106,6 +127,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                             const acc = Math.max(0, rec - rej);
                                             const snCount = parseSerials(serials[l.id]).length;
                                             const snMismatch = snCount > 0 && snCount !== acc;
+                                            const lotTracked = lotInfo.get(l.item_id)?.track ?? false;
                                             return (
                                                 <div key={l.id} className="px-3 py-2 space-y-1.5">
                                                   <div className="grid grid-cols-12 gap-2 items-center">
@@ -132,6 +154,31 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                       <p className="text-destructive">Enter exactly {acc} serial(s) to match accepted units (serial-tracked items), or leave blank.</p>
                                                     )}
                                                   </details>
+
+                                                  {/* Lot/batch capture — shown prominently for lot-tracked/perishable items,
+                                                      collapsed-optional otherwise. Posts a FIFO/FEFO InventoryLot layer on GRN post. */}
+                                                  {lotTracked ? (
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                      <div className="space-y-1">
+                                                        <label className="text-[11px] font-medium text-muted-foreground">Lot / batch no.</label>
+                                                        <Input type="text" placeholder="e.g. LOT-2406" value={lotNumber[l.id] ?? ''} onChange={(e) => setLotNumber((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                      </div>
+                                                      <div className="space-y-1">
+                                                        <label className="text-[11px] font-medium text-muted-foreground">Expiry date</label>
+                                                        <Input type="date" value={expiryDate[l.id] ?? ''} onChange={(e) => setExpiryDate((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                      </div>
+                                                    </div>
+                                                  ) : (
+                                                    <details className="text-xs">
+                                                      <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                                                        Lot / expiry {(lotNumber[l.id] || expiryDate[l.id]) ? '(set)' : '(optional)'}
+                                                      </summary>
+                                                      <div className="mt-1 grid grid-cols-2 gap-2">
+                                                        <Input type="text" placeholder="Lot / batch no." value={lotNumber[l.id] ?? ''} onChange={(e) => setLotNumber((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                        <Input type="date" value={expiryDate[l.id] ?? ''} onChange={(e) => setExpiryDate((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                      </div>
+                                                    </details>
+                                                  )}
                                                 </div>
                                             );
                                         })}

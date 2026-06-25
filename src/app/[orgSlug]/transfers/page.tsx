@@ -13,7 +13,11 @@ import {
 import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { AlertTriangle, ArrowRightLeft, ChevronDown, ChevronUp, Package, Plus, Search, X } from 'lucide-react';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
+import { AlertTriangle, ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -38,113 +42,101 @@ const STATUS_LABEL: Record<string, string> = {
     cancelled: 'Cancelled',
 };
 
-function TransferDetailRow({ orgSlug, transferId, onClose }: { orgSlug: string; transferId: string; onClose: () => void }) {
-    const { data: transfer, isLoading } = useTransfer(orgSlug, transferId);
+// Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
+// full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
+function TransferDetailDrawer({ orgSlug, transferId, onClose }: { orgSlug: string; transferId: string | null; onClose: () => void }) {
+    const { data: transfer, isLoading } = useTransfer(orgSlug, transferId ?? '');
     const shipMutation = useShipTransfer(orgSlug);
     const receiveMutation = useReceiveTransfer(orgSlug);
     const cancelMutation = useCancelTransfer(orgSlug);
 
     function handleShip() {
+        if (!transferId) return;
         shipMutation.mutate(transferId, {
             onSuccess: () => toast.success('Transfer shipped — status updated to In Transit'),
             onError: () => toast.error('Failed to ship transfer'),
         });
     }
-
     function handleReceive() {
+        if (!transferId) return;
         receiveMutation.mutate({ id: transferId }, {
-            onSuccess: () => toast.success('Transfer received — stock levels updated'),
+            onSuccess: () => { toast.success('Transfer received — stock levels updated'); onClose(); },
             onError: () => toast.error('Failed to receive transfer'),
         });
     }
-
     function handleCancel() {
+        if (!transferId) return;
         if (!confirm('Cancel this transfer? This cannot be undone.')) return;
         cancelMutation.mutate(transferId, {
-            onSuccess: () => toast.success('Transfer cancelled'),
+            onSuccess: () => { toast.success('Transfer cancelled'); onClose(); },
             onError: () => toast.error('Failed to cancel transfer'),
         });
     }
 
-    if (isLoading) {
-        return (
-            <tr>
-                <td colSpan={6} className="px-6 py-4 bg-muted/20 text-center text-sm text-muted-foreground">
-                    Loading transfer details...
-                </td>
-            </tr>
-        );
-    }
-
-    if (!transfer) return null;
-
-    const canShip = transfer.status === 'draft';
-    const canReceive = transfer.status === 'in_transit';
-    const canCancel = transfer.status === 'draft' || transfer.status === 'in_transit';
+    const canShip = transfer?.status === 'draft';
+    const canReceive = transfer?.status === 'in_transit';
+    const canCancel = transfer?.status === 'draft' || transfer?.status === 'in_transit';
     const isBusy = shipMutation.isPending || receiveMutation.isPending || cancelMutation.isPending;
 
     return (
-        <tr>
-            <td colSpan={6} className="px-6 py-4 bg-muted/10 border-b border-border">
-                <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                        {canShip && (
-                            <Button size="sm" onClick={handleShip} disabled={isBusy}>
-                                Ship Transfer
-                            </Button>
-                        )}
-                        {canReceive && (
-                            <Button size="sm" onClick={handleReceive} disabled={isBusy}>
-                                Mark Received
-                            </Button>
-                        )}
-                        {canCancel && (
-                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleCancel} disabled={isBusy}>
-                                Cancel Transfer
-                            </Button>
-                        )}
-                        {transfer.notes && (
-                            <span className="text-xs text-muted-foreground ml-2">Note: {transfer.notes}</span>
-                        )}
-                    </div>
-
-                    {(transfer.reference_no || transfer.carrier || (transfer.shipping_charges ?? 0) > 0) && (
-                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-                            {transfer.reference_no && <span>Ref: <span className="text-foreground font-medium">{transfer.reference_no}</span></span>}
-                            {transfer.carrier && <span>Carrier: <span className="text-foreground font-medium">{transfer.carrier}</span></span>}
-                            {(transfer.shipping_charges ?? 0) > 0 && <span>Shipping: <span className="text-foreground font-medium tabular-nums">{transfer.shipping_charges?.toLocaleString()}</span></span>}
-                        </div>
+        <DetailDrawer
+            open={!!transferId}
+            onClose={onClose}
+            loading={!!transferId && isLoading}
+            title={transfer?.transfer_number ?? 'Stock Transfer'}
+            subtitle={transfer ? `${transfer.source_warehouse?.name || '—'} → ${transfer.destination_warehouse?.name || '—'}` : undefined}
+            badges={transfer && <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>{STATUS_LABEL[transfer.status] ?? transfer.status}</Badge>}
+            fields={transfer ? [
+                { label: 'From', value: transfer.source_warehouse?.name || '—' },
+                { label: 'To', value: transfer.destination_warehouse?.name || '—' },
+                { label: 'Reference', value: transfer.reference_no, hideIfEmpty: true },
+                { label: 'Carrier', value: transfer.carrier, hideIfEmpty: true },
+                { label: 'Shipping', value: (transfer.shipping_charges ?? 0) > 0 ? transfer.shipping_charges?.toLocaleString() : '—', hideIfEmpty: true },
+                { label: 'Notes', value: transfer.notes, full: true, hideIfEmpty: true },
+            ] : []}
+            actions={transfer && (
+                <>
+                    {canShip && <Button size="sm" onClick={handleShip} disabled={isBusy}>Ship Transfer</Button>}
+                    {canReceive && <Button size="sm" onClick={handleReceive} disabled={isBusy}>Mark Received</Button>}
+                    {canCancel && (
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleCancel} disabled={isBusy}>Cancel Transfer</Button>
                     )}
-
-                    {(transfer.lines?.length ?? 0) > 0 && (
-                        <table className="w-full text-xs border border-border rounded-lg overflow-hidden">
+                </>
+            )}
+        >
+            {transfer && (transfer.lines?.length ?? 0) > 0 && (
+                <div className="space-y-2">
+                    <h3 className="text-sm font-semibold">Items</h3>
+                    <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-sm">
                             <thead>
-                                <tr className="bg-muted/30">
-                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-4 py-2 font-medium text-muted-foreground">SKU</th>
-                                    <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty Ordered</th>
+                                <tr className="border-b border-border bg-muted/30">
+                                    <th className="text-left px-3 py-2 font-medium text-muted-foreground">Item</th>
+                                    <th className="text-right px-3 py-2 font-medium text-muted-foreground">Qty</th>
                                     {transfer.status === 'received' && (
-                                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Qty Received</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Received</th>
                                     )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
-                                {transfer.lines.map((line) => (
+                                {transfer.lines!.map((line) => (
                                     <tr key={line.id}>
-                                        <td className="px-4 py-2">{line.item_name || '—'}</td>
-                                        <td className="px-4 py-2 font-mono text-muted-foreground">{line.item_sku || '—'}</td>
-                                        <td className="px-4 py-2 text-right tabular-nums">{line.quantity}</td>
+                                        <td className="px-3 py-2">
+                                            <div className="font-medium">{line.item_name || '—'}</div>
+                                            {line.item_sku && <div className="font-mono text-xs text-muted-foreground">{line.item_sku}</div>}
+                                        </td>
+                                        <td className="px-3 py-2 text-right tabular-nums">{line.quantity}</td>
                                         {transfer.status === 'received' && (
-                                            <td className="px-4 py-2 text-right tabular-nums">{line.received_qty ?? line.quantity}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{line.received_qty ?? line.quantity}</td>
                                         )}
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
-                    )}
+                    </div>
                 </div>
-            </td>
-        </tr>
+            )}
+        </DetailDrawer>
     );
 }
 
@@ -154,7 +146,9 @@ export default function TransfersPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
+    const [viewId, setViewId] = useState<string | null>(null);
+    // Inline create-and-link: which warehouse picker (source/destination) requested a quick-create.
+    const [addWarehouseFor, setAddWarehouseFor] = useState<'from' | 'to' | null>(null);
 
     const [fromWarehouse, setFromWarehouse] = useState('');
     const [toWarehouse, setToWarehouse] = useState('');
@@ -196,10 +190,6 @@ export default function TransfersPage() {
 
     function closeDialog() {
         setDialogOpen(false);
-    }
-
-    function toggleExpand(id: string) {
-        setExpandedId((prev) => (prev === id ? null : id));
     }
 
     function addItem() {
@@ -284,12 +274,12 @@ export default function TransfersPage() {
                         <table className="w-full text-sm">
                             <thead>
                                 <tr className="border-b border-border bg-muted/30">
-                                    <th className="w-8 px-3 py-3" />
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Reference</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">From</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">To</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Date</th>
+                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-border">
@@ -315,42 +305,34 @@ export default function TransfersPage() {
                                         </td>
                                     </tr>
                                 ) : (
-                                    paginatedItems.flatMap((transfer: TransferSummary) => {
-                                        const isExpanded = expandedId === transfer.id;
-                                        return [
-                                            <tr
-                                                key={transfer.id}
-                                                className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                                onClick={() => toggleExpand(transfer.id)}
-                                            >
-                                                <td className="px-3 py-4 text-muted-foreground">
-                                                    {isExpanded
-                                                        ? <ChevronUp className="h-4 w-4" />
-                                                        : <ChevronDown className="h-4 w-4" />}
-                                                </td>
-                                                <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
-                                                <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
-                                                <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
-                                                            {STATUS_LABEL[transfer.status] ?? transfer.status}
-                                                        </Badge>
-                                                        <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                                                            <Package className="h-3 w-3" />
-                                                            {transfer.line_count}
-                                                        </div>
+                                    paginatedItems.map((transfer: TransferSummary) => (
+                                        <tr
+                                            key={transfer.id}
+                                            className="hover:bg-accent/30 transition-colors cursor-pointer"
+                                            onClick={() => setViewId(transfer.id)}
+                                        >
+                                            <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
+                                            <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
+                                            <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
+                                                        {STATUS_LABEL[transfer.status] ?? transfer.status}
+                                                    </Badge>
+                                                    <div className="flex items-center gap-1 text-muted-foreground text-xs">
+                                                        <Package className="h-3 w-3" />
+                                                        {transfer.line_count}
                                                     </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                    {new Date(transfer.created_at).toLocaleDateString()}
-                                                </td>
-                                            </tr>,
-                                            ...(isExpanded
-                                                ? [<TransferDetailRow key={`detail-${transfer.id}`} orgSlug={orgSlug} transferId={transfer.id} onClose={() => setExpandedId(null)} />]
-                                                : []),
-                                        ];
-                                    })
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
+                                                {new Date(transfer.created_at).toLocaleDateString()}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <RowActions onView={() => setViewId(transfer.id)} />
+                                            </td>
+                                        </tr>
+                                    ))
                                 )}
                             </tbody>
                         </table>
@@ -379,31 +361,27 @@ export default function TransfersPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">From Warehouse *</label>
-                                            <select
+                                            <CreatableSelect
                                                 value={fromWarehouse}
-                                                onChange={(e) => setFromWarehouse(e.target.value)}
-                                                className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                                onChange={setFromWarehouse}
+                                                options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+                                                placeholder="Select source..."
                                                 required
-                                            >
-                                                <option value="">Select source...</option>
-                                                {warehouses?.map((wh) => (
-                                                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                                ))}
-                                            </select>
+                                                onAddClick={() => setAddWarehouseFor('from')}
+                                                addLabel="Add warehouse"
+                                            />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">To Warehouse *</label>
-                                            <select
+                                            <CreatableSelect
                                                 value={toWarehouse}
-                                                onChange={(e) => setToWarehouse(e.target.value)}
-                                                className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                                onChange={setToWarehouse}
+                                                options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+                                                placeholder="Select destination..."
                                                 required
-                                            >
-                                                <option value="">Select destination...</option>
-                                                {warehouses?.map((wh) => (
-                                                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                                ))}
-                                            </select>
+                                                onAddClick={() => setAddWarehouseFor('to')}
+                                                addLabel="Add warehouse"
+                                            />
                                         </div>
                                     </div>
 
@@ -523,6 +501,20 @@ export default function TransfersPage() {
                     </div>
                 </div>
             )}
+
+            {addWarehouseFor && (
+                <WarehouseQuickCreateDialog
+                    orgSlug={orgSlug}
+                    onClose={() => setAddWarehouseFor(null)}
+                    onCreated={(wh) => {
+                        if (addWarehouseFor === 'from') setFromWarehouse(wh.id);
+                        else setToWarehouse(wh.id);
+                        setAddWarehouseFor(null);
+                    }}
+                />
+            )}
+
+            <TransferDetailDrawer orgSlug={orgSlug} transferId={viewId} onClose={() => setViewId(null)} />
         </div>
     );
 }

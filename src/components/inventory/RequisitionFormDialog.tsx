@@ -2,12 +2,16 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
+import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
+import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { type CreateRequisitionInput, type Priority, type RequestType, type RequisitionLine } from '@/lib/api/requisitions';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 interface Props {
     isPending: boolean;
@@ -57,6 +61,12 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data ?? [];
+    const createSupplier = useCreateSupplier(orgSlug);
+
+    // Inline create-and-link: track which (per-line) supplier picker requested a quick-create,
+    // and whether the branch warehouse picker did.
+    const [addSupplierForLine, setAddSupplierForLine] = useState<number | null>(null);
+    const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
 
     const isInventory = requestType === 'inventory';
     const isExternal = requestType === 'external_item';
@@ -176,10 +186,14 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                             {isInventory && (
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Destination Branch / Warehouse</label>
-                                    <select className={selectClass} value={branchId} onChange={(e) => setBranchId(e.target.value)}>
-                                        <option value="">— Select (optional) —</option>
-                                        {warehouses?.map((wh) => <option key={wh.id} value={wh.id}>{wh.name}</option>)}
-                                    </select>
+                                    <CreatableSelect
+                                        value={branchId}
+                                        onChange={setBranchId}
+                                        options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+                                        placeholder="— Select (optional) —"
+                                        onAddClick={() => setAddWarehouseOpen(true)}
+                                        addLabel="Add warehouse"
+                                    />
                                 </div>
                             )}
 
@@ -233,10 +247,14 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                                 <Input type="number" min="1" placeholder="Qty" value={l.quantity} onChange={(e) => setExt(i, { quantity: e.target.value })} />
                                                 <Input type="number" min="0" step="0.01" placeholder="Est. price" value={l.estimatedPrice} onChange={(e) => setExt(i, { estimatedPrice: e.target.value })} />
                                             </div>
-                                            <select className={selectClass} value={l.supplierId} onChange={(e) => setExt(i, { supplierId: e.target.value })}>
-                                                <option value="">Preferred supplier (optional)</option>
-                                                {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                            </select>
+                                            <CreatableSelect
+                                                value={l.supplierId}
+                                                onChange={(id) => setExt(i, { supplierId: id })}
+                                                options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                                placeholder="Preferred supplier (optional)"
+                                                onAddClick={() => setAddSupplierForLine(i)}
+                                                addLabel="Add supplier"
+                                            />
                                             <div className="flex items-center justify-between">
                                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                                     <input type="checkbox" checked={l.urgent} onChange={(e) => setExt(i, { urgent: e.target.checked })} className="rounded" /> Urgent
@@ -287,6 +305,30 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                     </CardContent>
                 </Card>
             </div>
+
+            {addSupplierForLine !== null && (
+                <SupplierFormDialog
+                    editing={null}
+                    isPending={createSupplier.isPending}
+                    onClose={() => setAddSupplierForLine(null)}
+                    onSubmit={(data) => createSupplier.mutate(data, {
+                        onSuccess: (s) => {
+                            toast.success('Supplier created');
+                            setExt(addSupplierForLine, { supplierId: s.id });
+                            setAddSupplierForLine(null);
+                        },
+                        onError: () => toast.error('Failed to create supplier'),
+                    })}
+                />
+            )}
+
+            {addWarehouseOpen && (
+                <WarehouseQuickCreateDialog
+                    orgSlug={orgSlug}
+                    onClose={() => setAddWarehouseOpen(false)}
+                    onCreated={(wh) => { setBranchId(wh.id); setAddWarehouseOpen(false); }}
+                />
+            )}
         </div>
     );
 }

@@ -2,6 +2,9 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
+import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
 import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useUnits } from '@/hooks/useUnits';
@@ -43,6 +46,9 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const mutation = useCreateAdjustment(orgSlug);
+
+    const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
+    const [addUnitOpen, setAddUnitOpen] = useState(false);
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -137,33 +143,27 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Unit</label>
-                                    <select
+                                    <CreatableSelect
                                         value={unitId}
-                                        onChange={(e) => setUnitId(e.target.value)}
-                                        className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                    >
-                                        <option value="">Base unit</option>
-                                        {units?.map((u) => (
-                                            <option key={u.id} value={u.id}>
-                                                {u.name}{u.abbreviation ? ` (${u.abbreviation})` : ''}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={setUnitId}
+                                        options={(units ?? []).map((u) => ({ id: u.id, name: `${u.name}${u.abbreviation ? ` (${u.abbreviation})` : ''}` }))}
+                                        placeholder="Base unit"
+                                        onAddClick={() => setAddUnitOpen(true)}
+                                        addLabel="Add unit"
+                                    />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Warehouse</label>
-                                <select
+                                <CreatableSelect
                                     value={warehouseId}
-                                    onChange={(e) => setWarehouseId(e.target.value)}
-                                    className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="">All Warehouses</option>
-                                    {warehouses?.map((wh) => (
-                                        <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={setWarehouseId}
+                                    options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+                                    placeholder="All Warehouses"
+                                    onAddClick={() => setAddWarehouseOpen(true)}
+                                    addLabel="Add warehouse"
+                                />
                             </div>
 
                             <div className="space-y-2">
@@ -207,6 +207,21 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                     </CardContent>
                 </Card>
             </div>
+
+            {addWarehouseOpen && (
+                <WarehouseQuickCreateDialog
+                    orgSlug={orgSlug}
+                    onClose={() => setAddWarehouseOpen(false)}
+                    onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
+                />
+            )}
+            {addUnitOpen && (
+                <UnitQuickCreateDialog
+                    orgSlug={orgSlug}
+                    onClose={() => setAddUnitOpen(false)}
+                    onCreated={(u) => { setUnitId(u.id); setAddUnitOpen(false); }}
+                />
+            )}
         </div>
     );
 }

@@ -1,12 +1,14 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
 import { useWarehouses, useCreateWarehouse, useUpdateWarehouse, useDeleteWarehouse } from '@/hooks/useWarehouses';
 import { type Warehouse, type CreateWarehouseInput } from '@/lib/api/warehouses';
 import { useOutletStore } from '@/store/outlet';
 import { AlertTriangle, MapPin, Package, Pencil, Plus, Store, Trash2, Warehouse as WarehouseIcon, X } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 

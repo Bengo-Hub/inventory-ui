@@ -3,7 +3,11 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { useContracts, useCreateContract, useUpdateContract, useActivateContract, useTerminateContract } from '@/hooks/useContracts';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
 import { type Contract, type ContractStatus } from '@/lib/api/contracts';
 import { AlertTriangle, FileSignature, Plus, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -27,6 +31,8 @@ export default function ContractsPage() {
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Contract | null>(null);
+    const [viewing, setViewing] = useState<Contract | null>(null);
+    const [addSupplierOpen, setAddSupplierOpen] = useState(false);
 
     const [supplierId, setSupplierId] = useState('');
     const [title, setTitle] = useState('');
@@ -42,6 +48,7 @@ export default function ContractsPage() {
     const terminate = useTerminateContract(org);
     const { data: suppliersPage } = useSuppliers(org);
     const suppliers = suppliersPage?.data ?? [];
+    const createSupplier = useCreateSupplier(org);
 
     const { canAny } = usePermissions();
     const canAdd = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
@@ -131,22 +138,28 @@ export default function ContractsPage() {
                                     </tr>
                                 )}
                                 {!isError && rows.map((c) => (
-                                    <tr key={c.id} className="border-b border-border hover:bg-muted/20">
+                                    <tr key={c.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(c)}>
                                         <td className="px-6 py-3 font-medium">{c.title}</td>
                                         <td className="px-6 py-3 hidden md:table-cell">{nameOf(c.supplier_id)}</td>
                                         <td className="px-6 py-3 text-right tabular-nums">{c.value?.toLocaleString() ?? '—'}</td>
                                         <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{new Date(c.start_date).toLocaleDateString()} – {new Date(c.end_date).toLocaleDateString()}</td>
                                         <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[c.status]}>{c.status}</Badge></td>
                                         <td className="px-6 py-3">
-                                            <div className="flex gap-2 justify-end">
-                                                {canChange && <Button variant="outline" size="sm" onClick={() => openEdit(c)}>Edit</Button>}
-                                                {canChange && c.status !== 'active' && c.status !== 'terminated' && (
-                                                    <Button variant="outline" size="sm" onClick={() => activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: () => toast.error('Failed') })}>Activate</Button>
-                                                )}
-                                                {canChange && c.status === 'active' && (
-                                                    <Button variant="outline" size="sm" onClick={() => terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: () => toast.error('Failed') })}>Terminate</Button>
-                                                )}
-                                            </div>
+                                            <RowActions
+                                                onView={() => setViewing(c)}
+                                                onEdit={() => openEdit(c)}
+                                                canEdit={canChange}
+                                                extra={
+                                                    <>
+                                                        {canChange && c.status !== 'active' && c.status !== 'terminated' && (
+                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: () => toast.error('Failed') }); }}>Activate</Button>
+                                                        )}
+                                                        {canChange && c.status === 'active' && (
+                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: () => toast.error('Failed') }); }}>Terminate</Button>
+                                                        )}
+                                                    </>
+                                                }
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -172,10 +185,15 @@ export default function ContractsPage() {
                                 <form onSubmit={submit} className="space-y-4">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Supplier *</label>
-                                        <select className={selectClass} value={supplierId} onChange={(e) => setSupplierId(e.target.value)} required>
-                                            <option value="">— Select supplier —</option>
-                                            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                        </select>
+                                        <CreatableSelect
+                                            value={supplierId}
+                                            onChange={setSupplierId}
+                                            options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                            placeholder="— Select supplier —"
+                                            required
+                                            onAddClick={() => setAddSupplierOpen(true)}
+                                            addLabel="Add supplier"
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Title *</label>
@@ -211,6 +229,44 @@ export default function ContractsPage() {
                     </div>
                 </div>
             )}
+
+            {addSupplierOpen && (
+                <SupplierFormDialog
+                    editing={null}
+                    isPending={createSupplier.isPending}
+                    onClose={() => setAddSupplierOpen(false)}
+                    onSubmit={(data) => createSupplier.mutate(data, {
+                        onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setAddSupplierOpen(false); },
+                        onError: () => toast.error('Failed to create supplier'),
+                    })}
+                />
+            )}
+
+            <DetailDrawer
+                open={!!viewing}
+                onClose={() => setViewing(null)}
+                title={viewing?.title ?? 'Contract'}
+                subtitle={viewing ? nameOf(viewing.supplier_id) : undefined}
+                badges={viewing && <Badge variant={STATUS_VARIANT[viewing.status]}>{viewing.status}</Badge>}
+                fields={viewing ? [
+                    { label: 'Supplier', value: nameOf(viewing.supplier_id) },
+                    { label: 'Value', value: viewing.value != null ? viewing.value.toLocaleString() : '—' },
+                    { label: 'Start date', value: viewing.start_date ? new Date(viewing.start_date).toLocaleDateString() : '—' },
+                    { label: 'End date', value: viewing.end_date ? new Date(viewing.end_date).toLocaleDateString() : '—' },
+                    { label: 'Terms', value: viewing.terms, full: true, hideIfEmpty: true },
+                ] : []}
+                actions={viewing && (
+                    <>
+                        {canChange && <Button variant="outline" size="sm" onClick={() => { openEdit(viewing); setViewing(null); }}>Edit</Button>}
+                        {canChange && viewing.status !== 'active' && viewing.status !== 'terminated' && (
+                            <Button variant="outline" size="sm" onClick={() => activate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract activated'); setViewing(null); }, onError: () => toast.error('Failed') })}>Activate</Button>
+                        )}
+                        {canChange && viewing.status === 'active' && (
+                            <Button variant="outline" size="sm" onClick={() => terminate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract terminated'); setViewing(null); }, onError: () => toast.error('Failed') })}>Terminate</Button>
+                        )}
+                    </>
+                )}
+            />
         </div>
     );
 }

@@ -3,13 +3,15 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { AssetFormDialog } from '@/components/inventory/AssetFormDialog';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
 import {
     useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset, useRunDepreciation,
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
 import { AlertTriangle, BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
@@ -30,12 +32,14 @@ function money(v?: number | null) {
 
 export default function AssetsPage() {
     const params = useParams();
+    const router = useRouter();
     const orgSlug = params?.orgSlug as string;
     const [status, setStatus] = useState<AssetStatus | ''>('');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Asset | null>(null);
+    const [viewing, setViewing] = useState<Asset | null>(null);
 
     const { data, isLoading, isError, refetch } = useAssets(orgSlug, {
         status: status || undefined, search: search || undefined, page, limit: ITEMS_PER_PAGE,
@@ -139,21 +143,24 @@ export default function AssetsPage() {
                                     </tr>
                                 )}
                                 {!isError && rows.map((a) => (
-                                    <tr key={a.id} className="border-b border-border hover:bg-muted/20">
+                                    <tr key={a.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(a)}>
                                         <td className="px-6 py-3 font-medium">{a.asset_tag}</td>
                                         <td className="px-6 py-3">{a.name}</td>
                                         <td className="px-6 py-3 text-right hidden md:table-cell">{money(a.purchase_cost)}</td>
                                         <td className="px-6 py-3 text-right hidden lg:table-cell">{money(a.current_value)}</td>
                                         <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge></td>
                                         <td className="px-6 py-3">
-                                            <div className="flex gap-2 justify-end">
-                                                <Link href={`/${orgSlug}/assets/${a.id}`}><Button variant="outline">View</Button></Link>
-                                                {canChange && <Button variant="outline" onClick={() => openEdit(a)}>Edit</Button>}
-                                                {canChange && a.status === 'active' && (
-                                                    <Button variant="outline" onClick={() => act('Depreciation run', runDep.mutateAsync(a.id))}>Depreciate</Button>
+                                            <RowActions
+                                                onView={() => setViewing(a)}
+                                                onEdit={() => openEdit(a)}
+                                                canEdit={canChange}
+                                                onDelete={() => handleDelete(a)}
+                                                canDelete={canDelete}
+                                                deleteLabel="Dispose / retire"
+                                                extra={canChange && a.status === 'active' && (
+                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); act('Depreciation run', runDep.mutateAsync(a.id)); }}>Depreciate</Button>
                                                 )}
-                                                {canDelete && <Button variant="outline" onClick={() => handleDelete(a)}>Dispose</Button>}
-                                            </div>
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -173,6 +180,36 @@ export default function AssetsPage() {
                     onClose={closeDialog}
                 />
             )}
+
+            <DetailDrawer
+                open={!!viewing}
+                onClose={() => setViewing(null)}
+                title={viewing?.name ?? 'Asset'}
+                subtitle={viewing?.asset_tag}
+                badges={viewing && <Badge variant={STATUS_VARIANT[viewing.status]}>{viewing.status}</Badge>}
+                fields={viewing ? [
+                    { label: 'Asset Tag', value: viewing.asset_tag },
+                    { label: 'Serial No.', value: viewing.serial_number, hideIfEmpty: true },
+                    { label: 'Model', value: viewing.model, hideIfEmpty: true },
+                    { label: 'Manufacturer', value: viewing.manufacturer, hideIfEmpty: true },
+                    { label: 'Location', value: viewing.location, hideIfEmpty: true },
+                    { label: 'Purchase cost', value: money(viewing.purchase_cost) },
+                    { label: 'Current value', value: money(viewing.current_value) },
+                    { label: 'Accumulated dep.', value: money(viewing.accumulated_depreciation) },
+                    { label: 'Purchase date', value: viewing.purchase_date ? new Date(viewing.purchase_date).toLocaleDateString() : '—' },
+                    { label: 'Notes', value: viewing.notes, full: true, hideIfEmpty: true },
+                ] : []}
+                actions={viewing && (
+                    <>
+                        <Button size="sm" onClick={() => router.push(`/${orgSlug}/assets/${viewing.id}`)}>Open full asset</Button>
+                        {canChange && <Button variant="outline" size="sm" onClick={() => { openEdit(viewing); setViewing(null); }}>Edit</Button>}
+                        {canChange && viewing.status === 'active' && (
+                            <Button variant="outline" size="sm" onClick={() => act('Depreciation run', runDep.mutateAsync(viewing.id))}>Depreciate</Button>
+                        )}
+                        {canDelete && <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { handleDelete(viewing); }}>Dispose</Button>}
+                    </>
+                )}
+            />
         </div>
     );
 }

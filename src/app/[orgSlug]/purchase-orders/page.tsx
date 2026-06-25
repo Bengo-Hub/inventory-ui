@@ -7,6 +7,8 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
 import {
     usePurchaseOrders,
     usePurchaseOrder,
@@ -20,7 +22,7 @@ import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { AlertTriangle, ArrowLeft, BarChart3, Eye, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -214,216 +216,18 @@ export default function PurchaseOrdersPage() {
         });
     }
 
-    if (selectedPO && poDetail) {
-        const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
-        const canSend = canChangePO && poDetail.status === 'draft';
-        const canReceive = canChangePO && (poDetail.status === 'sent' || poDetail.status === 'partially_received' || poDetail.status === 'draft');
-        const canCancel = canCancelPO && (poDetail.status === 'draft' || poDetail.status === 'sent');
-        // Amend is allowed only before goods start arriving (draft or sent) — it replaces all lines.
-        const canAmend = canChangePO && (poDetail.status === 'draft' || poDetail.status === 'sent');
-        // Approval-matrix awareness: offer "Submit for Approval" on drafts that have not
-        // already entered (or cleared) an approval workflow.
-        const approvalStatus = poApproval?.status;
-        const showSubmit = canChangePO && poDetail.status === 'draft' && approvalStatus !== 'pending' && approvalStatus !== 'approved';
-
-        return (
-            <div className="p-6 space-y-6">
-                <div className="flex flex-wrap items-center gap-4">
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedPO(null)}>
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{poDetail.po_number}</h1>
-                        <p className="text-muted-foreground text-sm">{poDetail.supplier_name}</p>
-                    </div>
-                    <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'} className="ml-2">
-                        {STATUS_LABEL[poDetail.status] ?? poDetail.status}
-                    </Badge>
-                    {approvalStatus && (
-                        <Badge
-                            variant={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'error' : 'warning'}
-                            className="ml-1"
-                        >
-                            <ShieldCheck className="h-3 w-3 mr-1" />
-                            {approvalStatus === 'pending'
-                                ? `Awaiting approval${poApproval?.current_step ? ` · ${poApproval.current_step.name}` : ''}`
-                                : `Approval ${approvalStatus}`}
-                        </Badge>
-                    )}
-                    <div className="ml-auto flex flex-wrap gap-2">
-                        <Button size="sm" variant="outline" onClick={() => previewPO(poDetail)}>
-                            <Printer className="h-4 w-4 mr-2" />
-                            Print / Export
-                        </Button>
-                        {showSubmit && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={submitForApproval.isPending}
-                                onClick={() => submitForApproval.mutate(poDetail.id, {
-                                    onSuccess: (res) => toast.success(
-                                        res.approval_required
-                                            ? 'Submitted for approval'
-                                            : 'No approval rule matches — you can send this order directly',
-                                    ),
-                                    onError: () => toast.error('Failed to submit for approval'),
-                                })}
-                            >
-                                <ShieldCheck className="h-4 w-4 mr-2" />
-                                Submit for Approval
-                            </Button>
-                        )}
-                        {canAmend && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={isPOBusy}
-                                onClick={() => startAmend(poDetail)}
-                            >
-                                Amend
-                            </Button>
-                        )}
-                        {canSend && (
-                            <Button
-                                size="sm"
-                                disabled={isPOBusy}
-                                onClick={() => sendPO.mutate(poDetail.id, {
-                                    onSuccess: () => toast.success('PO sent to supplier'),
-                                    onError: (e: unknown) => {
-                                        const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-                                        toast.error(msg || 'Failed to send PO');
-                                    },
-                                })}
-                            >
-                                Send to Supplier
-                            </Button>
-                        )}
-                        {canReceive && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={isPOBusy}
-                                onClick={() => receivePO.mutate({ id: poDetail.id }, {
-                                    onSuccess: () => toast.success('PO received — stock updated'),
-                                    onError: () => toast.error('Failed to receive PO'),
-                                })}
-                            >
-                                Mark Received
-                            </Button>
-                        )}
-                        {canCancel && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-destructive border-destructive/30 hover:bg-destructive/10"
-                                disabled={isPOBusy}
-                                onClick={() => {
-                                    if (!confirm('Cancel this purchase order?')) return;
-                                    cancelPO.mutate(poDetail.id, {
-                                        onSuccess: () => { toast.success('PO cancelled'); setSelectedPO(null); },
-                                        onError: () => toast.error('Failed to cancel PO'),
-                                    });
-                                }}
-                            >
-                                Cancel Order
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    <Card className="lg:col-span-2">
-                        <CardHeader>
-                            <h2 className="text-lg font-semibold">Line Items</h2>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/30">
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">SKU</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Received</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Outstanding</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Cost</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Total</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {(poDetail.line_items?.length ?? 0) === 0 ? (
-                                            <tr>
-                                                <td colSpan={7} className="px-6 py-8 text-center text-muted-foreground">
-                                                    No line items
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            poDetail.line_items?.map((line) => {
-                                                const recv = line.received_qty ?? 0;
-                                                const outstanding = Math.max(0, line.quantity - recv);
-                                                return (
-                                                <tr key={line.id} className="hover:bg-accent/30 transition-colors">
-                                                    <td className="px-6 py-3 font-medium">{line.item_name ?? '—'}</td>
-                                                    <td className="px-6 py-3 font-mono text-xs text-muted-foreground">{line.item_sku ?? '—'}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{line.quantity}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{recv}</td>
-                                                    <td className={`px-6 py-3 text-right tabular-nums ${outstanding > 0 ? 'text-amber-600 font-medium' : 'text-muted-foreground'}`}>{outstanding}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
-                                                </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                    {(poDetail.line_items?.length ?? 0) > 0 && (
-                                        <tfoot>
-                                            <tr className="border-t-2 border-border bg-muted/30">
-                                                <td colSpan={6} className="px-6 py-3 text-right font-semibold">Grand Total</td>
-                                                <td className="px-6 py-3 text-right font-bold tabular-nums">{poDetail.total_amount.toLocaleString()}</td>
-                                            </tr>
-                                        </tfoot>
-                                    )}
-                                </table>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <h2 className="text-lg font-semibold">Order Info</h2>
-                        </CardHeader>
-                        <CardContent>
-                            <dl className="space-y-4 text-sm">
-                                <div>
-                                    <dt className="text-muted-foreground">PO Number</dt>
-                                    <dd className="font-medium mt-1 font-mono">{poDetail.po_number}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">Supplier</dt>
-                                    <dd className="font-medium mt-1">{poDetail.supplier_name}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">Warehouse</dt>
-                                    <dd className="font-medium mt-1">{poDetail.warehouse_name ?? '—'}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">Date</dt>
-                                    <dd className="font-medium mt-1">{new Date(poDetail.created_at).toLocaleDateString()}</dd>
-                                </div>
-                                <div>
-                                    <dt className="text-muted-foreground">Total</dt>
-                                    <dd className="font-bold text-lg mt-1">{poDetail.total_amount.toLocaleString()}</dd>
-                                </div>
-                            </dl>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                <ThreeWayMatchPanel org={orgSlug} poId={poDetail.id} />
-            </div>
-        );
-    }
+    // Drawer action gating — derived when a PO is selected.
+    const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
+    const dStatus = poDetail?.status;
+    const canSend = canChangePO && dStatus === 'draft';
+    const canReceive = canChangePO && (dStatus === 'sent' || dStatus === 'partially_received' || dStatus === 'draft');
+    const canCancel = canCancelPO && (dStatus === 'draft' || dStatus === 'sent');
+    // Amend is allowed only before goods start arriving (draft or sent) — it replaces all lines.
+    const canAmend = canChangePO && (dStatus === 'draft' || dStatus === 'sent');
+    // Approval-matrix awareness: offer "Submit for Approval" on drafts that have not
+    // already entered (or cleared) an approval workflow.
+    const approvalStatus = poApproval?.status;
+    const showSubmit = canChangePO && dStatus === 'draft' && approvalStatus !== 'pending' && approvalStatus !== 'approved';
 
     return (
         <>
@@ -527,14 +331,10 @@ export default function PurchaseOrdersPage() {
                                                 {new Date(po.created_at).toLocaleDateString()}
                                             </td>
                                             <td className="px-6 py-4">
-                                                <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                                                    <Button variant="ghost" size="sm" aria-label="View" title="View details" onClick={() => setSelectedPO(po.id)}>
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" aria-label="Print / Export" title="Print / Export PDF" onClick={() => previewPO(po)}>
-                                                        <Printer className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
+                                                <RowActions
+                                                    onView={() => setSelectedPO(po.id)}
+                                                    onPrint={() => previewPO(po)}
+                                                />
                                             </td>
                                         </tr>
                                     ))
@@ -740,6 +540,136 @@ export default function PurchaseOrdersPage() {
                 onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
             />
         )}
+
+        <DetailDrawer
+            open={!!selectedPO}
+            onClose={() => setSelectedPO(null)}
+            loading={!!selectedPO && !poDetail}
+            title={poDetail?.po_number ?? 'Purchase Order'}
+            subtitle={poDetail?.supplier_name}
+            badges={poDetail && (
+                <>
+                    <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'}>
+                        {STATUS_LABEL[poDetail.status] ?? poDetail.status}
+                    </Badge>
+                    {approvalStatus && (
+                        <Badge variant={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'error' : 'warning'}>
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            {approvalStatus === 'pending'
+                                ? `Awaiting approval${poApproval?.current_step ? ` · ${poApproval.current_step.name}` : ''}`
+                                : `Approval ${approvalStatus}`}
+                        </Badge>
+                    )}
+                </>
+            )}
+            fields={poDetail ? [
+                { label: 'Supplier', value: poDetail.supplier_name },
+                { label: 'Warehouse', value: poDetail.warehouse_name ?? '—' },
+                { label: 'Date', value: new Date(poDetail.created_at).toLocaleDateString() },
+                { label: 'Total', value: poDetail.total_amount.toLocaleString() },
+                { label: 'Notes', value: poDetail.notes, full: true, hideIfEmpty: true },
+            ] : []}
+            actions={poDetail && (
+                <>
+                    <Button size="sm" variant="outline" onClick={() => previewPO(poDetail)}>
+                        <Printer className="h-4 w-4 mr-2" /> Print / Export
+                    </Button>
+                    {showSubmit && (
+                        <Button size="sm" variant="outline" disabled={submitForApproval.isPending}
+                            onClick={() => submitForApproval.mutate(poDetail.id, {
+                                onSuccess: (res) => toast.success(res.approval_required ? 'Submitted for approval' : 'No approval rule matches — you can send this order directly'),
+                                onError: () => toast.error('Failed to submit for approval'),
+                            })}>
+                            <ShieldCheck className="h-4 w-4 mr-2" /> Submit for Approval
+                        </Button>
+                    )}
+                    {canAmend && (
+                        <Button size="sm" variant="outline" disabled={isPOBusy} onClick={() => startAmend(poDetail)}>Amend</Button>
+                    )}
+                    {canSend && (
+                        <Button size="sm" disabled={isPOBusy}
+                            onClick={() => sendPO.mutate(poDetail.id, {
+                                onSuccess: () => toast.success('PO sent to supplier'),
+                                onError: (e: unknown) => {
+                                    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+                                    toast.error(msg || 'Failed to send PO');
+                                },
+                            })}>
+                            Send to Supplier
+                        </Button>
+                    )}
+                    {canReceive && (
+                        <Button size="sm" variant="outline" disabled={isPOBusy}
+                            onClick={() => receivePO.mutate({ id: poDetail.id }, {
+                                onSuccess: () => toast.success('PO received — stock updated'),
+                                onError: () => toast.error('Failed to receive PO'),
+                            })}>
+                            Mark Received
+                        </Button>
+                    )}
+                    {canCancel && (
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" disabled={isPOBusy}
+                            onClick={() => {
+                                if (!confirm('Cancel this purchase order?')) return;
+                                cancelPO.mutate(poDetail.id, {
+                                    onSuccess: () => { toast.success('PO cancelled'); setSelectedPO(null); },
+                                    onError: () => toast.error('Failed to cancel PO'),
+                                });
+                            }}>
+                            Cancel Order
+                        </Button>
+                    )}
+                </>
+            )}
+        >
+            {poDetail && (
+                <>
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-semibold">Line Items</h3>
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Item</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Qty</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Recv</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Unit Cost</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {(poDetail.line_items?.length ?? 0) === 0 ? (
+                                        <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No line items</td></tr>
+                                    ) : (
+                                        poDetail.line_items?.map((line) => (
+                                            <tr key={line.id}>
+                                                <td className="px-3 py-2">
+                                                    <div className="font-medium">{line.item_name ?? '—'}</div>
+                                                    {line.item_sku && <div className="font-mono text-xs text-muted-foreground">{line.item_sku}</div>}
+                                                </td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{line.quantity}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{line.received_qty ?? 0}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
+                                                <td className="px-3 py-2 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                                {(poDetail.line_items?.length ?? 0) > 0 && (
+                                    <tfoot>
+                                        <tr className="border-t-2 border-border bg-muted/30">
+                                            <td colSpan={4} className="px-3 py-2 text-right font-semibold">Grand Total</td>
+                                            <td className="px-3 py-2 text-right font-bold tabular-nums">{poDetail.total_amount.toLocaleString()}</td>
+                                        </tr>
+                                    </tfoot>
+                                )}
+                            </table>
+                        </div>
+                    </div>
+                    <ThreeWayMatchPanel org={orgSlug} poId={poDetail.id} />
+                </>
+            )}
+        </DetailDrawer>
 
         <PdfPreview {...previewProps} />
         </>

@@ -35,6 +35,10 @@ export interface CreateGRNLineInput {
   rejection_reason?: string;
   /** Serial numbers for serial-tracked items: one per accepted unit. */
   serials?: string[];
+  /** Lot/batch number for lot-tracked or perishable items. */
+  lot_number?: string;
+  /** Lot expiry date (RFC3339) for perishable items. */
+  expiry_date?: string;
 }
 
 export interface CreateGRNInput {

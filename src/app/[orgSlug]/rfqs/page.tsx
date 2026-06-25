@@ -2,10 +2,12 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { useRFQs, useCreateRFQ } from '@/hooks/useRFQs';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
+import { useRFQs, useRFQ, useCreateRFQ, useDeleteRFQ } from '@/hooks/useRFQs';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import type { RFQStatus } from '@/lib/api/rfq';
+import type { RFQ, RFQStatus } from '@/lib/api/rfq';
 import { AlertTriangle, FileQuestion, Minus, Plus, Search, X } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
@@ -32,6 +34,7 @@ export default function RFQListPage() {
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [open, setOpen] = useState(false);
+    const [viewId, setViewId] = useState<string | null>(null);
 
     const [title, setTitle] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
@@ -41,9 +44,21 @@ export default function RFQListPage() {
     const { data: rfqs, isLoading, isError, refetch } = useRFQs(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     const createRFQ = useCreateRFQ(orgSlug);
+    const deleteRFQ = useDeleteRFQ(orgSlug);
+    const { data: viewRFQ } = useRFQ(orgSlug, viewId ?? '');
 
     const { canAny } = usePermissions();
     const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE, P.APPROVALS_MANAGE]);
+    const canChange = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
+    const canDelete = canAny([P.PURCHASES_DELETE, P.PURCHASES_MANAGE]);
+
+    function handleDelete(rfq: RFQ) {
+        if (!confirm(`Delete RFQ "${rfq.rfq_number}"?`)) return;
+        deleteRFQ.mutate(rfq.id, {
+            onSuccess: () => { toast.success('RFQ deleted'); if (viewId === rfq.id) setViewId(null); },
+            onError: () => toast.error('Failed to delete RFQ'),
+        });
+    }
 
     const filtered = search
         ? rfqs?.filter((r) =>
@@ -136,14 +151,15 @@ export default function RFQListPage() {
                                         <th className="text-left px-6 py-3 font-medium text-muted-foreground">Title</th>
                                         <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                                         <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Created</th>
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {isLoading ? (
-                                        <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading RFQs...</td></tr>
+                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading RFQs...</td></tr>
                                     ) : isError ? (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                            <td colSpan={5} className="px-6 py-12 text-center">
                                                 <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
                                                 <p className="text-muted-foreground">Couldn&apos;t load RFQs</p>
                                                 <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
@@ -151,7 +167,7 @@ export default function RFQListPage() {
                                         </tr>
                                     ) : (filtered?.length ?? 0) === 0 ? (
                                         <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                            <td colSpan={5} className="px-6 py-12 text-center">
                                                 <FileQuestion className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                                                 <p className="text-muted-foreground">No RFQs yet</p>
                                             </td>
@@ -161,12 +177,23 @@ export default function RFQListPage() {
                                             <tr
                                                 key={rfq.id}
                                                 className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                                onClick={() => router.push(`/${orgSlug}/rfqs/${rfq.id}`)}
+                                                onClick={() => setViewId(rfq.id)}
                                             >
                                                 <td className="px-6 py-4 font-mono text-xs font-medium">{rfq.rfq_number}</td>
                                                 <td className="px-6 py-4">{rfq.title || '—'}</td>
                                                 <td className="px-6 py-4"><Badge variant={STATUS_VARIANT[rfq.status] ?? 'default'}>{rfq.status}</Badge></td>
                                                 <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{new Date(rfq.created_at).toLocaleDateString()}</td>
+                                                <td className="px-6 py-4">
+                                                    <RowActions
+                                                        onView={() => setViewId(rfq.id)}
+                                                        onEdit={() => router.push(`/${orgSlug}/rfqs/${rfq.id}`)}
+                                                        canEdit={canChange}
+                                                        editLabel="Open full RFQ"
+                                                        onDelete={() => handleDelete(rfq)}
+                                                        canDelete={canDelete && rfq.status === 'draft'}
+                                                        deleteDisabled={deleteRFQ.isPending}
+                                                    />
+                                                </td>
                                             </tr>
                                         ))
                                     )}
@@ -270,6 +297,51 @@ export default function RFQListPage() {
                     </div>
                 </div>
             )}
+
+            <DetailDrawer
+                open={!!viewId}
+                onClose={() => setViewId(null)}
+                loading={!!viewId && !viewRFQ}
+                title={viewRFQ?.rfq_number ?? 'RFQ'}
+                subtitle={viewRFQ?.title}
+                badges={viewRFQ && <Badge variant={STATUS_VARIANT[viewRFQ.status] ?? 'default'}>{viewRFQ.status}</Badge>}
+                fields={viewRFQ ? [
+                    { label: 'Title', value: viewRFQ.title || '—' },
+                    { label: 'Due date', value: viewRFQ.due_date ? new Date(viewRFQ.due_date).toLocaleDateString() : '—' },
+                    { label: 'Created', value: new Date(viewRFQ.created_at).toLocaleDateString() },
+                    { label: 'Suppliers invited', value: String(viewRFQ.responses?.length ?? 0) },
+                    { label: 'Notes', value: viewRFQ.notes, full: true, hideIfEmpty: true },
+                ] : []}
+                actions={viewRFQ && (
+                    <Button size="sm" onClick={() => router.push(`/${orgSlug}/rfqs/${viewRFQ.id}`)}>Open full RFQ</Button>
+                )}
+            >
+                {viewRFQ && (viewRFQ.lines?.length ?? 0) > 0 && (
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-semibold">Requested Items</h3>
+                        <div className="overflow-x-auto rounded-lg border border-border">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Item / Description</th>
+                                        <th className="text-right px-3 py-2 font-medium text-muted-foreground">Qty</th>
+                                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">UoM</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {viewRFQ.lines?.map((l) => (
+                                        <tr key={l.id}>
+                                            <td className="px-3 py-2">{l.item_name || l.description || '—'}</td>
+                                            <td className="px-3 py-2 text-right tabular-nums">{l.quantity}</td>
+                                            <td className="px-3 py-2 text-muted-foreground">{l.uom || '—'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+            </DetailDrawer>
         </>
     );
 }

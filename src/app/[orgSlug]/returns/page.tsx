@@ -3,9 +3,11 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { RowActions } from '@/components/inventory/RowActions';
 import { usePurchaseReturns, useCreatePurchaseReturn, useApprovePurchaseReturn } from '@/hooks/usePurchaseReturns';
 import { useSuppliers } from '@/hooks/useSuppliers';
-import { type ReturnPaymentStatus } from '@/lib/api/purchase-returns';
+import { type PurchaseReturn, type ReturnPaymentStatus } from '@/lib/api/purchase-returns';
 import { AlertTriangle, Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -28,6 +30,7 @@ export default function PurchaseReturnsPage() {
     const [status, setStatus] = useState<ReturnPaymentStatus | ''>('');
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
+    const [viewing, setViewing] = useState<PurchaseReturn | null>(null);
 
     const [supplierId, setSupplierId] = useState('');
     const [reason, setReason] = useState('');
@@ -110,16 +113,19 @@ export default function PurchaseReturnsPage() {
                                     </tr>
                                 )}
                                 {!isError && rows.map((r) => (
-                                    <tr key={r.id} className="border-b border-border hover:bg-muted/20">
+                                    <tr key={r.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(r)}>
                                         <td className="px-6 py-3 font-medium font-mono text-xs">{r.return_number}</td>
                                         <td className="px-6 py-3 hidden md:table-cell">{nameOf(r.supplier_id)}</td>
                                         <td className="px-6 py-3 text-right tabular-nums">{r.return_amount.toLocaleString()}</td>
                                         <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[r.payment_status]}>{r.payment_status}</Badge></td>
                                         <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{new Date(r.date_returned).toLocaleDateString()}</td>
-                                        <td className="px-6 py-3 text-right">
-                                            {canChange && r.payment_status !== 'paid' && (
-                                                <Button variant="outline" size="sm" onClick={() => approve.mutate(r.id, { onSuccess: () => toast.success('Return approved — stock adjusted'), onError: () => toast.error('Failed to approve') })}>Approve</Button>
-                                            )}
+                                        <td className="px-6 py-3">
+                                            <RowActions
+                                                onView={() => setViewing(r)}
+                                                extra={canChange && r.payment_status !== 'paid' && (
+                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); approve.mutate(r.id, { onSuccess: () => toast.success('Return approved — stock adjusted'), onError: () => toast.error('Failed to approve') }); }}>Approve</Button>
+                                                )}
+                                            />
                                         </td>
                                     </tr>
                                 ))}
@@ -180,6 +186,23 @@ export default function PurchaseReturnsPage() {
                     </div>
                 </div>
             )}
+
+            <DetailDrawer
+                open={!!viewing}
+                onClose={() => setViewing(null)}
+                title={viewing?.return_number ?? 'Purchase Return'}
+                subtitle={viewing ? nameOf(viewing.supplier_id) : undefined}
+                badges={viewing && <Badge variant={STATUS_VARIANT[viewing.payment_status]}>{viewing.payment_status}</Badge>}
+                fields={viewing ? [
+                    { label: 'Supplier', value: nameOf(viewing.supplier_id) },
+                    { label: 'Amount', value: viewing.return_amount.toLocaleString() },
+                    { label: 'Date returned', value: new Date(viewing.date_returned).toLocaleDateString() },
+                    { label: 'Reason', value: viewing.reason, full: true, hideIfEmpty: true },
+                ] : []}
+                actions={viewing && canChange && viewing.payment_status !== 'paid' && (
+                    <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: () => toast.error('Failed to approve') })}>Approve</Button>
+                )}
+            />
         </div>
     );
 }
