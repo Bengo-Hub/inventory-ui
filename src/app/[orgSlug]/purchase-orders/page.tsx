@@ -29,6 +29,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 const ITEMS_PER_PAGE = 20;
@@ -205,14 +206,14 @@ export default function PurchaseOrdersPage() {
         if (amendingId) {
             amendPO.mutate({ id: amendingId, data: payload }, {
                 onSuccess: () => { toast.success('Purchase order amended'); closePODialog(); },
-                onError: () => toast.error('Failed to amend purchase order'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to amend purchase order')),
             });
             return;
         }
 
         createPO.mutate(payload, {
             onSuccess: () => { toast.success('Purchase order created'); closePODialog(); },
-            onError: () => toast.error('Failed to create purchase order'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create purchase order')),
         });
     }
 
@@ -528,7 +529,7 @@ export default function PurchaseOrdersPage() {
                 onClose={() => setAddSupplierOpen(false)}
                 onSubmit={(data) => createSupplier.mutate(data, {
                     onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setAddSupplierOpen(false); },
-                    onError: () => toast.error('Failed to create supplier'),
+                    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
                 })}
             />
         )}
@@ -578,7 +579,7 @@ export default function PurchaseOrdersPage() {
                         <Button size="sm" variant="outline" disabled={submitForApproval.isPending}
                             onClick={() => submitForApproval.mutate(poDetail.id, {
                                 onSuccess: (res) => toast.success(res.approval_required ? 'Submitted for approval' : 'No approval rule matches — you can send this order directly'),
-                                onError: () => toast.error('Failed to submit for approval'),
+                                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to submit for approval')),
                             })}>
                             <ShieldCheck className="h-4 w-4 mr-2" /> Submit for Approval
                         </Button>
@@ -602,7 +603,7 @@ export default function PurchaseOrdersPage() {
                         <Button size="sm" variant="outline" disabled={isPOBusy}
                             onClick={() => receivePO.mutate({ id: poDetail.id }, {
                                 onSuccess: () => toast.success('PO received — stock updated'),
-                                onError: () => toast.error('Failed to receive PO'),
+                                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to receive PO')),
                             })}>
                             Mark Received
                         </Button>
@@ -613,7 +614,7 @@ export default function PurchaseOrdersPage() {
                                 if (!confirm('Cancel this purchase order?')) return;
                                 cancelPO.mutate(poDetail.id, {
                                     onSuccess: () => { toast.success('PO cancelled'); setSelectedPO(null); },
-                                    onError: () => toast.error('Failed to cancel PO'),
+                                    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to cancel PO')),
                                 });
                             }}>
                             Cancel Order

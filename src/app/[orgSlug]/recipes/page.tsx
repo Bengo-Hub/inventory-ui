@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -123,13 +124,13 @@ export default function RecipesPage() {
                 { id: editing.id, data: payload },
                 {
                     onSuccess: () => { toast.success('Recipe updated'); closeDialog(); },
-                    onError: () => { toast.error('Failed to update recipe'); },
+                    onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to update recipe')); },
                 },
             );
         } else {
             createMutation.mutate(payload, {
                 onSuccess: () => { toast.success('Recipe created'); closeDialog(); },
-                onError: () => { toast.error('Failed to create recipe'); },
+                onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to create recipe')); },
             });
         }
     }
@@ -138,7 +139,7 @@ export default function RecipesPage() {
         if (!deleteTarget) return;
         deleteMutation.mutate(deleteTarget.id, {
             onSuccess: () => { toast.success('Recipe deleted'); setDeleteTarget(null); },
-            onError: () => { toast.error('Failed to delete recipe'); setDeleteTarget(null); },
+            onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to delete recipe')); setDeleteTarget(null); },
         });
     }
 

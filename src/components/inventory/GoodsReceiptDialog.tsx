@@ -5,6 +5,7 @@ import { useCreateGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders, usePurchaseOrder } from '@/hooks/usePurchaseOrders';
 import { useItems } from '@/hooks/useItems';
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -85,7 +86,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         if (lines.length === 0) { toast.error('Enter at least one received quantity'); return; }
         create.mutate({ notes: notes.trim() || undefined, lines }, {
             onSuccess: () => { toast.success('Goods receipt created (draft) — post it to update stock'); onCreated(); },
-            onError: () => toast.error('Failed to create goods receipt'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create goods receipt')),
         });
     }
 

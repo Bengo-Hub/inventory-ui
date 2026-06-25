@@ -16,6 +16,7 @@ import {
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { AwardEntry, SupplierResponse } from '@/lib/api/rfq';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { ArrowLeft, Award, CheckCircle2, FileQuestion, Send, Trash2, Truck, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -110,7 +111,7 @@ export default function RFQDetailPage() {
             { responseId: quoteResp.id, data: { items } },
             {
                 onSuccess: () => { toast.success('Quote saved'); setQuoteResp(null); },
-                onError: () => toast.error('Failed to save quote'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save quote')),
             },
         );
     }
@@ -120,7 +121,7 @@ export default function RFQDetailPage() {
         if (ids.length === 0) { toast.error('Select at least one supplier'); return; }
         invite.mutate(ids, {
             onSuccess: (res) => { toast.success(`${res.invited} supplier(s) invited`); setInviteOpen(false); setPicked({}); },
-            onError: () => toast.error('Failed to invite suppliers'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to invite suppliers')),
         });
     }
 
@@ -136,7 +137,7 @@ export default function RFQDetailPage() {
         if (awards.length === 0) { toast.error('Select a winning supplier for at least one line'); return; }
         awardRFQ.mutate(awards, {
             onSuccess: () => toast.success('Awards recorded'),
-            onError: () => toast.error('Failed to record awards'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record awards')),
         });
     }
 
@@ -190,7 +191,7 @@ export default function RFQDetailPage() {
                                     if (!confirm('Delete this RFQ?')) return;
                                     removeRFQ.mutate(rfq.id, {
                                         onSuccess: () => { toast.success('RFQ deleted'); router.push(`/${orgSlug}/rfqs`); },
-                                        onError: () => toast.error('Failed to delete RFQ'),
+                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete RFQ')),
                                     });
                                 }}>
                                 <Trash2 className="h-4 w-4" />
@@ -266,13 +267,13 @@ export default function RFQDetailPage() {
                                                     )}
                                                     {canChange && resp.status === 'invited' && (
                                                         <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                                                            onClick={() => decline.mutate(resp.id, { onSuccess: () => toast.success('Marked declined'), onError: () => toast.error('Failed') })}>
+                                                            onClick={() => decline.mutate(resp.id, { onSuccess: () => toast.success('Marked declined'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>
                                                             Decline
                                                         </Button>
                                                     )}
                                                     {canChange && resp.status === 'invited' && (
                                                         <Button size="sm" variant="ghost" className="text-muted-foreground"
-                                                            onClick={() => removeSupplier.mutate(resp.id, { onSuccess: () => toast.success('Removed'), onError: () => toast.error('Failed') })}>
+                                                            onClick={() => removeSupplier.mutate(resp.id, { onSuccess: () => toast.success('Removed'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>
                                                             <X className="h-4 w-4" />
                                                         </Button>
                                                     )}

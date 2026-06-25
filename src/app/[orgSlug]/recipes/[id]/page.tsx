@@ -9,6 +9,7 @@ import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 type IngredientRow = {
     item_id: string;
@@ -159,7 +160,7 @@ export default function RecipeDetailPage() {
             },
         }, {
             onSuccess: () => toast.success('Recipe ingredients saved'),
-            onError: () => toast.error('Failed to save ingredients'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save ingredients')),
         });
     }
 

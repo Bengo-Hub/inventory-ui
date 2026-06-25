@@ -14,6 +14,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
@@ -84,8 +85,8 @@ export default function ContractsPage() {
             terms: terms.trim() || undefined,
         };
         const done = () => { toast.success(editing ? 'Contract updated' : 'Contract created'); setOpen(false); };
-        if (editing) update.mutate({ id: editing.id, data }, { onSuccess: done, onError: () => toast.error('Failed to update') });
-        else create.mutate(data, { onSuccess: done, onError: () => toast.error('Failed to create') });
+        if (editing) update.mutate({ id: editing.id, data }, { onSuccess: done, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update')) });
+        else create.mutate(data, { onSuccess: done, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create')) });
     }
 
     return (
@@ -152,10 +153,10 @@ export default function ContractsPage() {
                                                 extra={
                                                     <>
                                                         {canChange && c.status !== 'active' && c.status !== 'terminated' && (
-                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: () => toast.error('Failed') }); }}>Activate</Button>
+                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }); }}>Activate</Button>
                                                         )}
                                                         {canChange && c.status === 'active' && (
-                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: () => toast.error('Failed') }); }}>Terminate</Button>
+                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }); }}>Terminate</Button>
                                                         )}
                                                     </>
                                                 }
@@ -237,7 +238,7 @@ export default function ContractsPage() {
                     onClose={() => setAddSupplierOpen(false)}
                     onSubmit={(data) => createSupplier.mutate(data, {
                         onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setAddSupplierOpen(false); },
-                        onError: () => toast.error('Failed to create supplier'),
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
                     })}
                 />
             )}
@@ -259,10 +260,10 @@ export default function ContractsPage() {
                     <>
                         {canChange && <Button variant="outline" size="sm" onClick={() => { openEdit(viewing); setViewing(null); }}>Edit</Button>}
                         {canChange && viewing.status !== 'active' && viewing.status !== 'terminated' && (
-                            <Button variant="outline" size="sm" onClick={() => activate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract activated'); setViewing(null); }, onError: () => toast.error('Failed') })}>Activate</Button>
+                            <Button variant="outline" size="sm" onClick={() => activate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract activated'); setViewing(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>Activate</Button>
                         )}
                         {canChange && viewing.status === 'active' && (
-                            <Button variant="outline" size="sm" onClick={() => terminate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract terminated'); setViewing(null); }, onError: () => toast.error('Failed') })}>Terminate</Button>
+                            <Button variant="outline" size="sm" onClick={() => terminate.mutate(viewing.id, { onSuccess: () => { toast.success('Contract terminated'); setViewing(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>Terminate</Button>
                         )}
                     </>
                 )}

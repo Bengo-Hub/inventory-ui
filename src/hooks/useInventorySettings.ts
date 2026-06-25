@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { inventorySettingsApi, type UpdateInventoryModulesInput, type UpdateInventorySettingsInput } from '@/lib/api/inventory-settings';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { toast } from 'sonner';
 
 export function useInventorySettings(orgSlug: string) {
@@ -22,7 +23,7 @@ export function useUpdateInventorySettings(orgSlug: string) {
       qc.setQueryData(['inventory-settings', orgSlug], data);
       toast.success('Settings saved');
     },
-    onError: () => toast.error('Failed to save settings'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save settings')),
   });
 }
 
@@ -35,6 +36,6 @@ export function useUpdateInventoryModules(orgSlug: string) {
       qc.setQueryData(['inventory-settings', orgSlug], data);
       toast.success('Module settings saved');
     },
-    onError: () => toast.error('Failed to save module settings'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save module settings')),
   });
 }

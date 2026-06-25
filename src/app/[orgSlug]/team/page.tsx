@@ -20,6 +20,7 @@ import {
 import { useAuthStore } from '@/store/auth';
 import { userHasPermission } from '@/lib/auth/permissions';
 import type { Permission } from '@/lib/api/rbac';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import {
   ChevronRight,
   Loader2,
@@ -155,7 +156,7 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
                       variant="outline"
                       onClick={() => updateStatus.mutate({ userId: u.id, status: u.status === 'active' ? 'inactive' : 'active' }, {
                         onSuccess: () => toast.success('User status updated'),
-                        onError: () => toast.error('Failed to update status'),
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update status')),
                       })}
                     >
                       {u.status === 'active' ? 'Deactivate' : 'Activate'}
@@ -207,9 +208,9 @@ function UserDetail({ orgSlug, userId, canManage }: { orgSlug: string; userId: s
                   disabled={!canManage || assignRole.isPending || revokeRole.isPending}
                   onChange={(v) => {
                     if (v) {
-                      assignRole.mutate({ user_id: userId, role_id: r.id }, { onError: () => toast.error('Failed to assign role') });
+                      assignRole.mutate({ user_id: userId, role_id: r.id }, { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to assign role')) });
                     } else if (assignment) {
-                      revokeRole.mutate(assignment.id, { onError: () => toast.error('Failed to revoke role') });
+                      revokeRole.mutate(assignment.id, { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to revoke role')) });
                     }
                   }}
                 />
@@ -235,9 +236,9 @@ function UserDetail({ orgSlug, userId, canManage }: { orgSlug: string; userId: s
                   disabled={!canManage || assignOutlet.isPending || removeOutlet.isPending}
                   onChange={(v) => {
                     if (v) {
-                      assignOutlet.mutate({ userId, outletId: o.id }, { onError: () => toast.error('Failed to assign outlet') });
+                      assignOutlet.mutate({ userId, outletId: o.id }, { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to assign outlet')) });
                     } else {
-                      removeOutlet.mutate({ userId, outletId: o.id }, { onError: () => toast.error('Failed to remove outlet') });
+                      removeOutlet.mutate({ userId, outletId: o.id }, { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to remove outlet')) });
                     }
                   }}
                 />
@@ -285,7 +286,7 @@ function RolesTab({ orgSlug, canManage }: { orgSlug: string; canManage: boolean 
                 disabled={!form.role_code || !form.name || createRole.isPending}
                 onClick={() => createRole.mutate(form, {
                   onSuccess: () => { toast.success('Role created'); setForm({ role_code: '', name: '', description: '' }); setShowNew(false); },
-                  onError: () => toast.error('Failed to create role'),
+                  onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create role')),
                 })}
               >
                 {createRole.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create role'}
@@ -347,7 +348,7 @@ function RolePermissionMatrix({ orgSlug, roleId, canManage }: { orgSlug: string;
             disabled={setRolePerms.isPending}
             onClick={() => setRolePerms.mutate({ roleId, permissionIds: Array.from(selected) }, {
               onSuccess: () => toast.success('Permissions updated'),
-              onError: () => toast.error('Failed to update permissions'),
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update permissions')),
             })}
           >
             {setRolePerms.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Save className="h-4 w-4" /> Save</>}

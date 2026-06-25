@@ -17,6 +17,7 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { AlertTriangle, ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -54,14 +55,14 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose }: { orgSlug: strin
         if (!transferId) return;
         shipMutation.mutate(transferId, {
             onSuccess: () => toast.success('Transfer shipped — status updated to In Transit'),
-            onError: () => toast.error('Failed to ship transfer'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to ship transfer')),
         });
     }
     function handleReceive() {
         if (!transferId) return;
         receiveMutation.mutate({ id: transferId }, {
             onSuccess: () => { toast.success('Transfer received — stock levels updated'); onClose(); },
-            onError: () => toast.error('Failed to receive transfer'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to receive transfer')),
         });
     }
     function handleCancel() {
@@ -69,7 +70,7 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose }: { orgSlug: strin
         if (!confirm('Cancel this transfer? This cannot be undone.')) return;
         cancelMutation.mutate(transferId, {
             onSuccess: () => { toast.success('Transfer cancelled'); onClose(); },
-            onError: () => toast.error('Failed to cancel transfer'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to cancel transfer')),
         });
     }
 
@@ -238,8 +239,8 @@ export default function TransfersPage() {
                 toast.success('Transfer created');
                 closeDialog();
             },
-            onError: () => {
-                toast.error('Failed to create transfer');
+            onError: async (e) => {
+                toast.error(await apiErrorMessage(e, 'Failed to create transfer'));
             },
         });
     }

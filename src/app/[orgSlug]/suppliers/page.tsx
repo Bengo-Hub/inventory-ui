@@ -10,6 +10,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -65,7 +66,7 @@ export default function SuppliersPage() {
         if (!confirm(`Delete supplier "${supplier.name}"? This cannot be undone.`)) return;
         deleteSupplier.mutate(supplier.id, {
             onSuccess: () => toast.success('Supplier deleted'),
-            onError: () => toast.error('Failed to delete supplier'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete supplier')),
         });
     }
 
@@ -73,12 +74,12 @@ export default function SuppliersPage() {
         if (editing) {
             updateSupplier.mutate({ id: editing.id, data }, {
                 onSuccess: () => { toast.success('Supplier updated'); closeDialog(); },
-                onError: () => toast.error('Failed to update supplier'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update supplier')),
             });
         } else {
             createSupplier.mutate(data, {
                 onSuccess: () => { toast.success('Supplier created'); closeDialog(); },
-                onError: () => toast.error('Failed to create supplier'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
             });
         }
     }

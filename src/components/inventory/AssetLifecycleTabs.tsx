@@ -11,6 +11,7 @@ import {
 import type {
     MaintenanceInput, TransferInput, DisposalInput, InsuranceInput, AuditInput,
 } from '@/lib/api/assets';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -141,9 +142,9 @@ function MaintenanceTab({ org, assetId }: { org: string; assetId: string }) {
                 { key: 'cost', label: 'Cost', type: 'number' },
                 { key: 'description', label: 'Description', type: 'textarea' },
             ]}
-            onCreate={(d, onDone) => create.mutate(d as unknown as MaintenanceInput, { onSuccess: () => { toast.success('Maintenance scheduled'); onDone(); }, onError: () => toast.error('Failed to schedule') })}
+            onCreate={(d, onDone) => create.mutate(d as unknown as MaintenanceInput, { onSuccess: () => { toast.success('Maintenance scheduled'); onDone(); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to schedule')) })}
             isCreating={create.isPending}
-            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Maintenance completed'), onError: () => toast.error('Failed') })}
+            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Maintenance completed'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}
         />
     );
 }
@@ -163,10 +164,10 @@ function TransferTab({ org, assetId }: { org: string; assetId: string }) {
                 { key: 'to_location', label: 'To location', type: 'text', required: true },
                 { key: 'reason', label: 'Reason', type: 'textarea' },
             ]}
-            onCreate={(d, onDone) => create.mutate(d as unknown as TransferInput, { onSuccess: () => { toast.success('Transfer requested'); onDone(); }, onError: () => toast.error('Failed to request') })}
+            onCreate={(d, onDone) => create.mutate(d as unknown as TransferInput, { onSuccess: () => { toast.success('Transfer requested'); onDone(); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to request')) })}
             isCreating={create.isPending}
-            onApprove={(id) => approve.mutate(id, { onSuccess: () => toast.success('Transfer approved'), onError: () => toast.error('Failed to approve') })}
-            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Transfer completed — asset moved'), onError: () => toast.error('Failed') })}
+            onApprove={(id) => approve.mutate(id, { onSuccess: () => toast.success('Transfer approved'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to approve')) })}
+            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Transfer completed — asset moved'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}
         />
     );
 }
@@ -185,9 +186,9 @@ function DisposalTab({ org, assetId }: { org: string; assetId: string }) {
                 { key: 'disposal_value', label: 'Disposal value', type: 'number' },
                 { key: 'reason', label: 'Reason', type: 'textarea' },
             ]}
-            onCreate={(d, onDone) => create.mutate(d as unknown as DisposalInput, { onSuccess: () => { toast.success('Disposal recorded'); onDone(); }, onError: () => toast.error('Failed to record') })}
+            onCreate={(d, onDone) => create.mutate(d as unknown as DisposalInput, { onSuccess: () => { toast.success('Disposal recorded'); onDone(); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record')) })}
             isCreating={create.isPending}
-            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Disposal completed — asset retired'), onError: () => toast.error('Failed') })}
+            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Disposal completed — asset retired'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}
         />
     );
 }
@@ -210,7 +211,7 @@ function InsuranceTab({ org, assetId }: { org: string; assetId: string }) {
                 { key: 'start_date', label: 'Start date', type: 'date' },
                 { key: 'end_date', label: 'End date', type: 'date' },
             ]}
-            onCreate={(d, onDone) => create.mutate(d as unknown as InsuranceInput, { onSuccess: () => { toast.success('Policy added'); onDone(); }, onError: () => toast.error('Failed to add policy') })}
+            onCreate={(d, onDone) => create.mutate(d as unknown as InsuranceInput, { onSuccess: () => { toast.success('Policy added'); onDone(); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to add policy')) })}
             isCreating={create.isPending}
         />
     );
@@ -231,9 +232,9 @@ function AuditTab({ org, assetId }: { org: string; assetId: string }) {
                 { key: 'discrepancies', label: 'Discrepancies', type: 'textarea' },
                 { key: 'recommendations', label: 'Recommendations', type: 'textarea' },
             ]}
-            onCreate={(d, onDone) => create.mutate(d as unknown as AuditInput, { onSuccess: () => { toast.success('Audit started'); onDone(); }, onError: () => toast.error('Failed to start audit') })}
+            onCreate={(d, onDone) => create.mutate(d as unknown as AuditInput, { onSuccess: () => { toast.success('Audit started'); onDone(); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to start audit')) })}
             isCreating={create.isPending}
-            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Audit completed'), onError: () => toast.error('Failed') })}
+            onComplete={(id) => complete.mutate(id, { onSuccess: () => toast.success('Audit completed'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}
         />
     );
 }

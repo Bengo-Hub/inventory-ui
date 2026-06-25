@@ -11,6 +11,7 @@ import { AlertTriangle, Calendar, MapPin, Pencil, Share2, Ticket, Users, X } fro
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 type Tab = 'upcoming' | 'past' | 'soldout';
 
@@ -89,7 +90,7 @@ function EditEventModal({
                     { sku: event.sku, data },
                     {
                         onSuccess: () => { toast.success('Event updated'); onClose(); },
-                        onError: () => toast.error('Failed to update event'),
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update event')),
                     },
                 );
             }}

@@ -12,6 +12,7 @@ import { AlertTriangle, FileQuestion, Minus, Plus, Search, X } from 'lucide-reac
 import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     draft: 'outline',
@@ -56,7 +57,7 @@ export default function RFQListPage() {
         if (!confirm(`Delete RFQ "${rfq.rfq_number}"?`)) return;
         deleteRFQ.mutate(rfq.id, {
             onSuccess: () => { toast.success('RFQ deleted'); if (viewId === rfq.id) setViewId(null); },
-            onError: () => toast.error('Failed to delete RFQ'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete RFQ')),
         });
     }
 
@@ -113,7 +114,7 @@ export default function RFQListPage() {
                     resetForm();
                     router.push(`/${orgSlug}/rfqs/${rfq.id}`);
                 },
-                onError: () => toast.error('Failed to create RFQ'),
+                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create RFQ')),
             },
         );
     }

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { backupsApi, type BackupSettings } from '@/lib/api/backups';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { toast } from 'sonner';
 
 export function useBackups(orgSlug: string) {
@@ -21,7 +22,7 @@ export function useCreateBackup(orgSlug: string) {
       qc.invalidateQueries({ queryKey: ['backups', orgSlug] });
       toast.success('Backup created');
     },
-    onError: () => toast.error('Failed to create backup'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create backup')),
   });
 }
 
@@ -34,14 +35,14 @@ export function useDeleteBackup(orgSlug: string) {
       qc.invalidateQueries({ queryKey: ['backups', orgSlug] });
       toast.success('Backup deleted');
     },
-    onError: () => toast.error('Failed to delete backup'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete backup')),
   });
 }
 
 export function useDownloadBackup(orgSlug: string) {
   return useMutation({
     mutationFn: (name: string) => backupsApi.download(orgSlug, name),
-    onError: () => toast.error('Failed to download backup'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to download backup')),
   });
 }
 
@@ -63,6 +64,6 @@ export function useUpdateBackupSettings(orgSlug: string) {
       qc.setQueryData(['backup-settings', orgSlug], data);
       toast.success('Backup schedule saved');
     },
-    onError: () => toast.error('Failed to save backup schedule'),
+    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save backup schedule')),
   });
 }

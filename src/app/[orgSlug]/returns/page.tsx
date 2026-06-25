@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
@@ -59,7 +60,7 @@ export default function PurchaseReturnsPage() {
         if (payloadLines.length === 0) { toast.error('Add at least one item'); return; }
         create.mutate({ supplier_id: supplierId || undefined, reason: reason.trim() || undefined, lines: payloadLines }, {
             onSuccess: () => { toast.success('Return created'); setOpen(false); setSupplierId(''); setReason(''); setLines([emptyLine()]); },
-            onError: () => toast.error('Failed to create return'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create return')),
         });
     }
 
@@ -123,7 +124,7 @@ export default function PurchaseReturnsPage() {
                                             <RowActions
                                                 onView={() => setViewing(r)}
                                                 extra={canChange && r.payment_status !== 'paid' && (
-                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); approve.mutate(r.id, { onSuccess: () => toast.success('Return approved — stock adjusted'), onError: () => toast.error('Failed to approve') }); }}>Approve</Button>
+                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); approve.mutate(r.id, { onSuccess: () => toast.success('Return approved — stock adjusted'), onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) }); }}>Approve</Button>
                                                 )}
                                             />
                                         </td>
@@ -200,7 +201,7 @@ export default function PurchaseReturnsPage() {
                     { label: 'Reason', value: viewing.reason, full: true, hideIfEmpty: true },
                 ] : []}
                 actions={viewing && canChange && viewing.payment_status !== 'paid' && (
-                    <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: () => toast.error('Failed to approve') })}>Approve</Button>
+                    <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) })}>Approve</Button>
                 )}
             />
         </div>
