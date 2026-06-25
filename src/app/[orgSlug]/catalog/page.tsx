@@ -2,6 +2,8 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
+import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
+import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
 import { useWarehouses } from '@/hooks/useWarehouses';
@@ -10,7 +12,7 @@ import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { AlertTriangle, Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Barcode, Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -186,10 +188,12 @@ export default function CatalogPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { hasFeature } = useSubscription();
   const canBulkImport = hasFeature('bulk_import');
-  const { can } = usePermissions();
+  const { can, canAny } = usePermissions();
   const canAdd = can(P.CATALOG_ADD);
   const canChange = can(P.CATALOG_CHANGE);
   const canDelete = can(P.CATALOG_DELETE);
+  // Label printing is a privileged item operation (backend gates on inventory.items.manage).
+  const canPrintLabels = canAny([P.CATALOG_MANAGE, P.CATALOG_CHANGE]);
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -206,6 +210,8 @@ export default function CatalogPage() {
   const [viewItem, setViewItem] = useState<Item | null>(null);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
+  const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
+  const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
 
   const createItem = useCreateItem(orgSlug);
   const updateItem = useUpdateItem(orgSlug);
@@ -322,6 +328,13 @@ export default function CatalogPage() {
                 {/* Visual separator between import and create groups */}
                 <div className="h-6 w-px bg-border" />
               </>
+            )}
+
+            {/* Bulk label printing — by category / supplier / PO / selection */}
+            {canPrintLabels && (
+              <Button variant="outline" size="sm" onClick={() => setPrintLabelsOpen(true)} title="Print barcode labels in bulk">
+                <Printer className="h-4 w-4 mr-1.5" />Print Labels
+              </Button>
             )}
 
             {/* Create actions */}
@@ -548,6 +561,14 @@ export default function CatalogPage() {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
+                            <button
+                              title="Show / print barcode"
+                              aria-label="Show item barcode"
+                              onClick={() => setBarcodeItem(item)}
+                              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <Barcode className="h-4 w-4" />
+                            </button>
                             {canChange && (
                               <button
                                 title="Edit item"
@@ -636,6 +657,16 @@ export default function CatalogPage() {
           onCancel={() => setDeleteItem(null)}
           isPending={deleteItemMut.isPending}
         />
+      )}
+
+      {/* Single-item barcode (show/print/download) */}
+      {barcodeItem && (
+        <BarcodeDialog orgSlug={orgSlug} item={barcodeItem} onClose={() => setBarcodeItem(null)} />
+      )}
+
+      {/* Bulk label printing */}
+      {printLabelsOpen && (
+        <PrintLabelsDialog orgSlug={orgSlug} onClose={() => setPrintLabelsOpen(false)} />
       )}
     </>
   );

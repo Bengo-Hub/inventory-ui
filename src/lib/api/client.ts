@@ -146,6 +146,21 @@ class ApiClient {
             .get(url, { params, responseType: 'blob' })
             .then((res: AxiosResponse<Blob>) => res.data);
     }
+
+    /**
+     * POST a JSON body and receive a binary payload (e.g. a generated label PDF or
+     * ZPL/Dymo text) as a Blob, carrying the shared auth + tenant headers.
+     */
+    public postBlob(url: string, data?: any): Promise<Blob> {
+        return this.instance
+            .post(url, data, { responseType: 'blob' })
+            .then((res: AxiosResponse<Blob>) => res.data);
+    }
+
+    /** The configured API base URL (for building direct <img>/download links). */
+    public get baseUrl(): string {
+        return apiBaseUrl;
+    }
 }
 
 export const apiClient = new ApiClient();
