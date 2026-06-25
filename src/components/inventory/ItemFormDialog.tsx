@@ -111,6 +111,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [shelfLifeDays, setShelfLifeDays] = useState(item?.shelf_life_days != null ? String(item.shelf_life_days) : '');
   const [barcodeType, setBarcodeType] = useState(item?.barcode_type ?? '');
   const [weightKg, setWeightKg] = useState(item?.weight_kg != null ? String(item.weight_kg) : '');
+  const [dimLength, setDimLength] = useState(item?.dimensions_cm?.length != null ? String(item.dimensions_cm.length) : '');
+  const [dimWidth, setDimWidth] = useState(item?.dimensions_cm?.width != null ? String(item.dimensions_cm.width) : '');
+  const [dimHeight, setDimHeight] = useState(item?.dimensions_cm?.height != null ? String(item.dimensions_cm.height) : '');
   const [durationMinutes, setDurationMinutes] = useState(item?.duration_minutes != null ? String(item.duration_minutes) : '');
   const [isActive, setIsActive] = useState(item?.is_active !== false);
 
@@ -204,6 +207,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setShelfLifeDays(item.shelf_life_days != null ? String(item.shelf_life_days) : '');
       setBarcodeType(item.barcode_type ?? '');
       setWeightKg(item.weight_kg != null ? String(item.weight_kg) : '');
+      setDimLength(item.dimensions_cm?.length != null ? String(item.dimensions_cm.length) : '');
+      setDimWidth(item.dimensions_cm?.width != null ? String(item.dimensions_cm.width) : '');
+      setDimHeight(item.dimensions_cm?.height != null ? String(item.dimensions_cm.height) : '');
       setDurationMinutes(item.duration_minutes != null ? String(item.duration_minutes) : '');
       setIsActive(item.is_active !== false);
       setImageUrl(item.image_url ?? '');
@@ -359,6 +365,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       track_serial_numbers: trackSerial,
       shelf_life_days: shelfLifeDays !== '' ? parseInt(shelfLifeDays, 10) : undefined,
       weight_kg: weightKg !== '' ? parseFloat(weightKg) : undefined,
+      dimensions_cm: (dimLength !== '' || dimWidth !== '' || dimHeight !== '')
+        ? {
+            ...(dimLength !== '' ? { length: parseFloat(dimLength) } : {}),
+            ...(dimWidth !== '' ? { width: parseFloat(dimWidth) } : {}),
+            ...(dimHeight !== '' ? { height: parseFloat(dimHeight) } : {}),
+          }
+        : undefined,
       duration_minutes: isService && durationMinutes !== '' ? parseInt(durationMinutes, 10) : undefined,
       is_active: isActive,
       image_url: imageUrl || undefined,
@@ -623,9 +636,20 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   )}
 
                   {scope.showWeightDimensions && (
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Weight (kg)</label>
-                      <Input type="number" min="0" step="0.001" placeholder="Unit weight for shipping/logistics" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Weight (kg)</label>
+                        <Input type="number" min="0" step="0.001" placeholder="Unit weight for shipping/logistics" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Dimensions (cm) — L × W × H</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          <Input type="number" min="0" step="0.1" placeholder="L" value={dimLength} onChange={(e) => setDimLength(e.target.value)} />
+                          <Input type="number" min="0" step="0.1" placeholder="W" value={dimWidth} onChange={(e) => setDimWidth(e.target.value)} />
+                          <Input type="number" min="0" step="0.1" placeholder="H" value={dimHeight} onChange={(e) => setDimHeight(e.target.value)} />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Used for shipping/packing and shelf planning.</p>
+                      </div>
                     </div>
                   )}
                 </>

@@ -31,6 +31,7 @@ export interface Item {
   track_serial_numbers: boolean;
   shelf_life_days?: number | null;
   weight_kg?: number;
+  dimensions_cm?: { length?: number; width?: number; height?: number } | null;
   duration_minutes?: number | null;
   reorder_level?: number;
   reorder_quantity?: number;
@@ -125,6 +126,7 @@ export interface CreateItemInput {
   shelf_life_days?: number;
   barcode_type?: string;
   weight_kg?: number;
+  dimensions_cm?: { length?: number; width?: number; height?: number };
   duration_minutes?: number;
   initial_quantity?: number;
   tags?: string[];
