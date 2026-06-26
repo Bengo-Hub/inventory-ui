@@ -43,6 +43,8 @@ export interface CreateRequisitionInput {
   required_by_date?: string | null;
   /** Destination branch/warehouse for inventory requisitions (maps to outlet_id). */
   outlet_id?: string | null;
+  /** Links the requisition (and the resulting RFQ/PO/bill cost) to a project. */
+  project_id?: string;
   notes?: string;
   lines: RequisitionLine[];
 }

@@ -46,6 +46,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
     const [purpose, setPurpose] = useState('');
     const [priority, setPriority] = useState<Priority>('medium');
     const [requiredBy, setRequiredBy] = useState('');
+    const [projectId, setProjectId] = useState('');
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
 
@@ -123,6 +124,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
             priority,
             required_by_date: requiredBy ? new Date(requiredBy).toISOString() : undefined,
             outlet_id: isInventory && branchId ? branchId : undefined,
+            project_id: projectId.trim() || undefined,
             notes: notes.trim() || undefined,
             lines,
         });
@@ -181,6 +183,13 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Purpose *</label>
                                 <Input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Why is this needed?" required />
+                            </div>
+
+                            {/* Link to a project so the cost is attributed to it through the
+                                requisition → RFQ → PO → bill chain (treasury budget actuals). */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Project (optional)</label>
+                                <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="Project ID — links the purchase cost to a project" />
                             </div>
 
                             {/* ── Inventory branch (inventory type only) ── */}
