@@ -67,6 +67,8 @@ export interface RFQLineInput {
 export interface CreateRFQInput {
   title?: string;
   requisition_id?: string | null;
+  /** Links the RFQ (and the awarded PO/contract) to a project for cost attribution. */
+  project_id?: string;
   warehouse_id?: string | null;
   notes?: string;
   due_date?: string | null;

@@ -38,6 +38,7 @@ export default function ContractsPage() {
     const [supplierId, setSupplierId] = useState('');
     const [title, setTitle] = useState('');
     const [value, setValue] = useState('');
+    const [projectId, setProjectId] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [terms, setTerms] = useState('');
@@ -63,11 +64,12 @@ export default function ContractsPage() {
     const isPending = create.isPending || update.isPending;
 
     function openNew() {
-        setEditing(null); setSupplierId(''); setTitle(''); setValue(''); setStartDate(''); setEndDate(''); setTerms('');
+        setEditing(null); setSupplierId(''); setTitle(''); setValue(''); setProjectId(''); setStartDate(''); setEndDate(''); setTerms('');
         setOpen(true);
     }
     function openEdit(c: Contract) {
         setEditing(c); setSupplierId(c.supplier_id); setTitle(c.title); setValue(String(c.value ?? ''));
+        setProjectId(c.project_id ?? '');
         setStartDate(toDateInput(c.start_date)); setEndDate(toDateInput(c.end_date)); setTerms(c.terms ?? '');
         setOpen(true);
     }
@@ -80,6 +82,7 @@ export default function ContractsPage() {
             supplier_id: supplierId,
             title: title.trim(),
             value: value ? Number(value) : undefined,
+            project_id: projectId.trim() || undefined,
             start_date: startDate ? new Date(startDate).toISOString() : undefined,
             end_date: endDate ? new Date(endDate).toISOString() : undefined,
             terms: terms.trim() || undefined,
@@ -204,6 +207,10 @@ export default function ContractsPage() {
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Value</label>
                                             <Input type="number" min="0" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Project (optional)</label>
+                                            <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="Project ID" />
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">

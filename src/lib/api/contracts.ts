@@ -5,6 +5,8 @@ export type ContractStatus = 'draft' | 'active' | 'expired' | 'terminated';
 export interface Contract {
   id: string;
   supplier_id: string;
+  rfq_id?: string;
+  project_id?: string;
   title: string;
   start_date: string;
   end_date: string;
@@ -17,6 +19,9 @@ export interface Contract {
 export interface CreateContractInput {
   supplier_id: string;
   title: string;
+  rfq_id?: string;
+  /** Links the contract to a project (or inherits it from rfq_id) for cost attribution. */
+  project_id?: string;
   start_date?: string;
   end_date?: string;
   value?: number;

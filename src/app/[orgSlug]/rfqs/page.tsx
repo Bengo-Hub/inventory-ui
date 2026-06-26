@@ -39,6 +39,7 @@ export default function RFQListPage() {
 
     const [title, setTitle] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
+    const [projectId, setProjectId] = useState('');
     const [dueDate, setDueDate] = useState('');
     const [lines, setLines] = useState<LineDraft[]>([{ itemId: '', itemName: '', quantity: '1', uom: '' }]);
 
@@ -71,6 +72,7 @@ export default function RFQListPage() {
     function resetForm() {
         setTitle('');
         setWarehouseId('');
+        setProjectId('');
         setDueDate('');
         setLines([{ itemId: '', itemName: '', quantity: '1', uom: '' }]);
     }
@@ -104,6 +106,7 @@ export default function RFQListPage() {
             {
                 title: title.trim() || undefined,
                 warehouse_id: warehouseId || null,
+                project_id: projectId.trim() || undefined,
                 due_date: dueDate || null,
                 lines: cleaned,
             },
@@ -238,6 +241,11 @@ export default function RFQListPage() {
                                                 ))}
                                             </select>
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Project (optional)</label>
+                                        <Input value={projectId} onChange={(e) => setProjectId(e.target.value)} placeholder="Project ID — attributes the awarded purchase to a project" />
                                     </div>
 
                                     <div className="space-y-2">
