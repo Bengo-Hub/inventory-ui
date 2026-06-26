@@ -1,8 +1,10 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { BankVerifyFields } from '@/components/inventory/BankVerifyFields';
 import { type Supplier, type CreateSupplierInput, type PaymentMethodType } from '@/lib/api/suppliers';
 import { X } from 'lucide-react';
+import { useParams } from 'next/navigation';
 import { useState } from 'react';
 
 interface Props {
@@ -22,6 +24,8 @@ const PAYMENT_METHODS: { value: PaymentMethodType; label: string }[] = [
 ];
 
 export function SupplierFormDialog({ editing, isPending, onSubmit, onClose }: Props) {
+    const params = useParams();
+    const orgSlug = params?.orgSlug as string;
     const [formName, setFormName] = useState(editing?.name ?? '');
     const [formContact, setFormContact] = useState(editing?.contact_person ?? '');
     const [formEmail, setFormEmail] = useState(editing?.email ?? '');
@@ -35,6 +39,7 @@ export function SupplierFormDialog({ editing, isPending, onSubmit, onClose }: Pr
     const [mpesaBusinessName, setMpesaBusinessName] = useState(editing?.mpesa_business_name ?? '');
     const [bankAccount, setBankAccount] = useState(editing?.bank_account_number ?? '');
     const [bankName, setBankName] = useState(editing?.bank_name ?? '');
+    const [bankCode, setBankCode] = useState('');
     const [bankBranch, setBankBranch] = useState(editing?.bank_branch ?? '');
     const [taxPin, setTaxPin] = useState(editing?.tax_pin ?? '');
     const [autoPay, setAutoPay] = useState(editing?.auto_pay_enabled ?? false);
@@ -166,19 +171,21 @@ export function SupplierFormDialog({ editing, isPending, onSubmit, onClose }: Pr
 
                                     {isBank && (
                                         <div className="space-y-4">
+                                            {/* Verify the account against Paystack (auto-fills the account holder name). */}
+                                            <BankVerifyFields
+                                                orgSlug={orgSlug}
+                                                bankName={bankName}
+                                                bankCode={bankCode}
+                                                accountNumber={bankAccount}
+                                                onChange={(patch) => {
+                                                    if (patch.bank_name !== undefined) setBankName(patch.bank_name);
+                                                    if (patch.bank_code !== undefined) setBankCode(patch.bank_code);
+                                                    if (patch.account_number !== undefined) setBankAccount(patch.account_number);
+                                                }}
+                                            />
                                             <div className="space-y-2">
-                                                <label className="text-sm font-medium">Account Number</label>
-                                                <Input placeholder="Bank account number" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">Bank Name</label>
-                                                    <Input placeholder="e.g. Equity Bank" value={bankName} onChange={(e) => setBankName(e.target.value)} />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">Branch</label>
-                                                    <Input placeholder="Branch name" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} />
-                                                </div>
+                                                <label className="text-sm font-medium">Branch (optional)</label>
+                                                <Input placeholder="Branch name" value={bankBranch} onChange={(e) => setBankBranch(e.target.value)} />
                                             </div>
                                         </div>
                                     )}
