@@ -68,6 +68,14 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-10px); }
   }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-8px); }
+    40% { transform: translateX(8px); }
+    60% { transform: translateX(-6px); }
+    80% { transform: translateX(6px); }
+  }
 }
 
 @utility magical-card {
@@ -249,6 +257,7 @@ button:focus-visible {
 .animate-fade-up       { animation: fade-up 0.25s ease-out both; }
 .animate-scale-in      { animation: scale-in 0.2s ease-out both; }
 .animate-slide-in-right { animation: slide-in-right 0.2s ease-out both; }
+.animate-shake          { animation: shake 0.4s ease-in-out both; }
 
 /* Staggered children: add .stagger-children > * to auto-delay each child */
 .stagger-children > *:nth-child(1) { animation-delay: 0ms; }

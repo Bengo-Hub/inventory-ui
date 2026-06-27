@@ -54,11 +54,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => apiClient.setOnLimitReached(null);
     }, []);
 
+    // Default landing for unauthenticated users = the branded outlet/login gate
+    // (not an instant SSO bounce), so they see the tenant-branded sign-in panel
+    // with the SSO affordance. The login page lives under /auth/ and renders with
+    // the bare layout, so this never loops.
     useEffect(() => {
         if (status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
-            useAuthStore.getState().redirectToSSO(orgSlug, window.location.href);
+            const returnTo = encodeURIComponent(
+                typeof window !== 'undefined'
+                    ? window.location.pathname + window.location.search
+                    : `/${orgSlug}`,
+            );
+            router.replace(`/${orgSlug}/auth/login?returnTo=${returnTo}`);
         }
-    }, [status, pathname, orgSlug]);
+    }, [status, pathname, orgSlug, router]);
 
     useEffect(() => {
         if (!session || isUnauthorizedPage || meLoading) return;
