@@ -4,6 +4,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { IdleScreensaver } from '@/components/idle-screensaver';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
+import { resolveIdleSeconds, useScreensaverSetting } from '@/hooks/use-screensaver-timeout';
 
 /**
  * DashboardScreensaver — mounts the branded idle screensaver across the
@@ -18,6 +19,11 @@ export function DashboardScreensaver() {
   const orgSlug = params?.orgSlug as string | undefined;
   const status = useAuthStore((s) => s.status);
   const clearOutlet = useOutletStore((s) => s.clearOutlet);
+  // Effective timeout = service_config (tenant/platform) → device override → default.
+  const { data: setting } = useScreensaverSetting(
+    status === 'authenticated' ? orgSlug : undefined,
+  );
+  const timeoutSeconds = resolveIdleSeconds(setting?.config_value);
 
   const handleWake = () => {
     if (!orgSlug) return;
@@ -32,5 +38,11 @@ export function DashboardScreensaver() {
   };
 
   // Only run while authenticated on a dashboard route.
-  return <IdleScreensaver enabled={status === 'authenticated'} onWake={handleWake} />;
+  return (
+    <IdleScreensaver
+      enabled={status === 'authenticated'}
+      timeoutSeconds={timeoutSeconds}
+      onWake={handleWake}
+    />
+  );
 }

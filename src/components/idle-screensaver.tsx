@@ -1,15 +1,21 @@
 'use client';
 
 import { Package } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useBranding } from '@/providers/branding-provider';
-import { DEFAULT_IDLE_MINUTES, readIdleMinutes, useIdle } from '@/hooks/use-idle';
+import { DEFAULT_IDLE_SECONDS, useIdle } from '@/hooks/use-idle';
+import { resolveIdleSeconds } from '@/hooks/use-screensaver-timeout';
 
 interface IdleScreensaverProps {
   /** Enable detection. Pass false on screens where a screensaver is unwanted. */
   enabled?: boolean;
-  /** Override the idle timeout (minutes). Defaults to the local setting or 5 min. */
-  timeoutMinutes?: number;
+  /**
+   * Effective idle timeout in SECONDS. When omitted, falls back to the
+   * device-local override → app default (the caller should pass the resolved
+   * service_config value to honor tenant/platform defaults).
+   */
+  timeoutSeconds?: number;
   /**
    * Called once when the user wakes the screensaver. Use to force re-auth
    * (e.g. send the next staff member back to the PIN pad / login gate).
@@ -30,18 +36,19 @@ function useClock(active: boolean) {
 
 /**
  * IdleScreensaver — a branded, full-screen overlay shown after a configurable
- * idle timeout (default 5 min; read from the `inventory-idle-timeout-minutes`
- * local setting). Displays the tenant logo + a live clock. ANY interaction
+ * idle timeout (default 5 min). The effective timeout resolves as service_config
+ * (tenant/platform) → device-local override → default; callers pass the resolved
+ * seconds via `timeoutSeconds`. Displays the tenant logo + a live clock. ANY interaction
  * dismisses it and returns to the underlying screen (and fires `onWake`, used
  * by the login gate to force re-auth for the next staff member).
  *
  * Reusable: drop it anywhere inside the branded tree. Uses only semantic /
  * tenant-branding tokens (no hardcoded colors).
  */
-export function IdleScreensaver({ enabled = true, timeoutMinutes, onWake }: IdleScreensaverProps) {
+export function IdleScreensaver({ enabled = true, timeoutSeconds, onWake }: IdleScreensaverProps) {
   const { tenant } = useBranding();
-  const minutes = timeoutMinutes ?? readIdleMinutes() ?? DEFAULT_IDLE_MINUTES;
-  const timeoutMs = useMemo(() => Math.max(1, minutes) * 60_000, [minutes]);
+  const seconds = timeoutSeconds ?? resolveIdleSeconds() ?? DEFAULT_IDLE_SECONDS;
+  const timeoutMs = useMemo(() => Math.max(5, seconds) * 1000, [seconds]);
   const { idle, wake } = useIdle(timeoutMs, enabled);
   const now = useClock(idle);
 

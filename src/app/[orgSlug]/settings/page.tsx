@@ -24,7 +24,6 @@ import {
   Link2,
   Loader2,
   Lock,
-  MonitorSmartphone,
   Package,
   Percent,
   Save,
@@ -32,7 +31,7 @@ import {
   ShieldCheck,
   Truck,
 } from 'lucide-react';
-import { DEFAULT_IDLE_MINUTES, IDLE_TIMEOUT_KEY, readIdleMinutes } from '@/hooks/use-idle';
+import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
 import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
 import { DOC_TYPE_LABELS, DATE_FORMATS, type DocumentSequence } from '@/lib/api/document-sequences';
 import { useParams } from 'next/navigation';
@@ -73,56 +72,6 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange: (
 // ══════════════════════════════════════════════════════════════════════════════
 // General tab
 // ══════════════════════════════════════════════════════════════════════════════
-
-// Branded idle screensaver timeout is a per-device terminal preference (not a
-// tenant-wide setting), so it persists to localStorage on this device only.
-function IdleScreensaverCard() {
-  const [minutes, setMinutes] = useState<number>(DEFAULT_IDLE_MINUTES);
-
-  useEffect(() => {
-    setMinutes(readIdleMinutes());
-  }, []);
-
-  const save = (val: number) => {
-    const clamped = Math.min(120, Math.max(1, val || DEFAULT_IDLE_MINUTES));
-    setMinutes(clamped);
-    try {
-      localStorage.setItem(IDLE_TIMEOUT_KEY, String(clamped));
-      toast.success('Screensaver timeout saved for this device');
-    } catch {
-      toast.error('Could not save screensaver timeout');
-    }
-  };
-
-  return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <MonitorSmartphone className="h-4 w-4 text-primary" />
-          <span className="font-bold text-sm">Idle Screensaver</span>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2 max-w-xs">
-          <label className={labelClass}>Idle timeout (minutes)</label>
-          <input
-            type="number"
-            min={1}
-            max={120}
-            value={minutes}
-            onChange={(e) => setMinutes(parseInt(e.target.value) || DEFAULT_IDLE_MINUTES)}
-            onBlur={(e) => save(parseInt(e.target.value) || DEFAULT_IDLE_MINUTES)}
-            className={`${inputClass} font-mono`}
-          />
-          <p className="text-xs text-muted-foreground">
-            After this much inactivity, a branded full-screen clock appears. Any interaction returns
-            to the login / outlet picker (re-auth for the next user). Saved per device.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function GeneralTab({ orgSlug }: { orgSlug: string }) {
   const { data: settings, isLoading } = useInventorySettings(orgSlug);
@@ -231,7 +180,7 @@ function GeneralTab({ orgSlug }: { orgSlug: string }) {
         </CardContent>
       </Card>
 
-      <IdleScreensaverCard />
+      <IdleScreensaverCard orgSlug={orgSlug} canEditTenant={canEdit} />
     </div>
   );
 }
@@ -841,20 +790,23 @@ function DocumentsTab({ orgSlug }: { orgSlug: string }) {
 
 function PlatformTab() {
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          <span className="font-bold text-sm">Platform Configuration</span>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm text-muted-foreground">
-          Platform-level settings such as service config, license keys, and infrastructure defaults.
-          These settings affect all tenants and require platform admin access.
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            <span className="font-bold text-sm">Platform Configuration</span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground">
+            Platform-level defaults that apply to all tenants (unless overridden per tenant).
+            These settings require platform admin access.
+          </p>
+        </CardContent>
+      </Card>
+      <PlatformScreensaverCard />
+    </div>
   );
 }
 

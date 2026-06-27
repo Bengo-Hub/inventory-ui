@@ -2,23 +2,52 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-/** localStorage key for the per-device idle-screensaver timeout (minutes). */
+/** Legacy localStorage key for the per-device idle timeout (MINUTES). Read-only fallback. */
 export const IDLE_TIMEOUT_KEY = 'inventory-idle-timeout-minutes';
 
-/** Default idle timeout in minutes when no local setting / service_config is present. */
-export const DEFAULT_IDLE_MINUTES = 5;
+/** localStorage key for the per-device idle-screensaver override (SECONDS). */
+export const IDLE_OVERRIDE_SECONDS_KEY = 'inventory-idle-timeout-seconds';
 
-/** Read the configured idle timeout (minutes) from the local device setting, clamped 1–120. */
-export function readIdleMinutes(): number {
-  if (typeof window === 'undefined') return DEFAULT_IDLE_MINUTES;
+/** App default idle timeout in seconds when no override / service_config is present (5 min). */
+export const DEFAULT_IDLE_SECONDS = 300;
+
+/** Default idle timeout in minutes (kept for backward compatibility). */
+export const DEFAULT_IDLE_MINUTES = DEFAULT_IDLE_SECONDS / 60;
+
+/**
+ * Read the per-device idle-timeout OVERRIDE (seconds), or null if this device
+ * has no local override set. Clamped to 5..3600. Prefers the seconds key, then
+ * falls back to the legacy minutes key. Returning null lets callers fall back
+ * to the service_config (tenant/platform) value.
+ */
+export function readIdleOverrideSeconds(): number | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const raw = window.localStorage.getItem(IDLE_TIMEOUT_KEY);
-    const n = raw ? parseInt(raw, 10) : NaN;
-    if (!Number.isFinite(n) || n <= 0) return DEFAULT_IDLE_MINUTES;
-    return Math.min(120, Math.max(1, n));
+    const rawSec = window.localStorage.getItem(IDLE_OVERRIDE_SECONDS_KEY);
+    if (rawSec != null) {
+      const n = parseInt(rawSec, 10);
+      if (Number.isFinite(n) && n > 0) return Math.min(3600, Math.max(5, n));
+    }
+    const rawMin = window.localStorage.getItem(IDLE_TIMEOUT_KEY);
+    if (rawMin != null) {
+      const m = parseInt(rawMin, 10);
+      if (Number.isFinite(m) && m > 0) return Math.min(3600, Math.max(5, m * 60));
+    }
+    return null;
   } catch {
-    return DEFAULT_IDLE_MINUTES;
+    return null;
   }
+}
+
+/**
+ * Read the configured idle timeout (minutes) from the local device override,
+ * falling back to the app default. Kept for backward compatibility with callers
+ * that don't resolve the service_config value.
+ */
+export function readIdleMinutes(): number {
+  const sec = readIdleOverrideSeconds();
+  if (sec == null) return DEFAULT_IDLE_MINUTES;
+  return Math.min(120, Math.max(1, Math.round(sec / 60)));
 }
 
 const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'wheel', 'scroll'] as const;
