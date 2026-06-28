@@ -4,10 +4,12 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { useCreateGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders, usePurchaseOrder } from '@/hooks/usePurchaseOrders';
 import { useItems } from '@/hooks/useItems';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -37,6 +39,15 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const receivablePOs = (orders ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
     const { data: po } = usePurchaseOrder(org, poId);
     const create = useCreateGoodsReceipt(org, poId);
+
+    // Branch resolution: the receiving warehouse defaults to the selected PO's warehouse; if the
+    // PO has none it falls back to the active outlet's warehouse and (under "All Outlets")
+    // requires an explicit pick before posting. Receiving into the wrong branch corrupts stock.
+    const receivingWarehouse = useActiveWarehouse(org);
+    useEffect(() => {
+        if (po?.warehouse_id) receivingWarehouse.setWarehouseId(po.warehouse_id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [po?.warehouse_id]);
 
     // Map item_id -> lot-tracking flags so we can surface lot/expiry inputs only where relevant.
     const { data: itemsPage } = useItems(org, { limit: 500 });
@@ -84,7 +95,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
             .filter((l) => l.quantity_received > 0);
         if (invalid) { toast.error('Rejected quantity cannot exceed received quantity'); return; }
         if (lines.length === 0) { toast.error('Enter at least one received quantity'); return; }
-        create.mutate({ notes: notes.trim() || undefined, lines }, {
+        if (receivingWarehouse.unresolved) { toast.error('Select the receiving warehouse before posting'); return; }
+        create.mutate({ warehouse_id: receivingWarehouse.warehouseId || undefined, notes: notes.trim() || undefined, lines }, {
             onSuccess: () => { toast.success('Goods receipt created (draft) — post it to update stock'); onCreated(); },
             onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create goods receipt')),
         });
@@ -110,6 +122,14 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                     {receivablePOs.map((o) => <option key={o.id} value={o.id}>{o.po_number} — {o.supplier_name ?? ''} ({o.status})</option>)}
                                 </select>
                             </div>
+
+                            {po && (
+                                <ActiveWarehousePicker
+                                    active={receivingWarehouse}
+                                    label="Receiving Warehouse"
+                                    required
+                                />
+                            )}
 
                             {po && (
                                 <div className="space-y-2">
@@ -196,7 +216,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
 
                             <div className="flex gap-3 pt-2">
                                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-                                <Button type="submit" className="flex-1" disabled={create.isPending}>{create.isPending ? 'Creating…' : 'Create Receipt'}</Button>
+                                <Button type="submit" className="flex-1" disabled={create.isPending || receivingWarehouse.unresolved}>{create.isPending ? 'Creating…' : 'Create Receipt'}</Button>
                             </div>
                         </form>
                     </CardContent>
