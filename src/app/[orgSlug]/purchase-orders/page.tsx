@@ -6,6 +6,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
@@ -20,7 +21,7 @@ import {
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
 import { AlertTriangle, BarChart3, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
@@ -68,7 +69,6 @@ export default function PurchaseOrdersPage() {
     const [amendingId, setAmendingId] = useState<string | null>(null);
 
     const [supplierId, setSupplierId] = useState('');
-    const [warehouseId, setWarehouseId] = useState('');
     const [expectedDate, setExpectedDate] = useState('');
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
@@ -77,7 +77,9 @@ export default function PurchaseOrdersPage() {
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data;
-    const { data: warehouses } = useWarehouses(orgSlug);
+    // Branch resolution: PO posts stock into a warehouse — default to the active outlet's,
+    // require an explicit pick under "All Outlets". Amend overrides via setWarehouseId below.
+    const activeWarehouse = useActiveWarehouse(orgSlug);
     const createSupplier = useCreateSupplier(orgSlug);
     const [addSupplierOpen, setAddSupplierOpen] = useState(false);
     const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
@@ -135,7 +137,7 @@ export default function PurchaseOrdersPage() {
 
     function resetPOForm() {
         setSupplierId('');
-        setWarehouseId('');
+        activeWarehouse.reset();
         setExpectedDate('');
         setPoNotes('');
         setPayTermDays('');
@@ -161,7 +163,7 @@ export default function PurchaseOrdersPage() {
         setSelectedPO(null); // leave the detail view; the dialog lives in the list view
         setAmendingId(po.id);
         setSupplierId(po.supplier_id);
-        setWarehouseId(po.warehouse_id);
+        activeWarehouse.setWarehouseId(po.warehouse_id);
         setExpectedDate(po.expected_date ? po.expected_date.slice(0, 10) : '');
         setPoNotes(po.notes ?? '');
         setPayTermDays(po.pay_term_days != null ? String(po.pay_term_days) : '');
@@ -183,7 +185,7 @@ export default function PurchaseOrdersPage() {
     function handlePOSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!supplierId) { toast.error('Select a supplier'); return; }
-        if (!warehouseId) { toast.error('Select a warehouse'); return; }
+        if (!activeWarehouse.warehouseId || activeWarehouse.unresolved) { toast.error('Select a warehouse'); return; }
         const lines = poLines
             .filter((l) => l.itemId && parseFloat(l.quantity) > 0)
             .map((l) => ({
@@ -195,7 +197,7 @@ export default function PurchaseOrdersPage() {
 
         const payload = {
             supplier_id: supplierId,
-            warehouse_id: warehouseId,
+            warehouse_id: activeWarehouse.warehouseId,
             expected_date: expectedDate || undefined,
             notes: poNotes.trim() || undefined,
             pay_term_days: parseInt(payTermDays) > 0 ? parseInt(payTermDays) : undefined,
@@ -381,18 +383,11 @@ export default function PurchaseOrdersPage() {
                                             addLabel="Add supplier"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Warehouse *</label>
-                                        <CreatableSelect
-                                            value={warehouseId}
-                                            onChange={setWarehouseId}
-                                            options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
-                                            placeholder="Select warehouse..."
-                                            required
-                                            onAddClick={() => setAddWarehouseOpen(true)}
-                                            addLabel="Add warehouse"
-                                        />
-                                    </div>
+                                    <ActiveWarehousePicker
+                                        active={activeWarehouse}
+                                        required
+                                        onAddNew={() => setAddWarehouseOpen(true)}
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -538,7 +533,7 @@ export default function PurchaseOrdersPage() {
             <WarehouseQuickCreateDialog
                 orgSlug={orgSlug}
                 onClose={() => setAddWarehouseOpen(false)}
-                onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
+                onCreated={(wh) => { activeWarehouse.setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
             />
         )}
 

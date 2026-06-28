@@ -6,8 +6,13 @@ import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
+import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
+import { useCreateSupplier } from '@/hooks/useSuppliers';
+import { type CreateSupplierInput } from '@/lib/api/suppliers';
+import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
@@ -93,6 +98,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   );
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
+  // Preferred supplier (procurement). preferredSupplierName seeds the combobox label in edit
+  // mode before its page loads. addVendorOpen drives the inline "+ Add new vendor" dialog.
+  const [preferredSupplierId, setPreferredSupplierId] = useState(item?.preferred_supplier_id ?? '');
+  const [preferredSupplierName, setPreferredSupplierName] = useState(item?.preferred_supplier_name ?? '');
+  const [addVendorOpen, setAddVendorOpen] = useState(false);
+  const createSupplierMut = useCreateSupplier(orgSlug);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
@@ -190,6 +201,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setType(item.type);
       setCategoryId(item.category_id ?? '');
       setUnitId(item.unit_id ?? '');
+      setPreferredSupplierId(item.preferred_supplier_id ?? '');
+      setPreferredSupplierName(item.preferred_supplier_name ?? '');
       setBarcode(item.barcode ?? '');
       setReorderLevel(String(item.reorder_level ?? ''));
       setReorderQty(String(item.reorder_quantity ?? ''));
@@ -330,6 +343,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       description: description.trim() || undefined,
       type,
       category_id: categoryId || undefined,
+      // Preferred supplier: send the chosen uuid; when editing and cleared, send the nil UUID
+      // so the backend explicitly unassigns it (nil/omitted would leave it untouched). On
+      // create, omit when empty.
+      preferred_supplier_id: preferredSupplierId
+        ? preferredSupplierId
+        : item
+          ? '00000000-0000-0000-0000-000000000000'
+          : undefined,
       unit_id: unitId || undefined,
       barcode: barcode.trim() || undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
@@ -469,6 +490,25 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   />
                 </div>
               </div>
+
+              {/* Preferred Supplier — procurement attribute (drives per-vendor PO split). Shown
+                  for stockable items; searchable combobox with an inline "+ Add new vendor". */}
+              {isStockable && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Preferred Supplier <span className="text-muted-foreground font-normal">(optional)</span></label>
+                  <SupplierCombobox
+                    orgSlug={orgSlug}
+                    value={preferredSupplierId}
+                    valueLabel={preferredSupplierName}
+                    onChange={(id) => {
+                      setPreferredSupplierId(id);
+                      if (!id) setPreferredSupplierName('');
+                    }}
+                    onAddNew={() => setAddVendorOpen(true)}
+                  />
+                  <p className="text-xs text-muted-foreground">Default vendor used when auto-cutting purchase orders for this item.</p>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description</label>
@@ -873,6 +913,28 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
           orgSlug={orgSlug}
           onClose={() => setAddUnitOpen(false)}
           onCreated={(u) => { setUnitId(u.id); setAddUnitOpen(false); }}
+        />
+      )}
+
+      {/* Inline "+ Add new vendor" — creates a supplier via the inventory-api master, then
+          appends + selects it as the item's preferred supplier. Rendered as a sibling overlay
+          so the item form stays mounted and NONE of its in-progress state is lost. */}
+      {addVendorOpen && (
+        <SupplierFormDialog
+          editing={null}
+          isPending={createSupplierMut.isPending}
+          onClose={() => setAddVendorOpen(false)}
+          onSubmit={(data: CreateSupplierInput) => {
+            createSupplierMut.mutate(data, {
+              onSuccess: (created) => {
+                setPreferredSupplierId(created.id);
+                setPreferredSupplierName(created.name);
+                setAddVendorOpen(false);
+                toast.success('Vendor added and set as preferred supplier');
+              },
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to add vendor')),
+            });
+          }}
         />
       )}
     </div>

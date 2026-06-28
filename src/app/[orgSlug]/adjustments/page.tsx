@@ -5,8 +5,9 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { AlertTriangle, ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
@@ -41,10 +42,11 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
     const [quantity, setQuantity] = useState('');
     const [reason, setReason] = useState('');
     const [notes, setNotes] = useState('');
-    const [warehouseId, setWarehouseId] = useState('');
     const [unitId, setUnitId] = useState('');
 
-    const { data: warehouses } = useWarehouses(orgSlug);
+    // Branch resolution: default to the active outlet's warehouse; require an explicit pick
+    // when "All Outlets" is selected (block submit while unresolved).
+    const activeWarehouse = useActiveWarehouse(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const mutation = useCreateAdjustment(orgSlug);
 
@@ -58,6 +60,10 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
             toast.error('Please fill in all required fields');
             return;
         }
+        if (activeWarehouse.unresolved) {
+            toast.error('Select a warehouse for this adjustment before submitting');
+            return;
+        }
 
         // Send the enum VALUE (e.g. "correction"), not the human label — the API validates
         // reason against the stockadjustment enum and silently collapses unknown values to
@@ -67,7 +73,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
             adjustment: type === 'add' ? qty : -qty,
             reason,
             notes: notes.trim() || undefined,
-            warehouse_id: warehouseId || undefined,
+            warehouse_id: activeWarehouse.warehouseId || undefined,
             unit_id: unitId || undefined,
         }, {
             onSuccess: () => {
@@ -155,17 +161,11 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                 </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">Warehouse</label>
-                                <CreatableSelect
-                                    value={warehouseId}
-                                    onChange={setWarehouseId}
-                                    options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
-                                    placeholder="All Warehouses"
-                                    onAddClick={() => setAddWarehouseOpen(true)}
-                                    addLabel="Add warehouse"
-                                />
-                            </div>
+                            <ActiveWarehousePicker
+                                active={activeWarehouse}
+                                required
+                                onAddNew={() => setAddWarehouseOpen(true)}
+                            />
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Reason *</label>
@@ -200,7 +200,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>
                                     Cancel
                                 </Button>
-                                <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+                                <Button type="submit" className="flex-1" disabled={mutation.isPending || activeWarehouse.unresolved}>
                                     {mutation.isPending ? 'Recording...' : `Record ${type === 'add' ? 'Addition' : 'Removal'}`}
                                 </Button>
                             </div>
@@ -213,7 +213,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                 <WarehouseQuickCreateDialog
                     orgSlug={orgSlug}
                     onClose={() => setAddWarehouseOpen(false)}
-                    onCreated={(wh) => { setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
+                    onCreated={(wh) => { activeWarehouse.setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
                 />
             )}
             {addUnitOpen && (

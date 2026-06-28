@@ -12,8 +12,10 @@ import {
 } from '@/hooks/useTransfers';
 import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
@@ -151,7 +153,9 @@ export default function TransfersPage() {
     // Inline create-and-link: which warehouse picker (source/destination) requested a quick-create.
     const [addWarehouseFor, setAddWarehouseFor] = useState<'from' | 'to' | null>(null);
 
-    const [fromWarehouse, setFromWarehouse] = useState('');
+    // Source warehouse uses branch resolution (defaults to the active outlet; explicit pick
+    // required under "All Outlets"). Destination stays an unscoped explicit pick.
+    const sourceWarehouse = useActiveWarehouse(orgSlug);
     const [toWarehouse, setToWarehouse] = useState('');
     const [note, setNote] = useState('');
     const [referenceNo, setReferenceNo] = useState('');
@@ -179,7 +183,7 @@ export default function TransfersPage() {
     useMemo(() => { setPage(1); }, [search]);
 
     function openCreate() {
-        setFromWarehouse('');
+        sourceWarehouse.reset();
         setToWarehouse('');
         setNote('');
         setReferenceNo('');
@@ -209,11 +213,15 @@ export default function TransfersPage() {
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!fromWarehouse || !toWarehouse) {
+        if (sourceWarehouse.unresolved) {
+            toast.error('Select the source warehouse before submitting');
+            return;
+        }
+        if (!sourceWarehouse.warehouseId || !toWarehouse) {
             toast.error('Select source and destination warehouses');
             return;
         }
-        if (fromWarehouse === toWarehouse) {
+        if (sourceWarehouse.warehouseId === toWarehouse) {
             toast.error('Source and destination must be different');
             return;
         }
@@ -227,7 +235,7 @@ export default function TransfersPage() {
         }
 
         createTransfer.mutate({
-            source_warehouse_id: fromWarehouse,
+            source_warehouse_id: sourceWarehouse.warehouseId,
             destination_warehouse_id: toWarehouse,
             notes: note.trim() || undefined,
             reference_no: referenceNo.trim() || undefined,
@@ -360,18 +368,12 @@ export default function TransfersPage() {
                             <CardContent className="overflow-y-auto flex-1">
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-sm font-medium">From Warehouse *</label>
-                                            <CreatableSelect
-                                                value={fromWarehouse}
-                                                onChange={setFromWarehouse}
-                                                options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
-                                                placeholder="Select source..."
-                                                required
-                                                onAddClick={() => setAddWarehouseFor('from')}
-                                                addLabel="Add warehouse"
-                                            />
-                                        </div>
+                                        <ActiveWarehousePicker
+                                            active={sourceWarehouse}
+                                            label="From Warehouse"
+                                            required
+                                            onAddNew={() => setAddWarehouseFor('from')}
+                                        />
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">To Warehouse *</label>
                                             <CreatableSelect
@@ -508,7 +510,7 @@ export default function TransfersPage() {
                     orgSlug={orgSlug}
                     onClose={() => setAddWarehouseFor(null)}
                     onCreated={(wh) => {
-                        if (addWarehouseFor === 'from') setFromWarehouse(wh.id);
+                        if (addWarehouseFor === 'from') sourceWarehouse.setWarehouseId(wh.id);
                         else setToWarehouse(wh.id);
                         setAddWarehouseFor(null);
                     }}

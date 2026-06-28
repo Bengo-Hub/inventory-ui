@@ -19,6 +19,10 @@ export interface Item {
   type: 'GOODS' | 'SERVICE' | 'RECIPE' | 'INGREDIENT' | 'VOUCHER' | 'EQUIPMENT';
   category_id?: string;
   category_name?: string;
+  // Preferred supplier for procurement (drives per-vendor PO split). Bound on the item form.
+  // preferred_supplier_name is read-only, surfaced by inventory-api when the edge is loaded.
+  preferred_supplier_id?: string | null;
+  preferred_supplier_name?: string;
   unit_id?: string;
   is_active: boolean;
   image_url?: string;
@@ -112,6 +116,8 @@ export interface CreateItemInput {
   description?: string;
   type: string;
   category_id?: string;
+  // Preferred supplier (uuid). Empty-string/null sentinel clears it on update.
+  preferred_supplier_id?: string | null;
   unit_id?: string;
   barcode?: string;
   reorder_level?: number;
