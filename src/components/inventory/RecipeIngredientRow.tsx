@@ -2,8 +2,10 @@
 
 import { Input } from '@/components/ui/base';
 import { ItemSearchInput } from './ItemSearchInput';
-import type { Unit } from '@/lib/api/units';
 import { Trash2 } from 'lucide-react';
+
+/** Minimal unit shape needed to auto-detect a recipe line's unit from an ingredient. */
+type UnitOption = { id: string; abbreviation: string };
 
 export interface IngredientRowValue {
   ingredient_name: string;
@@ -24,7 +26,7 @@ interface Props {
   onChange: (index: number, updated: IngredientRowValue) => void;
   onRemove: (index: number) => void;
   /** Tenant units, used to auto-fill the unit from the picked ingredient's base unit. */
-  units?:  Unit[];
+  units?:  UnitOption[];
 }
 
 /** One row in the inline recipe ingredient table inside ItemFormDialog / wizard. */

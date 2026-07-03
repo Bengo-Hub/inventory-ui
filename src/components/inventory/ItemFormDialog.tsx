@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { InfoHint } from '@/components/ui/info-hint';
 import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
@@ -109,6 +110,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
+  // Opening stock — create mode only. Seeds on-hand in the default warehouse as an
+  // opening_balance adjustment; afterwards stock is managed via Adjustments / Stock Take.
+  const [initialQty, setInitialQty] = useState('');
   const [costPrice, setCostPrice] = useState(item?.cost_price != null ? String(item.cost_price) : '');
   const [minSellingPrice, setMinSellingPrice] = useState(item?.min_selling_price != null ? String(item.min_selling_price) : '');
   const [maxSellingPrice, setMaxSellingPrice] = useState(item?.max_selling_price != null ? String(item.max_selling_price) : '');
@@ -353,6 +357,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
           : undefined,
       unit_id: unitId || undefined,
       barcode: barcode.trim() || undefined,
+      // Opening stock is a create-time seed only — on edit, stock is changed via Adjustments /
+      // Stock Take so the ledger stays the single source of truth (avoids double-counting).
+      initial_quantity: !item && isStockable && initialQty !== '' ? parseInt(initialQty, 10) : undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
       cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
@@ -588,13 +595,48 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
               {/* Stock-only fields — irrelevant for services/events/vouchers/recipes */}
               {isStockable && (
                 <>
+                  {/* Opening stock — create mode only. Edits go through Adjustments / Stock Take. */}
+                  {!item ? (
+                    <div className="space-y-2 rounded-lg border border-border bg-accent/20 p-3">
+                      <label className="text-sm font-medium inline-flex items-center gap-1">
+                        Initial Stock on Hand <span className="text-muted-foreground font-normal">(optional)</span>
+                        <InfoHint title="Opening balance">
+                          The quantity you already have of this item right now, in its base unit. It seeds on-hand stock
+                          in your default warehouse and is logged as an <em>opening balance</em> adjustment. Leave blank
+                          (or 0) to start empty. After creation, change stock only via <strong>Stock&nbsp;›&nbsp;Adjustments</strong>
+                          or a <strong>Stock Take</strong> so the ledger stays accurate.
+                        </InfoHint>
+                      </label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        placeholder="0"
+                        value={initialQty}
+                        onChange={(e) => setInitialQty(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Whole units in the item&apos;s base unit, added to the default warehouse. For per-warehouse counts or
+                        corrections later, use Adjustments or a Stock Take.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground -mt-1">
+                      To change stock levels, use <strong>Stock&nbsp;›&nbsp;Adjustments</strong> or a <strong>Stock Take</strong> — opening stock is set once, at creation.
+                    </p>
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Reorder Level</label>
+                      <label className="text-sm font-medium inline-flex items-center gap-1">Reorder Level
+                        <InfoHint title="Reorder point">When on-hand falls to or below this number, the item flags as low stock (and can auto-raise a purchase order). This is a threshold, not a stock quantity.</InfoHint>
+                      </label>
                       <Input type="number" min="0" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Reorder Quantity</label>
+                      <label className="text-sm font-medium inline-flex items-center gap-1">Reorder Quantity
+                        <InfoHint title="Reorder quantity">How much to reorder when the level is hit — the default order/top-up amount. Not your current stock.</InfoHint>
+                      </label>
                       <Input type="number" min="0" placeholder="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} />
                     </div>
                   </div>
@@ -673,7 +715,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     onClick={() => setRecipeOpen((o) => !o)}
                     className="flex items-center justify-between w-full text-sm font-semibold"
                   >
-                    <span>Recipe / BOM Ingredients</span>
+                    <span className="inline-flex items-center gap-1">Recipe / BOM Ingredients
+                      <InfoHint title="Recipe defines consumption, not stock">
+                        These ingredients are what one batch of this item <em>uses up</em> when sold or produced — they are
+                        not this item&apos;s own stock (a recipe/menu item holds no stock of its own). New ingredients are
+                        auto-created empty; set each ingredient&apos;s opening stock on its own item, via Adjustments, or a
+                        Stock Take.
+                      </InfoHint>
+                    </span>
                     {recipeOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
 
@@ -717,6 +766,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                             orgSlug={orgSlug}
                             row={row}
                             index={i}
+                            units={units}
                             onChange={(idx, updated) =>
                               setRecipeIngredients((prev) => prev.map((r, j) => j === idx ? updated : r))
                             }
