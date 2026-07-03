@@ -36,6 +36,12 @@ export const P = {
   STOCK_DELETE:       'inventory.stock.delete',
   STOCK_MANAGE:       'inventory.stock.manage',
 
+  // Stock counts / takes
+  STOCK_COUNT_VIEW:    'inventory.stock_count.view',
+  STOCK_COUNT_ADD:     'inventory.stock_count.add',
+  STOCK_COUNT_CHANGE:  'inventory.stock_count.change',
+  STOCK_COUNT_APPROVE: 'inventory.stock_count.approve',
+
   // Transfers
   TRANSFERS_ADD:      'inventory.transfers.add',
   TRANSFERS_READ:     'inventory.transfers.read',

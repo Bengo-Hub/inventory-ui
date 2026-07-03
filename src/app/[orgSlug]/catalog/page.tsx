@@ -221,7 +221,19 @@ export default function CatalogPage() {
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
   const [selectedWarehouseCode, setSelectedWarehouseCode] = useState('');
 
-  const { bulkImport, isPending: isImporting, templateUrl } = useBulkImport(orgSlug);
+  const { bulkImport, isPending: isImporting, downloadTemplate } = useBulkImport(orgSlug);
+  const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
+
+  async function handleDownloadTemplate() {
+    setIsDownloadingTemplate(true);
+    try {
+      await downloadTemplate();
+    } catch {
+      toast.error('Could not download the import template. Please try again.');
+    } finally {
+      setIsDownloadingTemplate(false);
+    }
+  }
   const { data: warehouses } = useWarehouses(orgSlug);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -305,14 +317,15 @@ export default function CatalogPage() {
                   </select>
                 )}
 
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={templateUrl}
-                    download="inventory-template.xlsx"
-                    title="Download XLSX template — fill and re-upload to bulk-add menu items"
-                  >
-                    <FileSpreadsheet className="h-4 w-4 mr-1.5" />Template
-                  </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleDownloadTemplate}
+                  disabled={isDownloadingTemplate}
+                  title="Download XLSX template — fill and re-upload to bulk-add menu items"
+                >
+                  <FileSpreadsheet className="h-4 w-4 mr-1.5" />
+                  {isDownloadingTemplate ? 'Preparing…' : 'Template'}
                 </Button>
 
                 <Button

@@ -8,27 +8,16 @@ import {
     useUpdateApprovalRule,
 } from '@/hooks/useApprovals';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import type { ApprovalModule, ApprovalRule, ApprovalStep } from '@/lib/api/approvals';
+import { APPROVAL_MODULES, APPROVAL_MODULE_LABELS, type ApprovalModule, type ApprovalRule, type ApprovalStep } from '@/lib/api/approvals';
+import { InfoHint } from '@/components/ui/info-hint';
 import { AlertTriangle, ArrowLeft, Minus, Plus, Shield, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const MODULE_LABEL: Record<string, string> = {
-    purchase_order: 'Purchase Order',
-    requisition: 'Requisition',
-    rfq: 'RFQ Award',
-    purchase_return: 'Purchase Return',
-    goods_receipt: 'Goods Receipt',
-    contract: 'Contract',
-    production_batch: 'Production Batch',
-    stock_transfer: 'Stock Transfer',
-    asset_disposal: 'Asset Disposal',
-    asset_transfer: 'Asset Transfer',
-    asset_maintenance: 'Asset Maintenance',
-};
+const MODULE_LABEL: Record<string, string> = APPROVAL_MODULE_LABELS;
 
 const ROLE_OPTIONS: { value: string; label: string }[] = [
     { value: 'inventory_admin', label: 'Inventory Admin' },
@@ -64,6 +53,17 @@ export default function ApprovalRulesPage() {
     const [maxAmount, setMaxAmount] = useState('');
     const [isActive, setIsActive] = useState(true);
     const [steps, setSteps] = useState<StepDraft[]>([{ name: 'Manager sign-off', approver_role: 'warehouse_manager' }]);
+
+    // Group the module options for the <optgroup> select, preserving declaration order.
+    const moduleGroups = useMemo(() => {
+        const order: string[] = [];
+        const byGroup = new Map<string, typeof APPROVAL_MODULES>();
+        for (const m of APPROVAL_MODULES) {
+            if (!byGroup.has(m.group)) { byGroup.set(m.group, []); order.push(m.group); }
+            byGroup.get(m.group)!.push(m);
+        }
+        return order.map((g) => [g, byGroup.get(g)!] as const);
+    }, []);
 
     function resetForm() {
         setModule('purchase_order');
@@ -262,31 +262,21 @@ export default function ApprovalRulesPage() {
                                 <form onSubmit={handleSubmit} className="space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-sm font-medium">Module *</label>
+                                            <label className="text-sm font-medium inline-flex items-center gap-1">Module *
+                                                <InfoHint title="What this rule gates">The document type this rule applies to. When such a document&apos;s amount falls in the band below, it must pass the approval steps before it can proceed — e.g. a stock adjustment or write-off above the threshold is held for manager sign-off.</InfoHint>
+                                            </label>
                                             <select
                                                 value={module}
                                                 onChange={(e) => setModule(e.target.value as ApprovalModule)}
                                                 className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                             >
-                                                <optgroup label="Procurement">
-                                                    <option value="purchase_order">Purchase Order (send)</option>
-                                                    <option value="requisition">Requisition (submit)</option>
-                                                    <option value="rfq">RFQ (award)</option>
-                                                    <option value="purchase_return">Purchase Return (approve)</option>
-                                                    <option value="goods_receipt">Goods Receipt (post)</option>
-                                                    <option value="contract">Contract (activate)</option>
-                                                </optgroup>
-                                                <optgroup label="Manufacturing">
-                                                    <option value="production_batch">Production Batch (start)</option>
-                                                </optgroup>
-                                                <optgroup label="Stock">
-                                                    <option value="stock_transfer">Stock Transfer (ship)</option>
-                                                </optgroup>
-                                                <optgroup label="Assets">
-                                                    <option value="asset_disposal">Asset Disposal (complete)</option>
-                                                    <option value="asset_transfer">Asset Transfer (complete)</option>
-                                                    <option value="asset_maintenance">Asset Maintenance (complete)</option>
-                                                </optgroup>
+                                                {moduleGroups.map(([group, mods]) => (
+                                                    <optgroup key={group} label={group}>
+                                                        {mods.map((m) => (
+                                                            <option key={m.value} value={m.value}>{m.label}</option>
+                                                        ))}
+                                                    </optgroup>
+                                                ))}
                                             </select>
                                         </div>
                                         <div className="space-y-2">

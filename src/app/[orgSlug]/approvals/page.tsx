@@ -6,7 +6,7 @@ import {
     useApproveRequest,
     useRejectRequest,
 } from '@/hooks/useApprovals';
-import type { ApprovalRequest, ApprovalRequestStatus } from '@/lib/api/approvals';
+import { APPROVAL_MODULE_LABELS, type ApprovalRequest, type ApprovalRequestStatus } from '@/lib/api/approvals';
 import { AlertTriangle, CheckCircle2, ClipboardList, Inbox, ShieldCheck, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -27,19 +27,7 @@ const ROLE_LABEL: Record<string, string> = {
     viewer: 'Viewer',
 };
 
-const MODULE_LABEL: Record<string, string> = {
-    purchase_order: 'Purchase Order',
-    requisition: 'Requisition',
-    rfq: 'RFQ Award',
-    purchase_return: 'Purchase Return',
-    goods_receipt: 'Goods Receipt',
-    contract: 'Contract',
-    production_batch: 'Production Batch',
-    stock_transfer: 'Stock Transfer',
-    asset_disposal: 'Asset Disposal',
-    asset_transfer: 'Asset Transfer',
-    asset_maintenance: 'Asset Maintenance',
-};
+const MODULE_LABEL: Record<string, string> = APPROVAL_MODULE_LABELS;
 
 function roleLabel(code: string) {
     return ROLE_LABEL[code] ?? code;

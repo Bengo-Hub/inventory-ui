@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { InfoHint } from '@/components/ui/info-hint';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
@@ -16,6 +17,27 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { approvalGateFromError } from '@/lib/api/approvals';
+
+/**
+ * When a large adjustment is routed through the approval workflow the API returns a 422
+ * with { approval_required: true }. Surface that as an informational message (not an error)
+ * and report handled so callers skip the generic failure toast. Returns true if it was an
+ * approval gate.
+ */
+function handleApprovalGate(e: unknown): boolean {
+    const gate = approvalGateFromError(e);
+    if (!gate) return false;
+    toast.info(
+        gate.state === 'pending' || gate.state === 'not_submitted'
+            ? 'This adjustment is awaiting manager approval before it can post.'
+            : gate.state === 'rejected'
+                ? 'This adjustment was rejected by an approver and cannot post.'
+                : 'This adjustment exceeds the approval threshold — a request has been sent for manager sign-off. It will post once approved.',
+        { duration: 6000 },
+    );
+    return true;
+}
 
 const REASON_OPTIONS = [
     { value: 'correction', label: 'Count Correction' },
@@ -81,6 +103,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                 onClose();
             },
             onError: async (e) => {
+                if (handleApprovalGate(e)) { onClose(); return; }
                 toast.error(await apiErrorMessage(e, 'Failed to record adjustment'));
             },
         });
@@ -168,7 +191,14 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                             />
 
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Reason *</label>
+                                <label className="text-sm font-medium inline-flex items-center gap-1">Reason *
+                                    <InfoHint title="Why the count is changing">
+                                        Sets the audit trail and reporting bucket. Use <strong>Initial Stock Count</strong> to load
+                                        opening stock for a brand-new item, <strong>Count Correction</strong> after a stock take,
+                                        and <strong>Damaged / Expired / Theft</strong> for write-offs (these may need manager approval
+                                        above a configured amount).
+                                    </InfoHint>
+                                </label>
                                 <select
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}

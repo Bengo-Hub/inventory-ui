@@ -1,10 +1,12 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { InfoHint } from '@/components/ui/info-hint';
 import { CategoryCombobox } from '@/components/inventory/CategoryCombobox';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { itemsApi, type MenuItemCompositeRequest } from '@/lib/api/items';
+import { useUnits } from '@/hooks/useUnits';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -73,12 +75,16 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-medium">Servings (batch yield)</label>
+          <label className="text-sm font-medium inline-flex items-center gap-1">Servings (batch yield)
+            <InfoHint title="Batch yield">The number of portions the ingredient quantities in Step 2 produce. Enter 1 if you list ingredients for a single serving; enter 10 if the recipe is written for a batch of 10. Cost per portion = batch cost ÷ servings.</InfoHint>
+          </label>
           <Input type="number" min={0.1} step={0.5} placeholder="1" value={data.servings} onChange={(e) => set('servings', e.target.value)} />
           <p className="text-xs text-muted-foreground">How many portions this batch produces (usually 1).</p>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Target Margin % <span className="text-muted-foreground font-normal">(optional)</span></label>
+          <label className="text-sm font-medium inline-flex items-center gap-1">Target Margin % <span className="text-muted-foreground font-normal">(optional)</span>
+            <InfoHint title="Target food-cost margin">The gross margin you aim to keep on this dish. The food-cost bar in Step 2 turns red when ingredient cost eats into this target, warning you to raise the price or trim the recipe. Leave blank to use the tenant default.</InfoHint>
+          </label>
           <Input type="number" min={0} max={99} step={1} placeholder="e.g. 30" value={data.targetMargin} onChange={(e) => set('targetMargin', e.target.value)} />
         </div>
       </div>
@@ -105,6 +111,7 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
   sellingPrice:   number;
   servings:       number;
 }) {
+  const { data: units } = useUnits(orgSlug);
   const batchCost = ingredients.reduce((sum, row) => {
     if (!row.qty || !(row.cost_price ?? 0)) return sum;
     return sum + row.qty * (row.cost_price ?? 0) * (1 + (row.waste_percent ?? 0) / 100);
@@ -112,14 +119,38 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Add each raw ingredient used in this recipe. The system will auto-create any new ingredient in your inventory.
-        The <strong>EP (edible portion) cost per base unit</strong> is loaded from each ingredient — edit it for live food-cost.
-      </p>
+      <div className="rounded-lg border border-border bg-accent/20 p-3 text-sm text-muted-foreground space-y-1.5">
+        <p className="flex items-start gap-1.5">
+          <strong className="text-foreground">Build the recipe.</strong>
+          <span>List every raw ingredient one portion of this dish consumes. Picking an ingredient that isn&apos;t in
+          inventory yet will auto-create it. Costs flow from here into the live food-cost bar below.</span>
+        </p>
+        <p className="text-xs">
+          <strong>Initial stock is not set here.</strong> This step defines the <em>recipe</em> (what&apos;s used), not
+          how much you have. Add opening stock for each ingredient afterwards on <em>Stock&nbsp;›&nbsp;Adjustments</em>
+          (reason &ldquo;Initial Stock Count&rdquo;) or a Stock&nbsp;Take.
+        </p>
+      </div>
 
       <div className="space-y-0">
         <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_72px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
-          <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>EP Cost</span><span>Line</span><span />
+          <span>Ingredient</span>
+          <span className="inline-flex items-center gap-1">Qty
+            <InfoHint title="Quantity per portion">How much of this ingredient one serving uses, expressed in the Unit beside it. Must be greater than 0.</InfoHint>
+          </span>
+          <span className="inline-flex items-center gap-1">Unit
+            <InfoHint title="Unit of measure">Auto-filled from the ingredient&apos;s base unit when you pick it (e.g. g, ml, pc). Override only if this recipe measures it differently.</InfoHint>
+          </span>
+          <span className="inline-flex items-center gap-1">Waste%
+            <InfoHint title="Trim / prep loss">Extra percentage lost to peeling, trimming or cooking. Effective qty = Qty × (1 + Waste%/100), so 100 g at 10% waste costs as 110 g.</InfoHint>
+          </span>
+          <span className="inline-flex items-center gap-1">EP Cost
+            <InfoHint title="Edible-portion cost per unit">Cost of ONE base unit of the usable ingredient (e.g. cost per 1 g). Prefilled from the ingredient; edit to model current prices.</InfoHint>
+          </span>
+          <span className="inline-flex items-center gap-1">Line
+            <InfoHint title="Line cost">Auto-calculated: Qty × EP&nbsp;Cost × (1 + Waste%/100). This is what this one ingredient contributes to the batch cost.</InfoHint>
+          </span>
+          <span />
         </div>
         {ingredients.length === 0 && (
           <p className="py-6 text-center text-sm text-muted-foreground">No ingredients yet — add the first one below.</p>
@@ -130,6 +161,7 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
             orgSlug={orgSlug}
             row={row}
             index={i}
+            units={units}
             onChange={(idx, updated) =>
               setIngredients(ingredients.map((r, j) => j === idx ? updated : r))
             }
@@ -189,27 +221,48 @@ function Step3({ modifiers, setModifiers }: { modifiers: ModGroup[]; setModifier
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Modifiers are optional extras (e.g. "Extra Cheese", "Add Bacon"). Add a <strong>Stock SKU</strong> to
-        link an option to an ingredient for automatic stock deduction when selected.
-      </p>
+      <div className="rounded-lg border border-border bg-accent/20 p-3 text-sm text-muted-foreground space-y-1.5">
+        <p>
+          <strong className="text-foreground">Modifiers are choices the cashier makes when selling this item</strong> —
+          e.g. a &ldquo;Size&rdquo; group (Small / Large) or an &ldquo;Extras&rdquo; group (Extra Cheese, Add Bacon).
+          They&apos;re optional; skip this step for a plain dish.
+        </p>
+        <p className="text-xs">
+          Each <strong>group</strong> is one question; each <strong>option</strong> is an answer that can bump the price
+          and (optionally) deduct a linked ingredient from stock. This is different from Step&nbsp;2 ingredients, which
+          are always consumed by every sale.
+        </p>
+      </div>
 
       {modifiers.map((g, gi) => (
         <div key={gi} className="border border-border rounded-lg p-3 space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <Input
-              placeholder="Group name (e.g. Extras)"
-              value={g.group_name}
-              onChange={(e) => setGroupField(gi, 'group_name', e.target.value)}
-              className="flex-1 min-w-[180px]"
-            />
+            <span className="inline-flex flex-1 min-w-45 items-center gap-1.5">
+              <Input
+                placeholder="Group name (e.g. Size, Extras)"
+                value={g.group_name}
+                onChange={(e) => setGroupField(gi, 'group_name', e.target.value)}
+                className="flex-1"
+              />
+              <InfoHint title="Modifier group">The question shown at the till, e.g. &ldquo;Choose a size&rdquo; or &ldquo;Add extras&rdquo;. Group related options under one name.</InfoHint>
+            </span>
             <label className="flex items-center gap-1.5 text-sm">
               <input type="checkbox" checked={g.is_required} onChange={(e) => setGroupField(gi, 'is_required', e.target.checked)} />
               Required
+              <InfoHint title="Required group">When on, the cashier MUST pick an option from this group before the item can be added to the order (e.g. size). Leave off for optional add-ons.</InfoHint>
             </label>
             <button type="button" onClick={() => removeGroup(gi)} className="text-muted-foreground hover:text-destructive text-xs">Remove</button>
           </div>
 
+          <div className="hidden sm:grid grid-cols-[1fr_120px_140px] gap-2 text-xs font-medium text-muted-foreground">
+            <span>Option name</span>
+            <span className="inline-flex items-center gap-1">Price adj.
+              <InfoHint title="Price adjustment">Amount added to (or, if negative, subtracted from) the selling price when this option is chosen. Use 0 for a free choice.</InfoHint>
+            </span>
+            <span className="inline-flex items-center gap-1">Stock SKU
+              <InfoHint title="Link to an ingredient (optional)">Enter an inventory item&apos;s SKU to auto-deduct its stock whenever this option is sold — e.g. &ldquo;Add Bacon&rdquo; → the bacon SKU. Leave blank if nothing should be deducted.</InfoHint>
+            </span>
+          </div>
           {g.options.map((opt, oi) => (
             <div key={oi} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_140px] gap-2">
               <Input placeholder="Option name" value={opt.name} onChange={(e) => setOptionField(gi, oi, 'name', e.target.value)} />
@@ -281,6 +334,20 @@ export default function NewMenuItemPage() {
     const cleanIngredients = ingredients.filter(
       (r) => r.ingredient_name.trim() !== '' || r.ingredient_sku.trim() !== '',
     );
+    // A recipe line must consume a positive quantity — the API rejects qty <= 0. Catch it here
+    // with a precise message instead of letting the whole submit fail server-side.
+    const missingQty = cleanIngredients.find((r) => !(r.qty > 0));
+    if (missingQty) {
+      toast.error(`Enter a quantity greater than 0 for "${missingQty.ingredient_name || missingQty.ingredient_sku}"`);
+      setStep(1);
+      return;
+    }
+    const missingUnit = cleanIngredients.find((r) => !r.unit.trim());
+    if (missingUnit) {
+      toast.error(`Choose a unit for "${missingUnit.ingredient_name || missingUnit.ingredient_sku}"`);
+      setStep(1);
+      return;
+    }
     const cleanModifiers = modifiers
       .filter((g) => g.group_name.trim() !== '')
       .map((g) => ({ ...g, options: g.options.filter((o) => o.name.trim() !== '') }));

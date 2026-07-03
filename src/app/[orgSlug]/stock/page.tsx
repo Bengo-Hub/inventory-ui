@@ -15,6 +15,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { approvalGateFromError } from '@/lib/api/approvals';
 import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 25;
@@ -111,7 +112,22 @@ function StockDrawer({
                 setAdjNotes('');
                 setShowAdjForm(false);
             },
-            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record adjustment')),
+            onError: async (e) => {
+                const gate = approvalGateFromError(e);
+                if (gate) {
+                    toast.info(
+                        gate.state === 'pending' || gate.state === 'not_submitted'
+                            ? 'This adjustment is awaiting manager approval before it can post.'
+                            : gate.state === 'rejected'
+                                ? 'This adjustment was rejected by an approver and cannot post.'
+                                : 'This adjustment exceeds the approval threshold — a request has been sent for sign-off. It will post once approved.',
+                        { duration: 6000 },
+                    );
+                    setShowAdjForm(false);
+                    return;
+                }
+                toast.error(await apiErrorMessage(e, 'Failed to record adjustment'));
+            },
         });
     }
 

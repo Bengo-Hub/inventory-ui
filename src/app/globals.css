@@ -203,6 +203,10 @@ button:focus-visible {
   }
 
   .dark {
+    /* Force native controls (select/option popups, date pickers, scrollbars) to
+       render with dark chrome. Without this the browser paints <option> lists on
+       its default light canvas, making dropdowns show white-on-white in dark mode. */
+    color-scheme: dark;
     --background: 18 42% 13%;
     --foreground: 24 82% 95%;
     --card: 18 38% 17%;
@@ -240,6 +244,15 @@ button:focus-visible {
   }
   body {
     @apply bg-background text-foreground min-h-screen antialiased transition-colors duration-150 ease-out;
+  }
+  /* Theme-aware native selects. Many filter dropdowns use bg-transparent, which
+     lets the browser paint the closed control and its <option> popup on the
+     default light canvas — unreadable white-on-white in dark mode. Pin the
+     option surface to the popover tokens so menus stay legible in every theme. */
+  select option,
+  select optgroup {
+    background-color: hsl(var(--popover));
+    color: hsl(var(--popover-foreground));
   }
 }
 

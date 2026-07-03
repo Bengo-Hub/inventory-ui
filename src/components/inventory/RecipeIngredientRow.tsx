@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/base';
 import { ItemSearchInput } from './ItemSearchInput';
+import type { Unit } from '@/lib/api/units';
 import { Trash2 } from 'lucide-react';
 
 export interface IngredientRowValue {
@@ -12,6 +13,8 @@ export interface IngredientRowValue {
   waste_percent:   number;
   notes:           string;
   cost_price?:     number; // EP cost per base unit — for live costing
+  /** True once the user manually edits the unit, so an ingredient re-pick won't overwrite it. */
+  unit_touched?:   boolean;
 }
 
 interface Props {
@@ -20,10 +23,12 @@ interface Props {
   index:   number;
   onChange: (index: number, updated: IngredientRowValue) => void;
   onRemove: (index: number) => void;
+  /** Tenant units, used to auto-fill the unit from the picked ingredient's base unit. */
+  units?:  Unit[];
 }
 
 /** One row in the inline recipe ingredient table inside ItemFormDialog / wizard. */
-export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove }: Props) {
+export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, units }: Props) {
   function set<K extends keyof IngredientRowValue>(key: K, val: IngredientRowValue[K]) {
     onChange(index, { ...row, [key]: val });
   }
@@ -44,10 +49,17 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove }:
           placeholder="Search ingredient…"
           fixedDropdown
           onSelect={(item) => {
+            // Auto-detect the recipe line's unit from the ingredient's own base unit so the
+            // operator doesn't have to guess it (unless they already typed one themselves).
+            const detected = item.unit_id
+              ? units?.find((u) => u.id === item.unit_id)?.abbreviation
+              : undefined;
+            const nextUnit = row.unit_touched && row.unit ? row.unit : (detected ?? row.unit);
             onChange(index, {
               ...row,
               ingredient_name: item.name,
               ingredient_sku:  item.sku,
+              unit: nextUnit,
               // Prefill the EP cost from the picked ingredient so line/batch costs populate.
               cost_price: item.cost_price ?? row.cost_price,
             });
@@ -74,9 +86,10 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove }:
         <label className="text-xs text-muted-foreground mb-1 block">Unit</label>
         <Input
           value={row.unit}
-          onChange={(e) => set('unit', e.target.value)}
+          onChange={(e) => onChange(index, { ...row, unit: e.target.value, unit_touched: true })}
           className="h-8 text-sm"
           placeholder="g / ml / pc"
+          title="Auto-filled from the ingredient's base unit when you pick it. Override if this recipe uses a different unit."
         />
       </div>
 

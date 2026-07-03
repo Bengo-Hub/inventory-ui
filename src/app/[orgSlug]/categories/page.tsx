@@ -84,9 +84,32 @@ export default function CategoriesPage() {
         deleteMutation.mutate(cat.id);
     }
 
-    // Sort: root categories first, then children nested under parents
     const sorted = useMemo(() => {
         if (!categories) return [];
+
+        // Search mode: show ONLY categories matching the query (by name OR code),
+        // ranked so exact matches come first, then prefix matches, then substrings.
+        // The hierarchical nesting is intentionally dropped here so the matched
+        // row is always surfaced at the very top instead of being buried under
+        // its parent root.
+        const q = search.trim().toLowerCase();
+        if (q) {
+            const rank = (c: Category): number => {
+                const name = c.name.toLowerCase();
+                const code = (c.code ?? '').toLowerCase();
+                if (name === q || code === q) return 0;            // exact match
+                if (name.startsWith(q) || code.startsWith(q)) return 1; // prefix match
+                if (name.includes(q) || code.includes(q)) return 2;     // substring match
+                return 3;                                          // no match
+            };
+            return categories
+                .map((c) => ({ cat: c, r: rank(c) }))
+                .filter(({ r }) => r < 3)
+                .sort((a, b) => a.r - b.r || a.cat.name.localeCompare(b.cat.name))
+                .map(({ cat }) => cat as Category & { indent?: boolean });
+        }
+
+        // Default view: root categories first, then children nested under parents.
         const roots = categories.filter((c) => !c.parent_id);
         const children = categories.filter((c) => !!c.parent_id);
         const result: Array<Category & { indent?: boolean }> = [];
@@ -105,7 +128,7 @@ export default function CategoriesPage() {
             }
         }
         return result;
-    }, [categories]);
+    }, [categories, search]);
 
     const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
     const paginatedItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);

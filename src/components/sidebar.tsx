@@ -70,14 +70,14 @@ interface NavGroup {
 // Mirrors pos-ui's USE_CASE_MODULES pattern.
 
 const USE_CASE_MODULES: Record<string, string[]> = {
-  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
-  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
-  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'events', 'assets', 'requisitions', 'approvals','settings'],
-  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'assets', 'settings'],
-  manufacturing: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'transfers', 'lots', 'purchase_orders', 'rfqs', 'suppliers', 'production_batches', 'assets', 'requisitions', 'approvals', 'settings'],
+  hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'stock_take', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'events', 'assets', 'requisitions', 'approvals','settings'],
+  warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
+  logistics:     ['dashboard', 'warehouses', 'stock', 'transfers', 'adjustments', 'stock_take', 'assets', 'settings'],
+  manufacturing: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs', 'suppliers', 'production_batches', 'assets', 'requisitions', 'approvals', 'settings'],
 };
 
 // Maps a sidebar module key to the subscription feature the backend enforces for it.
@@ -86,6 +86,7 @@ const USE_CASE_MODULES: Record<string, string[]> = {
 const MODULE_FEATURE: Record<string, string> = {
   stock: 'stock_tracking',
   adjustments: 'stock_tracking',
+  stock_take: 'stock_tracking',
   purchase_orders: 'purchase_orders',
 };
 
@@ -244,6 +245,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Warehouses', icon: Warehouse, href: '/warehouses', moduleKey: 'warehouses' },
         { label: 'Stock Levels', icon: BookOpen, href: '/stock', moduleKey: 'stock' },
         { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', moduleKey: 'adjustments' },
+        { label: 'Stock Take', icon: ClipboardCheck, href: '/stock-take', moduleKey: 'stock_take' },
         { label: 'Transfers', icon: ArrowRightLeft, href: '/transfers', moduleKey: 'transfers' },
         { label: 'Lots & Batches', icon: Layers, href: '/lots', moduleKey: 'lots' },
       ],

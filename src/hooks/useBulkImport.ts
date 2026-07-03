@@ -25,5 +25,8 @@ export function useBulkImport(orgSlug: string) {
     error:       mutation.error,
     reset:       mutation.reset,
     templateUrl: itemsApi.downloadTemplateUrl(orgSlug),
+    // Fetches the (auth-gated, multi-sheet XLSX) import template as a Blob and
+    // triggers a browser download. Falls back to a client-generated CSV.
+    downloadTemplate: () => itemsApi.downloadTemplate(orgSlug),
   };
 }

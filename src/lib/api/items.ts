@@ -189,6 +189,42 @@ export interface PaginatedItems {
   hasMore: boolean;
 }
 
+// Column-correct CSV fallback for the bulk-import "Items" sheet. Mirrors the
+// header row + one example row emitted by the inventory-api import-template
+// endpoint (internal/http/handlers/inventory_import_template.go), so an imported
+// CSV lines up with what the bulk-import parser expects.
+function buildItemsTemplateCsv(): string {
+  const headers = [
+    'sku', 'name', 'type', 'description', 'category_name', 'unit_name',
+    'cost_price', 'selling_price', 'is_perishable', 'track_lots',
+    'reorder_level', 'reorder_quantity', 'barcode', 'tags', 'image_url',
+    'requires_age_verification', 'is_active', 'initial_quantity', 'warehouse_name',
+    'use_case', 'tax_code_id', 'tax_inclusive',
+    'purchase_price', 'purchase_pack_size', 'purchase_unit', 'yield_pct',
+    'weight_kg', 'dimensions_cm',
+    'meal_plan', 'occupancy_basis', 'max_adults', 'max_children', 'extra_bed_allowed', 'single_supplement',
+    'total_capacity', 'event_start_at', 'event_end_at', 'event_venue',
+    'brand', 'manufacturer', 'model',
+  ];
+  const example: (string | number)[] = [
+    'SOD001', 'Soda 300ml', 'GOODS', 'Resale beverage', 'Soft Drink', 'each',
+    35, 150, 'FALSE', 'FALSE',
+    10, 50, '', '', '',
+    'FALSE', 'TRUE', 24, '',
+    'FOOD_BEVERAGE', '', 'FALSE',
+    35, 1, 'each', 1,
+    0.33, '',
+    '', '', '', '', '', '',
+    '', '', '', '',
+    'Coca-Cola', 'Coca-Cola Company', '330ml Can',
+  ];
+  const escape = (v: string | number) => {
+    const s = String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return [headers.join(','), example.map(escape).join(',')].join('\r\n') + '\r\n';
+}
+
 export const itemsApi = {
   list: async (orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string; use_case?: string }): Promise<PaginatedItems> => {
     const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), params as Record<string, string | number | undefined>);
@@ -234,6 +270,35 @@ export const itemsApi = {
 
   downloadTemplateUrl: (orgSlug: string) =>
     `/api/v1/${orgSlug}/inventory/import-template`,
+
+  /**
+   * Download the bulk-import template. The backend serves a multi-sheet XLSX
+   * (Items / RecipeIngredients / ModifierGroups / ModifierOptions / InitialStock)
+   * behind auth + tenant headers, so a plain <a href> would 404 against the UI
+   * origin and carry no credentials. Fetch it as a Blob through the shared
+   * apiClient (interceptors apply auth) and trigger a browser download.
+   *
+   * If the endpoint is unavailable we fall back to a client-generated CSV of the
+   * Items sheet so the button always yields a usable, column-correct template.
+   */
+  downloadTemplate: async (orgSlug: string): Promise<void> => {
+    let blob: Blob;
+    let filename = 'inventory_import_template.xlsx';
+    try {
+      blob = await apiClient.getBlob(itemsApi.downloadTemplateUrl(orgSlug));
+    } catch {
+      blob = new Blob([buildItemsTemplateCsv()], { type: 'text/csv;charset=utf-8;' });
+      filename = 'inventory-items-template.csv';
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 
   createMenuItemComposite: (orgSlug: string, payload: MenuItemCompositeRequest) =>
     apiClient.post<MenuItemCompositeResult>(`/api/v1/${orgSlug}/inventory/items/menu-item`, payload),

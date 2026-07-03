@@ -16,12 +16,17 @@ export interface Supplier {
   payment_method_type?: PaymentMethodType;
   mpesa_phone?: string;
   mpesa_business_name?: string;
+  // B2B M-Pesa fields (for supplier payments to a paybill or till)
+  mpesa_shortcode?: string;      // Recipient paybill or till number
+  mpesa_account_ref?: string;    // Account reference at recipient paybill
+  mpesa_shortcode_type?: 'paybill' | 'till'; // Determines CommandID: BusinessPayBill vs BusinessBuyGoods
   bank_account_number?: string;
   bank_name?: string;
   bank_branch?: string;
   tax_pin?: string;
   requires_invoice_before_payment?: boolean;
   auto_pay_enabled?: boolean;
+  auto_pay_max_amount?: number;    // POs above this amount require manual approval (0 = no limit)
   payment_terms_days?: number;
   credit_limit?: number;
   created_at: string;
@@ -40,12 +45,16 @@ export interface CreateSupplierInput {
   payment_method_type?: PaymentMethodType;
   mpesa_phone?: string;
   mpesa_business_name?: string;
+  mpesa_shortcode?: string;
+  mpesa_account_ref?: string;
+  mpesa_shortcode_type?: 'paybill' | 'till';
   bank_account_number?: string;
   bank_name?: string;
   bank_branch?: string;
   tax_pin?: string;
   requires_invoice_before_payment?: boolean;
   auto_pay_enabled?: boolean;
+  auto_pay_max_amount?: number;
   payment_terms_days?: number;
   credit_limit?: number;
 }

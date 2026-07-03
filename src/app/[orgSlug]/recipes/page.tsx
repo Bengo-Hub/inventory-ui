@@ -56,7 +56,23 @@ export default function RecipesPage() {
 
     const mutation = editing ? updateMutation : createMutation;
 
-    const paginatedItems = data?.data ?? [];
+    // Re-rank the returned page so an active search surfaces the matched recipe
+    // to the very top row. We match on name, SKU and produced-item name, ordering
+    // exact matches first, then prefix, then substring. Without this the list keeps
+    // the backend's default order and the match can appear below other rows.
+    const paginatedItems = useMemo(() => {
+        const rows = data?.data ?? [];
+        const q = search.trim().toLowerCase();
+        if (!q) return rows;
+        const rank = (r: Recipe): number => {
+            const fields = [r.name, r.sku, r.item_name ?? ''].map((f) => f.toLowerCase());
+            if (fields.some((f) => f === q)) return 0;
+            if (fields.some((f) => f.startsWith(q))) return 1;
+            if (fields.some((f) => f.includes(q))) return 2;
+            return 3;
+        };
+        return [...rows].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+    }, [data?.data, search]);
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
 
     useMemo(() => { setPage(1); }, [search]);
