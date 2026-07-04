@@ -263,6 +263,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     placeholderData: [],
   });
 
+  // Abbreviation of the selected base unit (e.g. "L", "kg"), shown as a suffix on
+  // quantity fields so opening stock / reorder values read in the right unit.
+  const unitAbbr = (units ?? []).find((u) => u.id === unitId)?.abbreviation ?? '';
+
   // In event mode show only event categories; fall back to all if the tenant has none seeded.
   const eventCategories = categories?.filter(isEventCategory) ?? [];
   const visibleCategories = isEventMode
@@ -359,7 +363,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       barcode: barcode.trim() || undefined,
       // Opening stock is a create-time seed only — on edit, stock is changed via Adjustments /
       // Stock Take so the ledger stays the single source of truth (avoids double-counting).
-      initial_quantity: !item && isStockable && initialQty !== '' ? parseInt(initialQty, 10) : undefined,
+      initial_quantity: !item && isStockable && initialQty !== '' ? parseFloat(initialQty) : undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
       cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
@@ -599,25 +603,33 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   {!item ? (
                     <div className="space-y-2 rounded-lg border border-border bg-accent/20 p-3">
                       <label className="text-sm font-medium inline-flex items-center gap-1">
-                        Initial Stock on Hand <span className="text-muted-foreground font-normal">(optional)</span>
-                        <InfoHint title="Opening balance">
-                          The quantity you already have of this item right now, in its base unit. It seeds on-hand stock
-                          in your default warehouse and is logged as an <em>opening balance</em> adjustment. Leave blank
-                          (or 0) to start empty. After creation, change stock only via <strong>Stock&nbsp;›&nbsp;Adjustments</strong>
-                          or a <strong>Stock Take</strong> so the ledger stays accurate.
+                        Initial Stock on Hand{unitAbbr ? <span className="text-muted-foreground font-normal"> (in {unitAbbr})</span> : <span className="text-muted-foreground font-normal"> (optional)</span>}
+                        <InfoHint title="Opening balance — enter it in the base unit">
+                          Enter how much you have right now measured in this item&apos;s <strong>base unit</strong>
+                          {unitAbbr ? <> ({unitAbbr})</> : null}, not in packs. Decimals are allowed. Example: two 3&nbsp;L
+                          bottles of oil with one half-used = 3 + 1.5 = <strong>4.5</strong> (base unit&nbsp;L). If you&apos;d
+                          rather count whole bottles, set the item&apos;s unit to &ldquo;bottle&rdquo; instead and enter the
+                          bottle count. It seeds on-hand in your default warehouse as an <em>opening balance</em> adjustment;
+                          change it afterwards only via <strong>Adjustments</strong> or a <strong>Stock Take</strong>.
                         </InfoHint>
                       </label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="1"
-                        placeholder="0"
-                        value={initialQty}
-                        onChange={(e) => setInitialQty(e.target.value)}
-                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="0"
+                          value={initialQty}
+                          onChange={(e) => setInitialQty(e.target.value)}
+                          className={unitAbbr ? 'pr-14' : undefined}
+                        />
+                        {unitAbbr && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{unitAbbr}</span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">
-                        Whole units in the item&apos;s base unit, added to the default warehouse. For per-warehouse counts or
-                        corrections later, use Adjustments or a Stock Take.
+                        Amount in the item&apos;s base unit{unitAbbr ? <> ({unitAbbr})</> : null}, added to the default warehouse.
+                        Convert packs to the base unit first (e.g. 2 × 3&nbsp;L = 6&nbsp;L). Decimals allowed.
                       </p>
                     </div>
                   ) : (
@@ -628,16 +640,24 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium inline-flex items-center gap-1">Reorder Level
-                        <InfoHint title="Reorder point">When on-hand falls to or below this number, the item flags as low stock (and can auto-raise a purchase order). This is a threshold, not a stock quantity.</InfoHint>
+                      <label className="text-sm font-medium inline-flex items-center gap-1">
+                        Reorder Level{unitAbbr ? <span className="text-muted-foreground font-normal"> ({unitAbbr})</span> : null}
+                        <InfoHint title="Reorder point">When on-hand falls to or below this number{unitAbbr ? <> of {unitAbbr}</> : null}, the item flags as low stock (and can auto-raise a purchase order). This is a threshold, not a stock quantity.</InfoHint>
                       </label>
-                      <Input type="number" min="0" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} />
+                      <div className="relative">
+                        <Input type="number" min="0" placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className={unitAbbr ? 'pr-14' : undefined} />
+                        {unitAbbr && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{unitAbbr}</span>}
+                      </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium inline-flex items-center gap-1">Reorder Quantity
-                        <InfoHint title="Reorder quantity">How much to reorder when the level is hit — the default order/top-up amount. Not your current stock.</InfoHint>
+                      <label className="text-sm font-medium inline-flex items-center gap-1">
+                        Reorder Quantity{unitAbbr ? <span className="text-muted-foreground font-normal"> ({unitAbbr})</span> : null}
+                        <InfoHint title="Reorder quantity">How much to reorder when the level is hit — the default order/top-up amount{unitAbbr ? <> in {unitAbbr}</> : null}. Not your current stock.</InfoHint>
                       </label>
-                      <Input type="number" min="0" placeholder="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} />
+                      <div className="relative">
+                        <Input type="number" min="0" placeholder="0" value={reorderQty} onChange={(e) => setReorderQty(e.target.value)} className={unitAbbr ? 'pr-14' : undefined} />
+                        {unitAbbr && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground pointer-events-none">{unitAbbr}</span>}
+                      </div>
                     </div>
                   </div>
 
