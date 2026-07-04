@@ -30,10 +30,12 @@ const REQUEST_TYPES: { value: RequestType; label: string; hint: string }[] = [
 const PRIORITIES: Priority[] = ['low', 'medium', 'high', 'critical'];
 
 type InvLine = { itemId: string; itemName: string; quantity: string; urgent: boolean };
-type ExtLine = { description: string; specifications: string; quantity: string; estimatedPrice: string; supplierId: string; urgent: boolean };
+// External lines can now link to an inventory item (itemId) — an out-of-stock item may
+// already exist in the catalog — while keeping a free-text description for anything new.
+type ExtLine = { itemId: string; itemName: string; description: string; specifications: string; quantity: string; estimatedPrice: string; supplierId: string; urgent: boolean };
 
 const emptyInv = (): InvLine => ({ itemId: '', itemName: '', quantity: '1', urgent: false });
-const emptyExt = (): ExtLine => ({ description: '', specifications: '', quantity: '1', estimatedPrice: '', supplierId: '', urgent: false });
+const emptyExt = (): ExtLine => ({ itemId: '', itemName: '', description: '', specifications: '', quantity: '1', estimatedPrice: '', supplierId: '', urgent: false });
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 const textareaClass = `${selectClass} resize-none`;
@@ -59,6 +61,10 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
     const [serviceDescription, setServiceDescription] = useState('');
     const [expectedDeliverables, setExpectedDeliverables] = useState('');
     const [duration, setDuration] = useState('');
+    // Provider + estimated cost so an approved service request auto-raises a PO to the provider.
+    const [serviceSupplierId, setServiceSupplierId] = useState('');
+    const [serviceEstPrice, setServiceEstPrice] = useState('');
+    const [addServiceSupplier, setAddServiceSupplier] = useState(false);
 
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: suppliersPage } = useSuppliers(orgSlug);
@@ -88,6 +94,8 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                 service_description: serviceDescription.trim(),
                 expected_deliverables: expectedDeliverables.trim() || undefined,
                 duration: duration.trim() || undefined,
+                supplier_id: serviceSupplierId || undefined,
+                estimated_price: serviceEstPrice ? Number(serviceEstPrice) : undefined,
             }];
         }
         if (isInventory) {
@@ -98,17 +106,20 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
             return lines;
         }
         const lines = extLines
-            .filter((l) => l.description.trim())
+            .filter((l) => l.description.trim() || l.itemId)
             .map<RequisitionLine>((l) => ({
                 item_type: 'external',
-                description: l.description.trim(),
+                // Linking to an existing (or newly-created) inventory item lets the approved
+                // requisition auto-raise a purchase order against that item.
+                item_id: l.itemId || undefined,
+                description: (l.description.trim() || l.itemName) || undefined,
                 specifications: l.specifications.trim() || undefined,
                 quantity: Number(l.quantity) || 1,
                 estimated_price: l.estimatedPrice ? Number(l.estimatedPrice) : undefined,
                 supplier_id: l.supplierId || undefined,
                 urgent: l.urgent,
             }));
-        if (lines.length === 0) { setError('Add at least one external item with a description.'); return null; }
+        if (lines.length === 0) { setError('Add at least one external item — search an item or type a description.'); return null; }
         return lines;
     }
 
@@ -249,9 +260,24 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                             <Plus className="h-3 w-3 mr-1" /> Add
                                         </Button>
                                     </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Search the catalog first — an item may already exist even if it&apos;s out of stock. Pick it (or
+                                        create it) to link the request to inventory so an approved requisition can auto-raise a purchase
+                                        order. Not in the catalog and shouldn&apos;t be? Just type a description.
+                                    </p>
                                     {extLines.map((l, i) => (
                                         <div key={i} className="space-y-2 p-3 rounded-lg border border-border">
-                                            <Input placeholder="Item description *" value={l.description} onChange={(e) => setExt(i, { description: e.target.value })} />
+                                            <ItemSearchInput
+                                                orgSlug={orgSlug}
+                                                value={l.itemName}
+                                                fixedDropdown
+                                                onSelect={(item) => setExt(i, { itemId: item.id, itemName: item.name, description: l.description.trim() || item.name })}
+                                                placeholder="Search inventory item (or create new)…"
+                                            />
+                                            {l.itemId && (
+                                                <p className="text-xs text-primary">Linked to catalog item “{l.itemName}”. <button type="button" className="underline" onClick={() => setExt(i, { itemId: '', itemName: '' })}>Clear</button></p>
+                                            )}
+                                            <Input placeholder={l.itemId ? 'Description (optional — defaults to the item name)' : 'Item description *'} value={l.description} onChange={(e) => setExt(i, { description: e.target.value })} />
                                             <Input placeholder="Specifications (brand, model, spec…)" value={l.specifications} onChange={(e) => setExt(i, { specifications: e.target.value })} />
                                             <div className="grid grid-cols-2 gap-2">
                                                 <Input type="number" min="1" placeholder="Qty" value={l.quantity} onChange={(e) => setExt(i, { quantity: e.target.value })} />
@@ -297,6 +323,24 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                             <Input value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="e.g. 3 weeks" />
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Provider / Supplier</label>
+                                            <CreatableSelect
+                                                value={serviceSupplierId}
+                                                onChange={setServiceSupplierId}
+                                                options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                                placeholder="Who will provide this? (optional)"
+                                                onAddClick={() => setAddServiceSupplier(true)}
+                                                addLabel="Add provider"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium">Estimated Cost</label>
+                                            <Input type="number" min="0" step="0.01" value={serviceEstPrice} onChange={(e) => setServiceEstPrice(e.target.value)} placeholder="e.g. 50000" />
+                                        </div>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">Set a provider so the approved request can auto-raise a purchase order to them.</p>
                                 </div>
                             )}
 
@@ -328,6 +372,22 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                             setAddSupplierForLine(null);
                         },
                         onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
+                    })}
+                />
+            )}
+
+            {addServiceSupplier && (
+                <SupplierFormDialog
+                    editing={null}
+                    isPending={createSupplier.isPending}
+                    onClose={() => setAddServiceSupplier(false)}
+                    onSubmit={(data) => createSupplier.mutate(data, {
+                        onSuccess: (s) => {
+                            toast.success('Provider created');
+                            setServiceSupplierId(s.id);
+                            setAddServiceSupplier(false);
+                        },
+                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create provider')),
                     })}
                 />
             )}
