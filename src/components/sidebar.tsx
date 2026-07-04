@@ -20,6 +20,7 @@ import {
   Key,
   LayoutDashboard,
   Layers,
+  Lock,
   LogOut,
   Monitor,
   Package,
@@ -58,6 +59,9 @@ interface NavItem {
   href: string;
   /** Module key used for use_case filtering. Omit to always show. */
   moduleKey?: string;
+  /** True when the tenant's plan lacks this module's feature — shown with an upgrade
+   *  badge but still navigable; the page renders the upgrade blocker. */
+  locked?: boolean;
 }
 
 interface NavGroup {
@@ -132,7 +136,16 @@ function NavLink({ item, orgSlug, onClose }: { item: NavItem; orgSlug: string; o
       )}
     >
       <Icon className={cn('h-4.5 w-4.5 shrink-0 transition-transform duration-200', !active && 'group-hover:scale-110')} />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate flex-1">{item.label}</span>
+      {item.locked && !active && (
+        <span
+          className="flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500 border border-amber-500/20 shrink-0"
+          title="Your plan doesn’t include this — upgrade to unlock"
+        >
+          <Lock className="h-2.5 w-2.5" />
+          Upgrade
+        </span>
+      )}
     </Link>
   );
 }
@@ -311,13 +324,15 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     },
   ];
 
-  // Filter groups and items by outlet use_case (admins bypass gating)
+  // Filter groups/items by outlet use_case only. Subscription gating never HIDES an item —
+  // items the plan doesn't include stay visible (marked `locked` with an upgrade badge) and
+  // remain navigable; the destination page renders the upgrade blocker (SubscriptionGate).
   const navGroups = allNavGroups
     .map((group) => ({
       ...group,
-      items: group.items.filter(
-        (item) => hasModule(item.moduleKey, useCase) && hasFeatureAccess(item.moduleKey),
-      ),
+      items: group.items
+        .filter((item) => hasModule(item.moduleKey, useCase))
+        .map((item) => ({ ...item, locked: !hasFeatureAccess(item.moduleKey) })),
     }))
     .filter((group) => group.items.length > 0);
 

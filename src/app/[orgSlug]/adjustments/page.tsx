@@ -11,7 +11,7 @@ import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useUnits } from '@/hooks/useUnits';
-import { SubscriptionGate } from '@/components/subscription/subscription-gate';
+import { FeatureLockBanner } from '@/components/subscription/feature-lock-banner';
 import { AlertTriangle, ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -301,14 +301,15 @@ export default function AdjustmentsPage() {
                     <p className="text-muted-foreground mt-1">Add or remove stock manually</p>
                 </div>
                 {canAdjust && (
-                    <SubscriptionGate feature="stock_tracking" fallback={null}>
-                        <Button onClick={() => openModal()}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Adjustment
-                        </Button>
-                    </SubscriptionGate>
+                    <Button onClick={() => openModal()}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Adjustment
+                    </Button>
                 )}
             </div>
+
+            {/* Non-hiding upgrade blocker: keeps the page + button visible, explains the lock. */}
+            <FeatureLockBanner feature="stock_tracking" />
 
             <Card>
                 <CardHeader>
