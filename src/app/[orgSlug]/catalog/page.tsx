@@ -17,6 +17,7 @@ import { AlertTriangle, Barcode, Edit2, Eye, FileSpreadsheet, Filter, Package, P
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
+import { UpgradeBadge } from '@bengo-hub/shared-ui-lib/subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
@@ -190,6 +191,17 @@ export default function CatalogPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { hasFeature } = useSubscription();
   const canBulkImport = hasFeature('bulk_import');
+  // Bulk-import buttons stay visible even without the feature; a locked tap prompts to upgrade
+  // rather than hiding the control. Returns true when the action may proceed.
+  function guardBulkImport(): boolean {
+    if (canBulkImport) return true;
+    const subscribeUrl = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexitsolutions.com';
+    toast.info('Bulk import needs a plan upgrade', {
+      description: 'Upgrade your plan to import items in bulk from a spreadsheet.',
+      action: { label: 'Upgrade', onClick: () => window.open(`${subscribeUrl}/subscribe`, '_blank') },
+    });
+    return false;
+  }
   const { can, canAny } = usePermissions();
   const canAdd = can(P.CATALOG_ADD);
   const canChange = can(P.CATALOG_CHANGE);
@@ -302,10 +314,11 @@ export default function CatalogPage() {
           <div className="flex flex-wrap items-center gap-2">
             <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xlsm" className="hidden" onChange={handleFileChange} />
 
-            {/* Bulk-import group — gated by subscription feature */}
-            {canBulkImport && (
+            {/* Bulk-import group — always shown; when the plan lacks bulk_import the buttons
+                carry an upgrade badge and a tap prompts to upgrade instead of being hidden. */}
+            {canAdd && (
               <>
-                {warehouses && warehouses.length > 0 && (
+                {canBulkImport && warehouses && warehouses.length > 0 && (
                   <select
                     value={selectedWarehouseCode}
                     onChange={(e) => setSelectedWarehouseCode(e.target.value)}
@@ -322,23 +335,25 @@ export default function CatalogPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleDownloadTemplate}
+                  onClick={() => { if (!guardBulkImport()) return; handleDownloadTemplate(); }}
                   disabled={isDownloadingTemplate}
                   title="Download XLSX template — fill and re-upload to bulk-add menu items"
                 >
                   <FileSpreadsheet className="h-4 w-4 mr-1.5" />
                   {isDownloadingTemplate ? 'Preparing…' : 'Template'}
+                  {!canBulkImport && <UpgradeBadge className="ml-1.5" />}
                 </Button>
 
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => { setImportResult(null); fileInputRef.current?.click(); }}
+                  onClick={() => { if (!guardBulkImport()) return; setImportResult(null); fileInputRef.current?.click(); }}
                   disabled={isImporting}
                   title="Import a filled XLSX or CSV template"
                 >
                   <Upload className="h-4 w-4 mr-1.5" />
                   {isImporting ? 'Importing…' : 'Import'}
+                  {!canBulkImport && <UpgradeBadge className="ml-1.5" />}
                 </Button>
 
                 {/* Visual separator between import and create groups */}
