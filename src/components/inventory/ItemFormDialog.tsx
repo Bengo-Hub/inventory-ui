@@ -4,7 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { InfoHint } from '@/components/ui/info-hint';
 import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
-import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { RecipeIngredientRow, ingredientLineForSubmit, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
@@ -322,15 +322,20 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         tags: [],
         is_perishable: isPerishable,
         image_url: imageUrl || undefined,
-        ingredients: recipeIngredients.map((row) => ({
-          ingredient_name: row.ingredient_name,
-          ingredient_sku:  row.ingredient_sku || undefined,
-          qty:             row.qty,
-          unit:            row.unit,
-          waste_percent:   row.waste_percent || 0,
-          notes:           row.notes || undefined,
-          cost_price:      row.cost_price,
-        })),
+        ingredients: recipeIngredients.map((row) => {
+          // Convert the line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it
+          // costs correctly against the per-base-unit cost.
+          const { qty, unit } = ingredientLineForSubmit(row);
+          return {
+            ingredient_name: row.ingredient_name,
+            ingredient_sku:  row.ingredient_sku || undefined,
+            qty,
+            unit,
+            waste_percent:   row.waste_percent || 0,
+            notes:           row.notes || undefined,
+            cost_price:      row.cost_price,
+          };
+        }),
       });
       return;
     }
@@ -777,7 +782,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
                       {/* Ingredient rows */}
                       <div className="space-y-0">
-                        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_72px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+                        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_84px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
                           <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>EP Cost</span><span>Line</span><span/>
                         </div>
                         {recipeIngredients.map((row, i) => (

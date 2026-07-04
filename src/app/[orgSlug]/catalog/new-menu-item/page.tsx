@@ -4,7 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { InfoHint } from '@/components/ui/info-hint';
 import { CategoryCombobox } from '@/components/inventory/CategoryCombobox';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
-import { RecipeIngredientRow, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { RecipeIngredientRow, ingredientLineForSubmit, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { itemsApi, type MenuItemCompositeRequest } from '@/lib/api/items';
 import { useUnits } from '@/hooks/useUnits';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -133,13 +133,13 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
       </div>
 
       <div className="space-y-0">
-        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_72px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_84px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
           <span>Ingredient</span>
           <span className="inline-flex items-center gap-1">Qty
             <InfoHint title="Quantity per portion">How much of this ingredient one serving uses, expressed in the Unit beside it. Must be greater than 0.</InfoHint>
           </span>
           <span className="inline-flex items-center gap-1">Unit
-            <InfoHint title="Unit of measure">Auto-filled from the ingredient&apos;s base unit when you pick it (e.g. g, ml, pc). Override only if this recipe measures it differently.</InfoHint>
+            <InfoHint title="Unit of measure">Defaults to the ingredient&apos;s stock unit when you pick it. You can choose a smaller/compatible unit for this line (e.g. ml when the oil is stocked in L) — the quantity is automatically converted back to the stock unit when you save, so costing stays correct.</InfoHint>
           </span>
           <span className="inline-flex items-center gap-1">Waste%
             <InfoHint title="Trim / prep loss">Extra percentage lost to peeling, trimming or cooking. Effective qty = Qty × (1 + Waste%/100), so 100 g at 10% waste costs as 110 g.</InfoHint>
@@ -360,7 +360,20 @@ export default function NewMenuItemPage() {
       selling_price: sellingPrice,
       servings,
       target_margin_percent: step1.targetMargin ? parseFloat(step1.targetMargin) : undefined,
-      ingredients:   cleanIngredients,
+      // Convert each line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it stores
+      // and costs correctly against the ingredient's per-base-unit cost.
+      ingredients:   cleanIngredients.map((r) => {
+        const { qty, unit } = ingredientLineForSubmit(r);
+        return {
+          ingredient_name: r.ingredient_name,
+          ingredient_sku:  r.ingredient_sku || undefined,
+          qty,
+          unit,
+          waste_percent:   r.waste_percent || 0,
+          notes:           r.notes || undefined,
+          cost_price:      r.cost_price,
+        };
+      }),
       modifiers:     cleanModifiers.length > 0 ? cleanModifiers : undefined,
     });
   }
