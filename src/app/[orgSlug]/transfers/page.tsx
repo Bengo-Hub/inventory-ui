@@ -12,6 +12,7 @@ import {
 } from '@/hooks/useTransfers';
 import type { TransferSummary } from '@/lib/api/transfers';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
@@ -149,6 +150,7 @@ export default function TransfersPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
+    useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Transfer
     const [viewId, setViewId] = useState<string | null>(null);
     // Inline create-and-link: which warehouse picker (source/destination) requested a quick-create.
     const [addWarehouseFor, setAddWarehouseFor] = useState<'from' | 'to' | null>(null);

@@ -6,6 +6,7 @@ import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useBulkImport } from '@/hooks/useBulkImport';
@@ -208,6 +209,7 @@ export default function CatalogPage() {
   const [statusFilter, setStatusFilter] = useState('active');
   const [page, setPage] = useState(1);
   const [createOpen, setCreateOpen] = useState(false);
+  useCreateFromQuery(() => setCreateOpen(true), 'item'); // mobile quick-add → open Add Item
   const [viewItem, setViewItem] = useState<Item | null>(null);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);

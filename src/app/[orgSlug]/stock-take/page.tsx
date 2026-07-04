@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import {
     useApproveStockCount,
     useCancelStockCount,
@@ -326,6 +327,7 @@ export default function StockTakePage() {
     const canApprove = canAny([P.STOCK_COUNT_APPROVE, P.STOCK_MANAGE]);
 
     const [createOpen, setCreateOpen] = useState(false);
+    useCreateFromQuery(() => setCreateOpen(true)); // mobile quick-add → open New Stock Take
     const [openId, setOpenId] = useState<string | null>(null);
 
     const whName = useMemo(() => {

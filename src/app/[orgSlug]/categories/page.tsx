@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -37,6 +38,7 @@ export default function CategoriesPage() {
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
+    useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Category
     const [editing, setEditing] = useState<Category | null>(null);
 
     const [formName, setFormName] = useState('');

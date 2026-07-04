@@ -8,6 +8,7 @@ import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuic
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
@@ -263,6 +264,7 @@ export default function AdjustmentsPage() {
     const [search, setSearch] = useState('');
     const [page] = useState(1);
     const [showModal, setShowModal] = useState(false);
+    useCreateFromQuery(() => setShowModal(true)); // mobile quick-add → open New Adjustment
     const [prefillSku, setPrefillSku] = useState('');
     const [prefillName, setPrefillName] = useState('');
 

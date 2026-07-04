@@ -51,13 +51,13 @@ export function Header({ onMenuClick }: HeaderProps) {
         <button
           type="button"
           onClick={onMenuClick}
-          className="md:hidden p-2 rounded-xl hover:bg-accent transition-colors"
+          className="lg:hidden p-2 rounded-xl hover:bg-accent transition-colors"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5 text-muted-foreground" />
         </button>
-        <div className="flex items-center gap-2 sm:gap-6 min-w-0">
-          <h1 className="text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate max-w-[110px] sm:max-w-none">
+        <div className="flex items-center gap-2 sm:gap-6 min-w-0 flex-1">
+          <h1 className="hidden sm:block text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate sm:max-w-none">
             {getServiceTitle('Inventory')}
           </h1>
           <div className="hidden md:flex relative w-80 max-w-full group ml-4">
@@ -67,8 +67,9 @@ export function Header({ onMenuClick }: HeaderProps) {
               className="w-full h-10 bg-accent/50 border-none rounded-xl py-1.5 pl-10 pr-4 text-sm focus:ring-1 focus:ring-primary/30 transition-all outline-none"
             />
           </div>
-          {/* Outlet switcher stays accessible on mobile (essential for multi-outlet tenants). */}
-          <OutletFilter className="block shrink-0" />
+          {/* Outlet switcher stays accessible on mobile (essential for multi-outlet tenants).
+              min-w-0 lets it shrink+truncate instead of being pushed off-screen on phones. */}
+          <OutletFilter className="block min-w-0 shrink" />
         </div>
       </div>
 

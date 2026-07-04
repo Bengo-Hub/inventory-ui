@@ -14,6 +14,7 @@ import { Footer } from '@/components/footer';
 import { SubscriptionBanner } from '@/components/subscription/subscription-banner';
 import { PWAUpdateBanner } from '@/components/pwa-update-banner';
 import { PWARegistration } from '@/components/pwa-registration';
+import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 
 /**
  * Client-side belt-and-suspenders for the tenant manifest link. The authoritative
@@ -93,12 +94,15 @@ export function OrgShell({ children }: { children: ReactNode }) {
                             <Header onMenuClick={() => setSidebarOpen(true)} />
                             <SubscriptionBanner />
                             <main className="flex-1 min-h-0 overflow-y-auto bg-accent/5">
-                                <div className="min-h-full flex flex-col">
+                                {/* Bottom padding on mobile clears the fixed bottom nav bar. */}
+                                <div className="min-h-full flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">
                                     <div className="flex-1">{children}</div>
                                     <Footer />
                                 </div>
                             </main>
                         </div>
+                        {/* App-style bottom navigation + quick-add, phones only. */}
+                        <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} />
                     </div>
                 </BrandingProvider>
             </AuthProvider>

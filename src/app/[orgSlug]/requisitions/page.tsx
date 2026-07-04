@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
@@ -30,6 +31,7 @@ export default function RequisitionsPage() {
     const [status, setStatus] = useState<RequisitionStatus | ''>('');
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
+    useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Requisition
 
     const { data, isLoading, isError, refetch } = useRequisitions(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const createReq = useCreateRequisition(orgSlug);

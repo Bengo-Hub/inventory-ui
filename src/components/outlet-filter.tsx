@@ -120,7 +120,7 @@ export function OutletFilter({ className }: { className?: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors min-w-40"
+        className="flex w-full items-center gap-1.5 rounded-xl border border-border bg-card px-2.5 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors min-w-0 max-w-37.5 sm:max-w-none sm:min-w-40"
         aria-expanded={open}
         aria-haspopup="listbox"
       >
