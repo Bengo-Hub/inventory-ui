@@ -11,11 +11,24 @@ function AuthCallbackContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const params = useParams();
-    const orgSlug = params?.orgSlug as string;
+    const urlSlug = params?.orgSlug as string;
     const code = searchParams?.get('code');
     const error = searchParams?.get('error');
     const { handleSSOCallback, hydrateFromWebAuthn, status, error: authError } = useAuthStore();
     const hasStarted = useRef(false);
+
+    // Authoritative tenant for this sign-in: the slug we persisted when starting SSO. SSO may
+    // return to a registered default callback under a DIFFERENT slug (this was the bug that
+    // landed users on `codevertex`); the persisted slug keeps us on the intended tenant.
+    const [orgSlug, setOrgSlug] = useState(urlSlug);
+    const [slugReady, setSlugReady] = useState(false);
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const intended = sessionStorage.getItem('sso_org_slug');
+            if (intended && intended !== urlSlug) setOrgSlug(intended);
+        }
+        setSlugReady(true);
+    }, [urlSlug]);
 
     const [lastEmail, setLastEmail] = useState<string | null>(null);
     const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -36,15 +49,18 @@ function AuthCallbackContent() {
     });
 
     useEffect(() => {
-        if (code && orgSlug && !hasStarted.current) {
+        if (slugReady && code && orgSlug && !hasStarted.current) {
             hasStarted.current = true;
-            const callbackUrl = `${window.location.origin}/${orgSlug}/auth/callback`;
+            // redirect_uri for the token exchange MUST match the URL SSO actually returned to
+            // (the current route's slug), even when we fetch the profile for the intended tenant.
+            const callbackUrl = `${window.location.origin}/${urlSlug}/auth/callback`;
             handleSSOCallback(orgSlug, code, callbackUrl);
         }
-    }, [code, orgSlug, handleSSOCallback]);
+    }, [slugReady, code, orgSlug, urlSlug, handleSSOCallback]);
 
     useEffect(() => {
         if (status === 'authenticated') {
+            if (typeof window !== 'undefined') sessionStorage.removeItem('sso_org_slug');
             const returnTo = sessionStorage.getItem('sso_return_to');
             sessionStorage.removeItem('sso_return_to');
             const storedOutlet = typeof window !== 'undefined'
@@ -81,7 +97,7 @@ function AuthCallbackContent() {
                     <h1 className="text-xl font-bold text-destructive mb-2">Authentication Failed</h1>
                     <p className="text-muted-foreground">{error || authError}</p>
                     <button
-                        onClick={() => router.replace(`/${orgSlug}`)}
+                        onClick={() => router.replace(`/${orgSlug}/auth/login`)}
                         className="mt-6 px-4 py-2 bg-primary text-primary-foreground rounded-lg"
                     >
                         Try Again
@@ -138,12 +154,27 @@ function AuthCallbackContent() {
                     </div>
                 )}
 
-                {(code || !showBiometric) && (
+                {code && (
                     <>
                         <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
                         <h1 className="text-xl font-medium">Completing Sign-in...</h1>
                         <p className="text-muted-foreground">Syncing your profile and permissions.</p>
                     </>
+                )}
+
+                {/* No auth code and no biometric prompt → SSO returned without completing.
+                    Offer a clean retry instead of spinning forever. */}
+                {!code && !showBiometric && (
+                    <div className="max-w-sm mx-auto">
+                        <h1 className="text-xl font-medium mb-2">Sign-in didn&apos;t complete</h1>
+                        <p className="text-muted-foreground mb-6">Your session may have expired or been interrupted. Please sign in again.</p>
+                        <button
+                            onClick={() => router.replace(`/${orgSlug}/auth/login`)}
+                            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg"
+                        >
+                            Sign in
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

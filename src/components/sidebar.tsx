@@ -44,6 +44,7 @@ import { useAuthStore } from '@/store/auth';
 import { isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
 import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
+import { usePermissions } from '@/hooks/usePermissions';
 import { nomenclatureFor } from '@/lib/use-case-nomenclature';
 
 interface SidebarProps {
@@ -197,10 +198,14 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // Bypassed for platform/demo/service-charge tenants and while the plan is still loading,
   // so we never hide a feature the tenant actually has.
   const { hasFeature, isLoading: subLoading, isPlatformOwner: subPlatform, isDemo, isServiceCharge, info } = useSubscription();
+  // Tenant admins/owners (and platform owners) get every in-scope module — they administer the
+  // tenant, so subscription-feature gating must not hide navigation from them.
+  const { isSuperuser } = usePermissions();
   function hasFeatureAccess(key: string | undefined): boolean {
     if (!key) return true;
     const feature = MODULE_FEATURE[key];
     if (!feature) return true;
+    if (isSuperuser) return true;
     if (subLoading || subPlatform || isDemo || isServiceCharge || !info?.planCode) return true;
     return hasFeature(feature);
   }

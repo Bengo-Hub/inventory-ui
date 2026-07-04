@@ -106,8 +106,13 @@ export const useAuthStore = create<AuthState>()(
                     storeVerifier(verifier);
                     storeState(state);
 
-                    if (returnTo && typeof window !== 'undefined') {
-                        sessionStorage.setItem('sso_return_to', returnTo);
+                    // Persist the tenant we're signing into so the callback uses the RIGHT slug even
+                    // if SSO returns to a registered default callback (e.g. /codevertex/auth/callback)
+                    // instead of our redirect_uri — the previous cause of landing on the wrong tenant.
+                    if (typeof window !== 'undefined') {
+                        sessionStorage.setItem('sso_org_slug', orgSlug);
+                        localStorage.setItem('tenantSlug', orgSlug);
+                        sessionStorage.setItem('sso_return_to', returnTo || `/${orgSlug}`);
                     }
 
                     const callbackUrl = `${window.location.origin}/${orgSlug}/auth/callback`;
