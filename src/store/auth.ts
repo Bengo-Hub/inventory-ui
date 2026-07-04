@@ -225,11 +225,18 @@ export const useAuthStore = create<AuthState>()(
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
                 if (typeof window !== 'undefined') {
+                    // Capture the tenant we're leaving BEFORE clearing storage, so re-login returns
+                    // to the SAME tenant rather than the bare origin (which would default to the
+                    // wrong tenant and fail SSO with "not a member of the requested tenant").
+                    const slugFromPath = window.location.pathname.split('/').filter(Boolean)[0] || '';
+                    let slug = slugFromPath;
+                    try { slug = slug || (localStorage.getItem('tenantSlug') ?? ''); } catch { /* no-op */ }
                     try { localStorage.removeItem('tenantId'); } catch { /* no-op */ }
-                    try { localStorage.removeItem('tenantSlug'); } catch { /* no-op */ }
+                    // Keep `tenantSlug` as the last-used hint so the bare-root landing routes back here.
                     try { localStorage.removeItem('inventory-auth-storage'); } catch { /* no-op */ }
                     try { sessionStorage.clear(); } catch { /* no-op */ }
-                    const returnTo = encodeURIComponent(window.location.origin);
+                    const dest = slug ? `${window.location.origin}/${slug}` : window.location.origin;
+                    const returnTo = encodeURIComponent(dest);
                     window.location.href = buildLogoutUrl(`https://accounts.codevertexitsolutions.com/login?return_to=${returnTo}`);
                 }
             },

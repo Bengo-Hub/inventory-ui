@@ -14,6 +14,7 @@ function AuthCallbackContent() {
     const urlSlug = params?.orgSlug as string;
     const code = searchParams?.get('code');
     const error = searchParams?.get('error');
+    const errorDescription = searchParams?.get('error_description');
     const { handleSSOCallback, hydrateFromWebAuthn, status, error: authError } = useAuthStore();
     const hasStarted = useRef(false);
 
@@ -22,10 +23,14 @@ function AuthCallbackContent() {
     // landed users on `codevertex`); the persisted slug keeps us on the intended tenant.
     const [orgSlug, setOrgSlug] = useState(urlSlug);
     const [slugReady, setSlugReady] = useState(false);
+    // The user's remembered tenant — used to rescue them when SSO denies the URL's tenant
+    // (e.g. they landed on /codevertex but belong to codevertex-demo).
+    const [lastTenant, setLastTenant] = useState<string | null>(null);
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const intended = sessionStorage.getItem('sso_org_slug');
             if (intended && intended !== urlSlug) setOrgSlug(intended);
+            try { setLastTenant(localStorage.getItem('tenantSlug')); } catch { /* ignore */ }
         }
         setSlugReady(true);
     }, [urlSlug]);
@@ -91,17 +96,30 @@ function AuthCallbackContent() {
     }, [status, orgSlug, router]);
 
     if (error || authError) {
+        // Wrong-tenant rescue: SSO denied the URL's tenant but we remember a different one the
+        // user belongs to — offer to sign into that instead of looping on the wrong slug.
+        const wrongTenant = error === 'access_denied' && !!lastTenant && lastTenant !== urlSlug;
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
                 <div className="text-center p-8 border border-destructive/20 rounded-xl bg-destructive/5 max-w-md">
                     <h1 className="text-xl font-bold text-destructive mb-2">Authentication Failed</h1>
-                    <p className="text-muted-foreground">{error || authError}</p>
-                    <button
-                        onClick={() => router.replace(`/${orgSlug}/auth/login`)}
-                        className="mt-6 px-4 py-2 bg-primary text-primary-foreground rounded-lg"
-                    >
-                        Try Again
-                    </button>
+                    <p className="text-muted-foreground">{errorDescription || error || authError}</p>
+                    <div className="mt-6 flex flex-col gap-2">
+                        {wrongTenant && (
+                            <button
+                                onClick={() => router.replace(`/${lastTenant}/auth/login`)}
+                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium"
+                            >
+                                Sign in to {lastTenant}
+                            </button>
+                        )}
+                        <button
+                            onClick={() => router.replace(`/${orgSlug}/auth/login`)}
+                            className={wrongTenant ? 'px-4 py-2 rounded-lg border border-border text-foreground' : 'px-4 py-2 bg-primary text-primary-foreground rounded-lg'}
+                        >
+                            Try Again
+                        </button>
+                    </div>
                 </div>
             </div>
         );
