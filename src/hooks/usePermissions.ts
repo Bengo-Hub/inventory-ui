@@ -19,11 +19,8 @@
 import { useMemo } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { P } from '@/lib/rbac/permissions';
+import { ADMIN_ROLE_ALIASES } from '@/lib/auth/api';
 import type { Permission } from '@/lib/auth/types';
-
-// Roles that bypass every permission check. Matches the sidebar's ADMIN bypass
-// and auth-api's seeded superuser/admin roles.
-const SUPERUSER_ROLES = ['admin', 'superuser', 'super_admin', 'inventory_admin'];
 
 export function usePermissions() {
   const user = useAuthStore((s) => s.user);
@@ -31,7 +28,8 @@ export function usePermissions() {
   const isSuperuser = useMemo(() => {
     if (!user) return false;
     if (user.isPlatformOwner || user.isSuperUser) return true;
-    return (user.roles ?? []).some((r) => SUPERUSER_ROLES.includes(r));
+    // Tenant admins/owners bypass every permission check — they own their tenant's inventory.
+    return (user.roles ?? []).some((r) => ADMIN_ROLE_ALIASES.has(String(r).toLowerCase()));
   }, [user]);
 
   const granted = useMemo<Set<string>>(

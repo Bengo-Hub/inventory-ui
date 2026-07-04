@@ -38,13 +38,17 @@ export function isPlatformOwner(
 // would be blocked client-side whenever a specific granular permission string is missing from
 // their token (e.g. a newly added permission not yet in their cached claims). NOTE: this does
 // NOT grant platform-level access; platform pages are gated separately via isPlatformOwner().
-const FULL_TENANT_ACCESS_ROLES = ["superuser", "admin", "inventory_admin"];
+const FULL_TENANT_ACCESS_ROLES = [
+  "superuser", "admin", "administrator", "super_admin", "inventory_admin",
+  "tenant_admin", "tenant-admin", "tenantadmin", "owner", "account_owner",
+  "org_admin", "orgadmin", "organization_admin", "proprietor", "director",
+];
 
 function hasFullTenantAccess(user: UserProfile | null): boolean {
   if (!user) return false;
   if (user.isSuperUser === true || (user as { isPlatformOwner?: boolean }).isPlatformOwner === true) return true;
   const roles = (user.roles ?? []) as unknown as string[];
-  return roles.some((r) => FULL_TENANT_ACCESS_ROLES.includes(r));
+  return roles.some((r) => FULL_TENANT_ACCESS_ROLES.includes(String(r).toLowerCase()));
 }
 
 export function userHasRole(

@@ -37,9 +37,18 @@ export async function fetchInventoryProfile(tenantSlug: string): Promise<{
         tenant_id: data.tenant_id ?? '',
         tenant_slug: data.tenant_slug ?? tenantSlug,
         isPlatformOwner: data.is_platform_owner === true,
-        isSuperUser: roles.includes('superuser') || roles.includes('inventory_admin'),
+        // Honour the server's is_superuser flag (set for tenant admins/owners) and recognise
+        // tenant-admin role aliases directly, so a tenant admin always gets full access.
+        isSuperUser: data.is_superuser === true || roles.some((r) => ADMIN_ROLE_ALIASES.has(r.toLowerCase())),
     };
 }
+
+/** Global role names that grant full tenant access in inventory-ui. Mirrors the API mapping. */
+export const ADMIN_ROLE_ALIASES = new Set([
+    'superuser', 'admin', 'administrator', 'super_admin', 'inventory_admin',
+    'tenant_admin', 'tenant-admin', 'tenantadmin', 'owner', 'account_owner',
+    'org_admin', 'orgadmin', 'organization_admin', 'proprietor', 'director',
+]);
 
 const SSO_BASE_URL = process.env.NEXT_PUBLIC_SSO_URL || 'https://sso.codevertexitsolutions.com';
 const SSO_CLIENT_ID = process.env.NEXT_PUBLIC_SSO_CLIENT_ID || 'inventory-ui';
