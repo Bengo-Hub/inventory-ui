@@ -5,7 +5,8 @@ import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
+import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useWarehouses } from '@/hooks/useWarehouses';
@@ -14,134 +15,204 @@ import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { AlertTriangle, Barcode, Edit2, Eye, FileSpreadsheet, Filter, Package, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, Package, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradeBadge } from '@bengo-hub/shared-ui-lib/subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
-function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: () => void; onEdit: () => void; canEdit: boolean }) {
+const KES = (n?: number | null) =>
+  n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
+
+function MiniStat({ label, value, accent }: { label: string; value: ReactNode; accent?: boolean }) {
   return (
-    <Sheet open onClose={onClose} width="md">
-      <SheetHeader>
-        <SheetTitle>{item.name}</SheetTitle>
-        <div className="flex items-center gap-2">
-          {canEdit && (
-            <Button size="sm" variant="outline" onClick={onEdit}>
-              <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
-            </Button>
-          )}
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-      </SheetHeader>
-      <SheetContent>
-        <div className="flex items-center gap-2 flex-wrap">
+    <div>
+      <p className="text-[11px] text-muted-foreground">{label}</p>
+      <p className={`text-sm font-semibold mt-0.5 ${accent ? 'text-primary' : 'text-foreground'}`}>{value}</p>
+    </div>
+  );
+}
+
+function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: () => void; onEdit: () => void; canEdit: boolean }) {
+  const params = useParams();
+  const orgSlug = (params?.orgSlug as string) ?? '';
+  const router = useRouter();
+  const { canAny } = usePermissions();
+  const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
+  const isStockable = ['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(item.type);
+
+  const { data: pricing = [], isLoading: pricingLoading } = useItemPricing(orgSlug, item.id);
+  const { data: tiers = [] } = usePricingTiers(orgSlug);
+  const tierMeta = new Map(tiers.map((t) => [t.id, t]));
+  // Default tier first, then alphabetical; all-outlet rows before outlet-specific overrides.
+  const profiles = [...pricing].sort((a, b) => {
+    const ad = tierMeta.get(a.pricing_tier_id)?.is_default ? 0 : 1;
+    const bd = tierMeta.get(b.pricing_tier_id)?.is_default ? 0 : 1;
+    if (ad !== bd) return ad - bd;
+    return (a.tier_name ?? '').localeCompare(b.tier_name ?? '');
+  });
+
+  const margin =
+    item.cost_price != null && item.selling_price != null && item.selling_price > 0
+      ? ((item.selling_price - item.cost_price) / item.selling_price) * 100
+      : null;
+
+  const goAdjust = () => {
+    router.push(`/${orgSlug}/adjustments?create=1&sku=${encodeURIComponent(item.sku)}&name=${encodeURIComponent(item.name)}`);
+  };
+
+  const fields: DetailField[] = [
+    { label: 'Category', value: item.category_name },
+    { label: 'Preferred Supplier', value: item.preferred_supplier_name, hideIfEmpty: true },
+    { label: 'Use Case', value: item.use_case ? ITEM_USE_CASE_LABEL[item.use_case] ?? item.use_case : null, hideIfEmpty: true },
+    { label: 'Barcode', value: item.barcode ? <span className="font-mono">{item.barcode}</span> : null, hideIfEmpty: true },
+    {
+      label: 'Tax',
+      value: item.tax_code_id
+        ? `${item.tax_code_id}${item.tax_rate != null ? ` · ${item.tax_rate}%` : ''}${item.tax_inclusive ? ' (incl.)' : ''}`
+        : null,
+      hideIfEmpty: true,
+    },
+    { label: 'Shelf Life', value: item.shelf_life_days != null ? `${item.shelf_life_days} days` : null, hideIfEmpty: true },
+    { label: 'Weight', value: item.weight_kg != null ? `${item.weight_kg} kg` : null, hideIfEmpty: true },
+    { label: 'Service Duration', value: item.duration_minutes != null ? `${item.duration_minutes} min` : null, hideIfEmpty: true },
+    { label: 'Description', value: item.description, full: true, hideIfEmpty: true },
+    { label: 'Created', value: new Date(item.created_at).toLocaleDateString() },
+    { label: 'Updated', value: new Date(item.updated_at).toLocaleDateString() },
+  ];
+
+  return (
+    <DetailDrawer
+      open
+      onClose={onClose}
+      width="md"
+      title={item.name}
+      subtitle={item.category_name}
+      badges={
+        <>
           <Badge variant={item.is_active ? 'success' : 'outline'}>{item.is_active ? 'Active' : 'Inactive'}</Badge>
           <Badge variant="outline" className="font-mono">{item.sku}</Badge>
           <Badge variant="default" className="capitalize">{item.type?.toLowerCase()}</Badge>
+        </>
+      }
+      fields={fields}
+      actions={
+        <>
+          {isStockable && canAdjust && (
+            <Button size="sm" variant="outline" onClick={goAdjust}>
+              <ClipboardList className="h-3.5 w-3.5 mr-1" />Adjust Stock
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => router.push(`/${orgSlug}/catalog/${item.id}`)}>
+            <ExternalLink className="h-3.5 w-3.5 mr-1" />Full details
+          </Button>
+          {canEdit && (
+            <Button size="sm" onClick={onEdit}>
+              <Edit2 className="h-3.5 w-3.5 mr-1" />Edit
+            </Button>
+          )}
+        </>
+      }
+    >
+      {/* Pricing — effective price, cost/margin, guardrails, and every tier profile. */}
+      <div className="rounded-xl border border-border p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Pricing</p>
+          <div className="text-right">
+            <p className="text-[11px] text-muted-foreground">Selling price</p>
+            <p className="text-lg font-black text-primary leading-tight">{KES(item.selling_price)}</p>
+          </div>
         </div>
-
-        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Category</p>
-            <p className="text-sm font-medium">{item.category_name ?? '—'}</p>
-          </div>
-          {item.barcode && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Barcode</p>
-              <p className="text-sm font-mono">{item.barcode}</p>
-            </div>
-          )}
-          {item.cost_price != null && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Cost Price</p>
-              <p className="text-sm font-semibold text-primary">
-                {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(item.cost_price)}
-              </p>
-            </div>
-          )}
-          {item.suggested_price != null && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Suggested Price</p>
-              <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                {new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(item.suggested_price)}
-              </p>
-            </div>
-          )}
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Reorder Level</p>
-            <p className="text-sm font-medium">{item.reorder_level ?? '—'}</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Reorder Quantity</p>
-            <p className="text-sm font-medium">{item.reorder_quantity ?? '—'}</p>
-          </div>
-          {item.shelf_life_days != null && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Shelf Life</p>
-              <p className="text-sm font-medium">{item.shelf_life_days} days</p>
-            </div>
-          )}
-          {item.weight_kg != null && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Weight</p>
-              <p className="text-sm font-medium">{item.weight_kg} kg</p>
-            </div>
-          )}
-          {item.duration_minutes != null && (
-            <div>
-              <p className="text-xs text-muted-foreground mb-1">Service Duration</p>
-              <p className="text-sm font-medium">{item.duration_minutes} min</p>
-            </div>
-          )}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <MiniStat label="Cost" value={KES(item.cost_price)} />
+          <MiniStat label="Margin" value={margin != null ? `${margin.toFixed(1)}%` : '—'} />
+          <MiniStat label="Min (Wholesale)" value={KES(item.min_selling_price)} />
+          <MiniStat label="Max (Retail)" value={KES(item.max_selling_price)} />
         </div>
-
-        {item.description && (
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Description</p>
-            <p className="text-sm text-foreground">{item.description}</p>
-          </div>
-        )}
-
-        {(item.is_perishable || item.requires_age_verification || item.track_lots || item.is_controlled_substance || item.track_serial_numbers) && (
-          <div className="flex flex-wrap gap-2">
-            {item.is_perishable && <Badge variant="warning">Perishable</Badge>}
-            {item.requires_age_verification && <Badge variant="warning">Age Verification</Badge>}
-            {item.is_controlled_substance && <Badge variant="warning">Controlled Substance</Badge>}
-            {item.track_lots && <Badge variant="outline">Track Lots</Badge>}
-            {item.track_serial_numbers && <Badge variant="outline">Serial Tracked</Badge>}
-          </div>
-        )}
-
-        {item.tags && item.tags.length > 0 && (
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Tags</p>
-            <div className="flex flex-wrap gap-1">
-              {item.tags.map((tag) => (
-                <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+        <div className="pt-3 border-t border-border">
+          <p className="text-[11px] text-muted-foreground mb-2">Price profiles</p>
+          {pricingLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="h-4 rounded bg-muted/50 animate-pulse" style={{ width: `${70 - i * 15}%` }} />
               ))}
             </div>
-          </div>
-        )}
-
-        <div className="text-xs text-muted-foreground pt-3 border-t border-border space-y-1">
-          <p>Created: {new Date(item.created_at).toLocaleDateString()}</p>
-          <p>Updated: {new Date(item.updated_at).toLocaleDateString()}</p>
+          ) : profiles.length > 0 ? (
+            <ul className="space-y-1.5">
+              {profiles.map((p, i) => {
+                const meta = tierMeta.get(p.pricing_tier_id);
+                return (
+                  <li key={`${p.pricing_tier_id}-${p.outlet_id ?? 'all'}-${i}`} className="flex items-center justify-between text-sm">
+                    <span className="flex items-center gap-1.5">
+                      {p.tier_name ?? meta?.name ?? 'Tier'}
+                      {meta?.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
+                      {p.outlet_id && <Badge variant="outline" className="text-[10px]">Outlet</Badge>}
+                    </span>
+                    <span className="font-mono font-semibold">
+                      {(p.currency ?? 'KES')} {p.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No price profiles set — the selling price above is derived from the item&apos;s max/retail price.
+            </p>
+          )}
         </div>
-      </SheetContent>
-    </Sheet>
+      </div>
+
+      {/* Stock — on-hand / available (stockable item types only). */}
+      {isStockable && (
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Stock</p>
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div>
+              <p className="text-xl font-black text-foreground tabular-nums">{item.on_hand ?? '—'}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">On hand</p>
+            </div>
+            <div>
+              <p className="text-xl font-black text-foreground tabular-nums">{item.available ?? '—'}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Available</p>
+            </div>
+            <div>
+              <p className="text-xl font-black text-foreground tabular-nums">{item.reorder_level ?? '—'}</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">Reorder at</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Compliance flags + tags. */}
+      {(item.is_perishable || item.requires_age_verification || item.track_lots || item.is_controlled_substance || item.track_serial_numbers) && (
+        <div className="flex flex-wrap gap-2">
+          {item.is_perishable && <Badge variant="warning">Perishable</Badge>}
+          {item.requires_age_verification && <Badge variant="warning">Age Verification</Badge>}
+          {item.is_controlled_substance && <Badge variant="warning">Controlled Substance</Badge>}
+          {item.track_lots && <Badge variant="outline">Track Lots</Badge>}
+          {item.track_serial_numbers && <Badge variant="outline">Serial Tracked</Badge>}
+        </div>
+      )}
+
+      {item.tags && item.tags.length > 0 && (
+        <div>
+          <p className="text-[11px] text-muted-foreground mb-2">Tags</p>
+          <div className="flex flex-wrap gap-1">
+            {item.tags.map((tag) => (
+              <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+    </DetailDrawer>
   );
 }
 

@@ -264,9 +264,14 @@ export default function AdjustmentsPage() {
     const [search, setSearch] = useState('');
     const [page] = useState(1);
     const [showModal, setShowModal] = useState(false);
-    useCreateFromQuery(() => setShowModal(true)); // mobile quick-add → open New Adjustment
     const [prefillSku, setPrefillSku] = useState('');
     const [prefillName, setPrefillName] = useState('');
+    // Mobile quick-add + "Adjust Stock" deep-links from the catalog drawer land here with
+    // ?create=1 (+ optional &sku=&name= to prefill the item).
+    useCreateFromQuery(() => {
+        const p = new URLSearchParams(window.location.search);
+        openModal(p.get('sku') ?? '', p.get('name') ?? '');
+    });
 
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
