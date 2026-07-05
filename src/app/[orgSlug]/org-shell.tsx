@@ -7,6 +7,7 @@ import { PlatformScopeGuard } from '@/components/platform-scope-guard';
 import { DashboardScreensaver } from '@/components/dashboard-screensaver';
 import { AuthProvider } from '@/providers/auth-provider';
 import { BrandingProvider } from '@/providers/branding-provider';
+import { SubscriptionEntitlementsProvider } from '@/providers/subscription-entitlements-provider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactNode, useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
@@ -76,6 +77,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
                 <BrandingProvider>
+                    <SubscriptionEntitlementsProvider>
                     <ManifestInjector />
                     <PlatformScopeGuard />
                     <OutletGate />
@@ -104,6 +106,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
                         {/* App-style bottom navigation + quick-add, phones only. */}
                         <MobileBottomNav onOpenMenu={() => setSidebarOpen(true)} />
                     </div>
+                    </SubscriptionEntitlementsProvider>
                 </BrandingProvider>
             </AuthProvider>
         </QueryClientProvider>

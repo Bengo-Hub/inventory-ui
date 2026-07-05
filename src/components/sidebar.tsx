@@ -20,7 +20,6 @@ import {
   Key,
   LayoutDashboard,
   Layers,
-  Lock,
   LogOut,
   Monitor,
   Package,
@@ -47,6 +46,7 @@ import { useOutletStore } from '@/store/outlet';
 import { useSubscription } from '@/hooks/use-subscription';
 import { usePermissions } from '@/hooks/usePermissions';
 import { nomenclatureFor } from '@/lib/use-case-nomenclature';
+import { FeatureLock } from '@bengo-hub/shared-ui-lib/subscription';
 
 interface SidebarProps {
   open?: boolean;
@@ -124,7 +124,7 @@ function NavLink({ item, orgSlug, onClose }: { item: NavItem; orgSlug: string; o
   const active = item.href === '' ? pathname === `/${orgSlug}` : pathname.startsWith(href);
   const Icon = item.icon;
 
-  return (
+  const link = (
     <Link
       href={href}
       onClick={onClose}
@@ -137,17 +137,21 @@ function NavLink({ item, orgSlug, onClose }: { item: NavItem; orgSlug: string; o
     >
       <Icon className={cn('h-4.5 w-4.5 shrink-0 transition-transform duration-200', !active && 'group-hover:scale-110')} />
       <span className="truncate flex-1">{item.label}</span>
-      {item.locked && !active && (
-        <span
-          className="flex items-center gap-1 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-500 border border-amber-500/20 shrink-0"
-          title="Your plan doesn’t include this — upgrade to unlock"
-        >
-          <Lock className="h-2.5 w-2.5" />
-          Upgrade
-        </span>
-      )}
     </Link>
   );
+
+  // Locked (plan lacks the feature): keep the item visible with the shared "🔒 <tier>" badge;
+  // clicking opens the shared UpgradeDialog (capture-phase, so the Link never navigates).
+  const feature = item.moduleKey ? MODULE_FEATURE[item.moduleKey] : undefined;
+  if (item.locked && feature) {
+    return (
+      <FeatureLock feature={feature} mode="badge" className="pr-2">
+        {link}
+      </FeatureLock>
+    );
+  }
+
+  return link;
 }
 
 // ── Collapsible group ─────────────────────────────────────────────────────────
