@@ -12,10 +12,10 @@ import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useBulkImport } from '@/hooks/useBulkImport';
-import { type CreateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
+import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { Pagination } from '@/components/ui/pagination';
-import { AlertTriangle, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, Package, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, Loader2, Package, Pencil, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -37,6 +37,96 @@ function MiniStat({ label, value, accent }: { label: string; value: ReactNode; a
       <p className="text-[11px] text-muted-foreground">{label}</p>
       <p className={`text-sm font-semibold mt-0.5 ${accent ? 'text-primary' : 'text-foreground'}`}>{value}</p>
     </div>
+  );
+}
+
+// itemToUpdateInput mirrors the item's CURRENT values into a full update payload. The item PUT
+// unconditionally Sets booleans (is_active, tax_inclusive, track_*…), so a partial patch would
+// clobber them to false — we resend the current values and only the caller's changed field differs.
+function itemToUpdateInput(item: Item): UpdateItemInput {
+  return {
+    name: item.name,
+    type: item.type,
+    description: item.description ?? undefined,
+    category_id: item.category_id ?? undefined,
+    unit_id: item.unit_id ?? undefined,
+    barcode: item.barcode ?? undefined,
+    barcode_type: item.barcode_type ?? undefined,
+    reorder_level: item.reorder_level ?? undefined,
+    reorder_quantity: item.reorder_quantity ?? undefined,
+    cost_price: item.cost_price ?? undefined,
+    min_selling_price: item.min_selling_price ?? undefined,
+    max_selling_price: item.max_selling_price ?? undefined,
+    target_margin_percent: item.target_margin_percent ?? undefined,
+    tax_code_id: item.tax_code_id || undefined,
+    tax_inclusive: item.tax_inclusive ?? false,
+    is_active: item.is_active,
+    requires_age_verification: item.requires_age_verification,
+    is_controlled_substance: item.is_controlled_substance ?? false,
+    is_perishable: item.is_perishable,
+    track_lots: item.track_lots,
+    track_serial_numbers: item.track_serial_numbers,
+    shelf_life_days: item.shelf_life_days ?? undefined,
+    weight_kg: item.weight_kg ?? undefined,
+    duration_minutes: item.duration_minutes ?? undefined,
+    tags: item.tags,
+    image_url: item.image_url ?? undefined,
+    metadata: item.metadata,
+    use_case: item.use_case,
+    total_capacity: item.total_capacity ?? undefined,
+  };
+}
+
+// PriceCell — inline-editable price in a data-table row. Click to edit, Enter/blur to save,
+// Esc to cancel. Read-only (plain value) when not editable.
+function PriceCell({ value, editable, saving, onSave }: {
+  value: number | null;
+  editable: boolean;
+  saving?: boolean;
+  onSave: (n: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  if (!editable) {
+    return <span className="font-mono text-sm text-foreground">{value != null ? value.toLocaleString() : '—'}</span>;
+  }
+
+  if (editing) {
+    const commit = () => {
+      setEditing(false);
+      const n = parseFloat(draft);
+      if (!isNaN(n) && n >= 0 && n !== value) onSave(n);
+    };
+    return (
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        autoFocus
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); (e.target as HTMLInputElement).blur(); }
+          if (e.key === 'Escape') { setEditing(false); }
+        }}
+        className="w-24 rounded-md border border-input bg-background px-2 py-1 text-sm text-right font-mono focus:ring-1 focus:ring-ring focus:outline-none"
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { setDraft(value != null ? String(value) : ''); setEditing(true); }}
+      title="Click to edit price"
+      className="group inline-flex items-center gap-1.5 font-mono text-sm text-foreground hover:text-primary transition-colors"
+    >
+      {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : (value != null ? value.toLocaleString() : '—')}
+      <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-60 transition-opacity" />
+    </button>
   );
 }
 
@@ -603,6 +693,8 @@ export default function CatalogPage() {
                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Category</th>
                     <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
+                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Wholesale</th>
+                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Retail</th>
                     <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
                     <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
                   </tr>
@@ -610,13 +702,13 @@ export default function CatalogPage() {
                 <tbody className="divide-y divide-border">
                   {isLoading ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                      <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
                         Loading items...
                       </td>
                     </tr>
                   ) : isError ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={8} className="px-6 py-12 text-center">
                         <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
                         <p className="text-muted-foreground">Couldn&apos;t load items</p>
                         <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
@@ -624,7 +716,7 @@ export default function CatalogPage() {
                     </tr>
                   ) : items.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center">
+                      <td colSpan={8} className="px-6 py-12 text-center">
                         <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
                         <p className="text-muted-foreground">No {nomenclature.itemPlural.toLowerCase()} found</p>
                         {(search || categoryId || typeFilter || statusFilter !== 'active') && (
@@ -656,6 +748,40 @@ export default function CatalogPage() {
                           <Badge variant="outline" className="capitalize">
                             {item.type?.toLowerCase() ?? '—'}
                           </Badge>
+                        </td>
+                        {/* Wholesale (min) / Retail (max) price profiles — inline-editable; a
+                            RECIPE item is priced from its recipe, so its cells are read-only. */}
+                        <td className="px-6 py-4 text-right hidden lg:table-cell">
+                          <PriceCell
+                            value={item.min_selling_price ?? null}
+                            editable={canChange && item.type !== 'RECIPE'}
+                            saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+                            onSave={(n) =>
+                              updateItem.mutate(
+                                { sku: item.sku, data: { ...itemToUpdateInput(item), min_selling_price: n } },
+                                {
+                                  onSuccess: () => toast.success(`${item.name} wholesale price updated`),
+                                  onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
+                                },
+                              )
+                            }
+                          />
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <PriceCell
+                            value={item.max_selling_price ?? item.selling_price ?? null}
+                            editable={canChange && item.type !== 'RECIPE'}
+                            saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+                            onSave={(n) =>
+                              updateItem.mutate(
+                                { sku: item.sku, data: { ...itemToUpdateInput(item), max_selling_price: n } },
+                                {
+                                  onSuccess: () => toast.success(`${item.name} retail price updated`),
+                                  onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
+                                },
+                              )
+                            }
+                          />
                         </td>
                         <td className="px-6 py-4">
                           <Badge variant={item.is_active ? 'success' : 'outline'}>
