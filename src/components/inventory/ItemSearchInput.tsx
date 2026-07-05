@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { useCreateItem } from '@/hooks/useItems';
 import type { CreateItemInput, Item } from '@/lib/api/items';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +33,8 @@ interface Props {
   fixedDropdown?: boolean;
   /** Allow creating a new item inline when no match is found (default: true). */
   allowCreate?: boolean;
+  /** Show the camera barcode-scan button (default: true). Scanning fills the search query. */
+  enableScan?: boolean;
 }
 
 function itemToResult(i: Item): ItemResult {
@@ -46,7 +49,7 @@ function itemToResult(i: Item): ItemResult {
   };
 }
 
-export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true }: Props) {
+export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -137,8 +140,18 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
             setOpen(true);
           }}
           onFocus={() => query.length >= 2 && setOpen(true)}
-          className="pl-10"
+          className={enableScan ? 'pl-10 pr-12' : 'pl-10'}
         />
+        {enableScan && (
+          <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+            <BarcodeScanButton
+              title="Scan item barcode"
+              hint="Point the camera at the item barcode."
+              className="h-8 w-8 rounded-lg"
+              onScan={(code) => { setQuery(code); setOpen(true); }}
+            />
+          </div>
+        )}
         {dropdownVisible && !fixedDropdown && (
           <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg max-h-52 overflow-y-auto">
             {results?.slice(0, 10).map((item) => (

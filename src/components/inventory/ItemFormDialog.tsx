@@ -15,6 +15,7 @@ import { useCreateSupplier } from '@/hooks/useSuppliers';
 import { type CreateSupplierInput } from '@/lib/api/suppliers';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
@@ -467,7 +468,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Barcode</label>
-                  <Input placeholder="Barcode (optional)" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                  <div className="flex items-center gap-2">
+                    <Input className="flex-1" placeholder="Barcode (optional)" value={barcode} onChange={(e) => setBarcode(e.target.value)} />
+                    <BarcodeScanButton
+                      title="Scan barcode"
+                      hint="Point the camera at the product barcode."
+                      onScan={(code) => setBarcode(code)}
+                    />
+                  </div>
                   {scope.showBarcodeType && (
                     <select value={barcodeType} onChange={(e) => setBarcodeType(e.target.value)} className={`${selectCls} mt-2`}>
                       <option value="">Barcode type (auto)</option>

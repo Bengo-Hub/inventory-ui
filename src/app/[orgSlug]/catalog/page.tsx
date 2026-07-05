@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
@@ -434,11 +435,19 @@ export default function CatalogPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
-                placeholder="Search by SKU or name..."
+                placeholder="Search by SKU, name, or barcode..."
                 value={search}
                 onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                className="pl-10"
+                className="pl-10 pr-12"
               />
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+                <BarcodeScanButton
+                  title="Scan barcode to search"
+                  hint="Point the camera at the product barcode."
+                  className="h-8 w-8 rounded-lg"
+                  onScan={(code) => { setSearch(code); setPage(1); }}
+                />
+              </div>
             </div>
             {/* Status + Type filter row */}
             <div className="flex flex-wrap items-center gap-3">
