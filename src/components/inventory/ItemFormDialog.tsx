@@ -566,31 +566,35 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
               {/* Selling-price guardrails + goods margin (GOODS/EQUIPMENT) */}
               {['GOODS', 'EQUIPMENT'].includes(type) && (
                 <div className="space-y-3 border border-border rounded-lg p-3">
-                  <p className="text-sm font-semibold">Selling-price guardrails</p>
+                  <p className="text-sm font-semibold">Selling prices</p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Min Selling Price (KES)</label>
-                      <Input type="number" min="0" step="0.01" placeholder="Floor" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
+                      <label className="text-sm font-medium">Wholesale / Min Price (KES)</label>
+                      <Input type="number" min="0" step="0.01" placeholder="Wholesale" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Max Selling Price (KES)</label>
-                      <Input type="number" min="0" step="0.01" placeholder="Ceiling" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
+                      <label className="text-sm font-medium">Retail / Max Price (KES)</label>
+                      <Input type="number" min="0" step="0.01" placeholder="Retail" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Target Margin (%)</label>
+                      <label className="text-sm font-medium">Target Margin (%) <span className="text-muted-foreground font-normal">(optional)</span></label>
                       <Input type="number" min="0" max="99.9" step="0.1" placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
                     </div>
                   </div>
                   {minMaxInvalid && (
-                    <p className="text-xs text-destructive">Min selling price cannot exceed max selling price.</p>
+                    <p className="text-xs text-destructive">Wholesale price cannot exceed the retail price.</p>
                   )}
+                  <p className="text-xs text-muted-foreground">
+                    The <span className="font-semibold">Retail / Max</span> price sets the default (Retail) price profile customers pay; the
+                    {' '}<span className="font-semibold">Wholesale / Min</span> price sets the Wholesale profile. These are the prices used at POS —
+                    the system never substitutes a cost-plus-margin estimate when a retail price is provided.
+                  </p>
                   {suggestedFromMargin != null && (
                     <p className="text-xs text-muted-foreground">
-                      At {targetMargin}% margin, suggested price ≈ <span className="font-semibold">KES {suggestedFromMargin.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
-                      {' '}(price = cost ÷ (1 − margin)). Tier prices are set per profile on the product page and are hard-capped to this band.
+                      Guide only — at {targetMargin}% margin a cost-plus price would be ≈ <span className="font-semibold">KES {suggestedFromMargin.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                      {' '}(cost ÷ (1 − margin)). This is a hint; your Retail price above is what actually sells.
                     </p>
                   )}
-                  <p className="text-xs text-muted-foreground">Prices outside [min, max] are rejected on price updates and require a manager override at POS.</p>
                 </div>
               )}
 
