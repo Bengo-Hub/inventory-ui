@@ -54,10 +54,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => apiClient.setOnLimitReached(null);
     }, []);
 
-    // Default landing for unauthenticated users = the branded outlet/login gate
-    // (not an instant SSO bounce), so they see the tenant-branded sign-in panel
-    // with the SSO affordance. The login page lives under /auth/ and renders with
-    // the bare layout, so this never loops.
+    // Default landing for unauthenticated users = the PIN login page (the warehouse/desk
+    // default, like pos-ui and library-ui), which itself offers "Sign in with your account
+    // (SSO)". Never bounce straight to SSO — that hangs on the callback for many users. The
+    // PIN page lives under /auth/ and renders with the bare layout, so this never loops.
     useEffect(() => {
         if (status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
             const returnTo = encodeURIComponent(
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     ? window.location.pathname + window.location.search
                     : `/${orgSlug}`,
             );
-            router.replace(`/${orgSlug}/auth/login?returnTo=${returnTo}`);
+            router.replace(`/${orgSlug}/auth/pin-login?returnTo=${returnTo}`);
         }
     }, [status, pathname, orgSlug, router]);
 
