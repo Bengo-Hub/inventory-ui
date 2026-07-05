@@ -2,10 +2,12 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
 import { useFoodCostVariance } from '@/hooks/useReports';
-import type { VarianceReportItem } from '@/lib/api/reports';
-import { RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
+import { reportsApi, type VarianceReportItem } from '@/lib/api/reports';
+import { Printer, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 function formatCurrency(v: number): string {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(v);
@@ -50,6 +52,15 @@ export default function FoodCostVariancePage() {
         refetch();
     }
 
+    // Print / Export — streams the branded variance PDF for the selected period.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function printReport() {
+        openPreview(
+            () => reportsApi.foodCostVarianceDoc(orgSlug, { from, to, recalculate, tenant_slug: orgSlug, format: 'pdf' }),
+            { fileName: `food-cost-variance-${from}_${to}.pdf`, title: 'Food-Cost Variance' },
+        );
+    }
+
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
             <div>
@@ -82,6 +93,9 @@ export default function FoodCostVariancePage() {
                         <Button variant="primary" onClick={handleSearch} disabled={isFetching}>
                             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
                             {isFetching ? 'Loading…' : 'Run Report'}
+                        </Button>
+                        <Button variant="outline" onClick={printReport}>
+                            <Printer className="h-4 w-4 mr-2" /> Print / Export
                         </Button>
                     </div>
                 </CardContent>
@@ -166,6 +180,8 @@ export default function FoodCostVariancePage() {
                     )}
                 </CardContent>
             </Card>
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

@@ -91,4 +91,19 @@ export const reportsApi = {
 
   deadstock: (orgSlug: string, days = 90): Promise<DeadstockReport> =>
     apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days) }),
+
+  // Branded document exports (PDF/CSV) — streamed from inventory-api's *.pdf report endpoints and
+  // fed to the shared PDF previewer. Each mirrors the JSON report's query params so the exported
+  // document matches what the page shows.
+  stockValuationDoc: (orgSlug: string, format: 'pdf' | 'csv' = 'pdf'): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/stock-valuation.pdf`, { format }),
+
+  deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf'): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format }),
+
+  foodCostVarianceDoc: (orgSlug: string, params?: FoodCostVarianceParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance.pdf`, params as Record<string, string | boolean | undefined>),
+
+  menuEngineeringDoc: (orgSlug: string, params?: MenuEngineeringParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/menu-engineering.pdf`, params as Record<string, string | undefined>),
 };

@@ -2,10 +2,13 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useDeadstock } from '@/hooks/useReports';
-import { AlertTriangle, ArrowLeft, Boxes, DollarSign, RefreshCw } from 'lucide-react';
+import { reportsApi } from '@/lib/api/reports';
+import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 function fmt(n: number) {
     return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -28,6 +31,15 @@ export default function DeadstockPage() {
     const [days, setDays] = useState(90);
     const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days);
     const cur = data?.currency ?? 'KES';
+
+    // Print / Export — streams the branded deadstock PDF for the active lookback window.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function printReport() {
+        openPreview(
+            () => reportsApi.deadstockDoc(org, days, 'pdf'),
+            { fileName: `deadstock-${days}d.pdf`, title: 'Deadstock' },
+        );
+    }
 
     const kpis = [
         { label: 'Capital Tied Up', value: `${cur} ${fmt(data?.total_dead_value ?? 0)}`, icon: DollarSign },
@@ -58,6 +70,9 @@ export default function DeadstockPage() {
                     ))}
                     <Button variant="outline" size="sm" disabled={isFetching} onClick={() => refetch()}>
                         <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={printReport}>
+                        <Printer className="h-4 w-4 mr-2" /> Print / Export
                     </Button>
                 </div>
             </div>
@@ -121,6 +136,8 @@ export default function DeadstockPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

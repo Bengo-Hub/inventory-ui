@@ -2,9 +2,12 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useStockValuation } from '@/hooks/useReports';
-import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Layers, RefreshCw } from 'lucide-react';
+import { reportsApi } from '@/lib/api/reports';
+import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Layers, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { toast } from 'sonner';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 function fmt(n: number) {
     return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -17,6 +20,15 @@ export default function StockValuationPage() {
     const org = params?.orgSlug as string;
     const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org);
     const cur = data?.currency ?? 'KES';
+
+    // Print / Export — streams the branded PDF from inventory-api into the shared previewer.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function printReport() {
+        openPreview(
+            () => reportsApi.stockValuationDoc(org, 'pdf'),
+            { fileName: 'stock-valuation.pdf', title: 'Stock Valuation' },
+        );
+    }
 
     const kpis = [
         { label: 'Total Stock Value', value: `${cur} ${fmt(data?.total_value ?? 0)}`, icon: DollarSign },
@@ -34,9 +46,14 @@ export default function StockValuationPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Stock Valuation</h1>
                     <p className="text-muted-foreground text-sm">On-hand × unit cost, by category and top items</p>
                 </div>
-                <Button variant="outline" size="sm" disabled={isFetching} onClick={() => refetch()}>
-                    <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={printReport}>
+                        <Printer className="h-4 w-4 mr-2" /> Print / Export
+                    </Button>
+                    <Button variant="outline" size="sm" disabled={isFetching} onClick={() => refetch()}>
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} /> Refresh
+                    </Button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -135,6 +152,8 @@ export default function StockValuationPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

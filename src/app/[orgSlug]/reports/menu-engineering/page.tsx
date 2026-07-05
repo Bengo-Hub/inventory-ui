@@ -2,10 +2,12 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
 import { useMenuEngineering } from '@/hooks/useReports';
-import type { MenuCategory, MenuMatrixItem } from '@/lib/api/reports';
-import { RefreshCw, Star, TrendingDown, TrendingUp, Zap } from 'lucide-react';
+import { reportsApi, type MenuCategory, type MenuMatrixItem } from '@/lib/api/reports';
+import { Printer, RefreshCw, Star, TrendingDown, TrendingUp, Zap } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 type CategoryConfig = {
     label: string;
@@ -74,6 +76,15 @@ export default function MenuEngineeringPage() {
         setQueryParams({ from, to, tenant_slug: orgSlug });
     }
 
+    // Print / Export — streams the branded menu-engineering PDF for the selected period.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function printReport() {
+        openPreview(
+            () => reportsApi.menuEngineeringDoc(orgSlug, { from, to, tenant_slug: orgSlug, format: 'pdf' }),
+            { fileName: `menu-engineering-${from}_${to}.pdf`, title: 'Menu Engineering' },
+        );
+    }
+
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
             <div>
@@ -96,6 +107,9 @@ export default function MenuEngineeringPage() {
                         <Button variant="primary" onClick={handleRun} disabled={isFetching}>
                             <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
                             {isFetching ? 'Loading…' : 'Analyze'}
+                        </Button>
+                        <Button variant="outline" onClick={printReport}>
+                            <Printer className="h-4 w-4 mr-2" /> Print / Export
                         </Button>
                     </div>
                 </CardContent>
@@ -184,6 +198,8 @@ export default function MenuEngineeringPage() {
                     )}
                 </CardContent>
             </Card>
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }
