@@ -129,6 +129,37 @@ export function unitsConvertible(a: string, b: string): boolean {
 }
 
 /**
+ * Minimal item shape for stock-unit conversion (mirrors the API's content-per-unit
+ * bridge): `unit_content_qty`/`unit_content_uom` declare how much one stock unit
+ * contains (a 750 ml whiskey bottle stocked in pieces → 750 + 'ml').
+ */
+export interface StockUnitItem {
+  base_unit?: string | null; // the item's stock unit abbreviation
+  unit_content_qty?: number | null;
+  unit_content_uom?: string | null;
+}
+
+/**
+ * Convert a recipe-line quantity into the item's STOCK unit, exactly like the API
+ * deduction path (stock.ConvertToStockUnit): same-dimension conversion first, then
+ * the content-per-unit bridge (30 ml against a 750 ml/pc bottle → 0.04 pc). Returns
+ * null when the line can never deduct (cross-dimension, no bridge) so callers can
+ * block/warn instead of silently miscosting.
+ */
+export function convertToStockUnit(item: StockUnitItem, qty: number, fromUnit: string): number | null {
+  const from = normalizeUnit(fromUnit);
+  const stockUnit = normalizeUnit(item.base_unit);
+  if (!from || !stockUnit || from === stockUnit) return qty;
+  const direct = convertQuantity(qty, from, stockUnit);
+  if (direct != null) return direct;
+  if (item.unit_content_qty && item.unit_content_qty > 0 && item.unit_content_uom) {
+    const inContent = convertQuantity(qty, from, item.unit_content_uom);
+    if (inContent != null) return inContent / item.unit_content_qty;
+  }
+  return null;
+}
+
+/**
  * EP cost per base unit from a pack-style price entry: `price` buys `basisQty` of
  * `basisUnit` (e.g. KES 52.50 per 500 ml). Converts the basis quantity into the
  * base unit and divides — 52.50 / 500 ml against a base of ml → 0.105/ml; the same

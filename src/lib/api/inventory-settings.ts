@@ -15,6 +15,11 @@ export interface InventorySettings {
   enable_expiry_tracking: boolean;
   purchase_order_approval_required: boolean;
   auto_adjust_on_transfer: boolean;
+  // Non-depletion (manual stock counting) policy: when true, RECIPE items sell without
+  // depleting ingredient stock unless individually set to "tracked"; goods keep depleting.
+  recipe_items_non_depleting_default: boolean;
+  // When non-depleting, still record theoretical usage rows for AvT/food-cost reports.
+  record_theoretical_usage: boolean;
   lots_module_enabled: boolean;
   recipes_module_enabled: boolean;
   purchase_orders_enabled: boolean;
@@ -45,6 +50,8 @@ export interface UpdateInventorySettingsInput {
   enable_expiry_tracking?: boolean;
   purchase_order_approval_required?: boolean;
   auto_adjust_on_transfer?: boolean;
+  recipe_items_non_depleting_default?: boolean;
+  record_theoretical_usage?: boolean;
   default_target_margin_percent?: number;
   enable_room_pricing?: boolean;
   enable_facility_booking?: boolean;

@@ -1,17 +1,20 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
-import { useAuthStore } from '@/store/auth';
-import { userHasPermission, isPlatformOwner as checkPlatformOwner } from '@/lib/auth/permissions';
-import type { UserProfile as AuthUserProfile } from '@/lib/auth/types';
+import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
 import {
   useInventorySettings,
-  useUpdateInventorySettings,
   useUpdateInventoryModules,
+  useUpdateInventorySettings,
 } from '@/hooks/useInventorySettings';
 import { apiClient } from '@/lib/api/client';
+import { DATE_FORMATS, DOC_TYPE_LABELS, type DocumentSequence } from '@/lib/api/document-sequences';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { isPlatformOwner as checkPlatformOwner, userHasPermission } from '@/lib/auth/permissions';
+import type { UserProfile as AuthUserProfile } from '@/lib/auth/types';
+import { useAuthStore } from '@/store/auth';
 import {
   Bell,
   BookOpen,
@@ -31,9 +34,6 @@ import {
   ShieldCheck,
   Truck,
 } from 'lucide-react';
-import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
-import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
-import { DOC_TYPE_LABELS, DATE_FORMATS, type DocumentSequence } from '@/lib/api/document-sequences';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -205,6 +205,8 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     enableExpiryTracking: false,
     purchaseOrderApprovalRequired: false,
     autoAdjustOnTransfer: true,
+    recipeItemsNonDepletingDefault: false,
+    recordTheoreticalUsage: true,
   });
   const [unitDefaults, setUnitDefaults] = useState<Record<string, number>>({});
   const [newUnitAbbr, setNewUnitAbbr] = useState('');
@@ -222,6 +224,8 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         enableExpiryTracking: settings.enable_expiry_tracking,
         purchaseOrderApprovalRequired: settings.purchase_order_approval_required,
         autoAdjustOnTransfer: settings.auto_adjust_on_transfer,
+        recipeItemsNonDepletingDefault: settings.recipe_items_non_depleting_default ?? false,
+        recordTheoreticalUsage: settings.record_theoretical_usage ?? true,
       });
       setUnitDefaults(settings.unit_reorder_defaults ?? {});
     }
@@ -239,6 +243,8 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       enable_expiry_tracking: form.enableExpiryTracking,
       purchase_order_approval_required: form.purchaseOrderApprovalRequired,
       auto_adjust_on_transfer: form.autoAdjustOnTransfer,
+      recipe_items_non_depleting_default: form.recipeItemsNonDepletingDefault,
+      record_theoretical_usage: form.recordTheoreticalUsage,
     } as Parameters<typeof update.mutate>[0]);
   };
 
@@ -406,6 +412,8 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
             { key: 'enableExpiryTracking' as const, label: 'Expiry Date Tracking', desc: 'Track expiry dates and enforce FEFO (First Expired, First Out).' },
             { key: 'purchaseOrderApprovalRequired' as const, label: 'Purchase Order Approval Required', desc: 'Require manager approval before a PO can be issued.' },
             { key: 'autoAdjustOnTransfer' as const, label: 'Auto-Adjust Stock on Transfer', desc: 'Automatically deduct source and credit destination on transfer completion.' },
+            { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.' },
+            { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).' },
           ].map((item) => (
             <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
               <div>

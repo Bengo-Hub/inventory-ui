@@ -52,6 +52,13 @@ export interface Item {
   purchase_pack_size?: number | null;
   purchase_unit?: string;
   yield_pct?: number | null;
+  // Content-per-unit bridge: how much of unit_content_uom ONE stock unit contains
+  // (750ml whiskey bottle stocked in pieces → 750 + 'ml'). Lets ml/g recipe lines
+  // (tots, pours) cost + deduct fractional stock units.
+  unit_content_qty?: number | null;
+  unit_content_uom?: string | null;
+  // Depletion behavior: 'default' (RECIPE items follow tenant policy) | 'tracked' | 'non_depleting'.
+  stock_tracking_mode?: 'default' | 'tracked' | 'non_depleting';
   min_selling_price?: number | null;
   max_selling_price?: number | null;
   target_margin_percent?: number | null;
@@ -137,6 +144,10 @@ export interface CreateItemInput {
   purchase_pack_size?: number;
   purchase_unit?: string;
   yield_pct?: number;
+  // Content-per-unit + depletion mode (see Item). unit_content_qty 0 clears the bridge.
+  unit_content_qty?: number;
+  unit_content_uom?: string;
+  stock_tracking_mode?: 'default' | 'tracked' | 'non_depleting';
   min_selling_price?: number;
   max_selling_price?: number;
   target_margin_percent?: number;

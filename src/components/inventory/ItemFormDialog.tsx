@@ -125,6 +125,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   );
   const [packQty, setPackQty] = useState(itemHasPack ? String(item!.purchase_pack_size) : '1');
   const [packUnit, setPackUnit] = useState(''); // '' = the item's own base unit
+  // Content-per-unit bridge: one stock unit contains this much of the content unit
+  // (750 ml whiskey bottle stocked in pieces → 750 + 'ml'). Lets ml/g recipe lines
+  // (tots, pours) cost + deduct fractional stock units.
+  const [unitContentQty, setUnitContentQty] = useState(item?.unit_content_qty != null ? String(item.unit_content_qty) : '');
+  const [unitContentUom, setUnitContentUom] = useState(item?.unit_content_uom ?? 'ml');
+  // Depletion behavior: default (recipes follow tenant policy) | tracked | non_depleting.
+  const [stockTrackingMode, setStockTrackingMode] = useState<'default' | 'tracked' | 'non_depleting'>(item?.stock_tracking_mode ?? 'default');
   const [minSellingPrice, setMinSellingPrice] = useState(item?.min_selling_price != null ? String(item.min_selling_price) : '');
   const [maxSellingPrice, setMaxSellingPrice] = useState(item?.max_selling_price != null ? String(item.max_selling_price) : '');
   const [targetMargin, setTargetMargin] = useState(item?.target_margin_percent != null ? String(item.target_margin_percent) : '');
@@ -227,6 +234,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setCostPrice(hasPack ? String(item.purchase_price) : item.cost_price != null ? String(item.cost_price) : '');
       setPackQty(hasPack ? String(item.purchase_pack_size) : '1');
       setPackUnit('');
+      setUnitContentQty(item.unit_content_qty != null ? String(item.unit_content_qty) : '');
+      setUnitContentUom(item.unit_content_uom ?? 'ml');
+      setStockTrackingMode(item.stock_tracking_mode ?? 'default');
       setMinSellingPrice(item.min_selling_price != null ? String(item.min_selling_price) : '');
       setMaxSellingPrice(item.max_selling_price != null ? String(item.max_selling_price) : '');
       setTargetMargin(item.target_margin_percent != null ? String(item.target_margin_percent) : '');
@@ -398,6 +408,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       purchase_unit: isStockable && enteredCostNum != null && packUnitEff
         ? (packIsUnitCost ? packUnitEff : `${packQtyNum} ${packUnitEff}`)
         : undefined,
+      // Content-per-unit: on edit, an emptied qty sends 0 to explicitly clear the bridge.
+      unit_content_qty: isStockable && unitContentQty !== ''
+        ? parseFloat(unitContentQty) || 0
+        : (item && isStockable && item.unit_content_qty != null ? 0 : undefined),
+      unit_content_uom: isStockable && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
+      stock_tracking_mode: stockTrackingMode !== 'default' || item ? stockTrackingMode : undefined,
       min_selling_price: minSellingPrice !== '' ? parseFloat(minSellingPrice) : undefined,
       max_selling_price: maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : undefined,
       target_margin_percent: targetMargin !== '' ? parseFloat(targetMargin) : undefined,
@@ -823,6 +839,43 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     )}
                   </div>
 
+                  {/* Content per unit — bridges count-stocked packaged goods (a 750 ml whiskey
+                      bottle stocked in pieces) to ml/g recipe lines: a 30 ml tot deducts
+                      30/750 = 0.04 pieces, so 25 tots deplete exactly one bottle. */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium inline-flex items-center gap-1">
+                      Content per unit <span className="text-muted-foreground font-normal">(optional)</span>
+                      <InfoHint title="Content per unit">
+                        How much ONE stock unit contains — e.g. a whiskey bottle stocked in pieces holds 750&nbsp;ml.
+                        Recipe lines in ml/g (tots, pours) then cost and deduct fractional units automatically:
+                        25 × 30&nbsp;ml tots deplete exactly one 750&nbsp;ml bottle.
+                      </InfoHint>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="e.g. 750"
+                        value={unitContentQty}
+                        onChange={(e) => setUnitContentQty(e.target.value)}
+                        className="max-w-35"
+                      />
+                      <select
+                        value={unitContentUom}
+                        onChange={(e) => setUnitContentUom(e.target.value)}
+                        className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                        disabled={unitContentQty === ''}
+                      >
+                        <option value="ml">ml</option>
+                        <option value="l">L</option>
+                        <option value="g">g</option>
+                        <option value="kg">kg</option>
+                      </select>
+                      <span className="text-xs text-muted-foreground">per {unitAbbr || 'unit'}</span>
+                    </div>
+                  </div>
+
                   {/* Shelf life — only meaningful for perishable / lot-tracked goods. Per-batch
                       expiry dates are entered at goods receipt (Lots); this seeds them. */}
                   {scope.showShelfLife && (isPerishable || trackLots) && (
@@ -851,6 +904,30 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Stock tracking mode — AccuPOS/Square-style per-item depletion control. */}
+              {(isStockable || isRecipe) && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium inline-flex items-center gap-1">
+                    Stock Tracking
+                    <InfoHint title="Stock tracking mode">
+                      <strong>Default</strong>: recipe items follow the tenant policy in Settings; goods/ingredients always deplete.{' '}
+                      <strong>Always deplete</strong>: selling this item always reduces stock (recipes deplete their ingredients).{' '}
+                      <strong>Non-depleting</strong>: sells without touching stock and is never auto-marked sold-out — for businesses
+                      that count stock manually. Usage can still be recorded for variance reports.
+                    </InfoHint>
+                  </label>
+                  <select
+                    value={stockTrackingMode}
+                    onChange={(e) => setStockTrackingMode(e.target.value as 'default' | 'tracked' | 'non_depleting')}
+                    className="h-9 w-full max-w-xs rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                  >
+                    <option value="default">Default (follow tenant policy)</option>
+                    <option value="tracked">Always deplete stock</option>
+                    <option value="non_depleting">Non-depleting (manual counting)</option>
+                  </select>
+                </div>
               )}
 
               {/* Service duration — services (salon/barber) appointment length */}

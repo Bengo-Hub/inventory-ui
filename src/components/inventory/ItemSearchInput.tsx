@@ -28,6 +28,10 @@ export interface ItemResult {
   purchase_pack_size?: number | null;
   purchase_unit?: string;
   yield_pct?: number | null;
+  // Content-per-unit bridge (750 ml per bottle piece) — lets ml/g recipe lines
+  // cost + deduct fractional stock units of count-stocked packaged goods.
+  unit_content_qty?: number | null;
+  unit_content_uom?: string | null;
 }
 
 interface Props {
@@ -57,6 +61,8 @@ function itemToResult(i: Item): ItemResult {
     purchase_pack_size: i.purchase_pack_size ?? null,
     purchase_unit: i.purchase_unit,
     yield_pct: i.yield_pct ?? null,
+    unit_content_qty: i.unit_content_qty ?? null,
+    unit_content_uom: i.unit_content_uom ?? null,
   };
 }
 

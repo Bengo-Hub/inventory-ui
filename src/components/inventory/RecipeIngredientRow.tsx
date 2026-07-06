@@ -2,7 +2,7 @@
 
 import { Input } from '@/components/ui/base';
 import { ItemSearchInput } from './ItemSearchInput';
-import { convertQuantity, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
+import { convertQuantity, convertToStockUnit, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -22,6 +22,10 @@ export interface IngredientRowValue {
   /** The ingredient's own stock/base unit abbreviation (e.g. "L"). The line unit may differ
    *  (e.g. "ml"); qty is converted to this base unit before costing and submission. */
   base_unit?:      string;
+  /** Content-per-unit bridge from the picked item (a 750 ml bottle stocked in pieces →
+   *  750 + 'ml'): lets a ml/g line cost + deduct fractional stock units (tots/pours). */
+  unit_content_qty?: number | null;
+  unit_content_uom?: string | null;
   /** Cost basis as the user expressed it: `cost_entered` buys `cost_basis_qty` of
    *  `cost_basis_unit` (e.g. 52.50 per 500 ml packet). cost_price above is always the
    *  derived per-base-unit figure — never the raw pack price. */
@@ -59,8 +63,11 @@ export function withDerivedCost(row: IngredientRowValue): IngredientRowValue {
 
 /**
  * Convert a recipe line to the ingredient's base unit for submission/costing.
- * e.g. 2.5 ml against a base of L → { qty: 0.0025, unit: "L" }. Falls back to the
- * entered values when there's no base unit or the units aren't convertible.
+ * e.g. 2.5 ml against a base of L → { qty: 0.0025, unit: "L" }. Content-bridged lines
+ * (30 ml of a bottle stocked in pieces) submit AS ENTERED — the API stores the line in
+ * ml and converts through unit_content at deduction time, keeping the recipe readable.
+ * Falls back to the entered values when there's no base unit or the units aren't
+ * convertible (the API's write-time guard rejects truly unbridgeable lines).
  */
 export function ingredientLineForSubmit(row: IngredientRowValue): { qty: number; unit: string } {
   if (row.base_unit && row.unit) {
@@ -68,6 +75,20 @@ export function ingredientLineForSubmit(row: IngredientRowValue): { qty: number;
     if (conv != null) return { qty: conv, unit: row.base_unit };
   }
   return { qty: row.qty, unit: row.unit };
+}
+
+/** Whether this line can never deduct stock: cross-dimension against the item's stock
+ *  unit with no content-per-unit bridge. Mirrors the API's write-time guard so the UI
+ *  can warn before the 422. */
+export function lineUnitMismatch(row: IngredientRowValue): boolean {
+  if (!row.base_unit || !row.unit) return false;
+  return (
+    convertToStockUnit(
+      { base_unit: row.base_unit, unit_content_qty: row.unit_content_qty, unit_content_uom: row.unit_content_uom },
+      row.qty || 1,
+      row.unit,
+    ) == null
+  );
 }
 
 /**
@@ -100,10 +121,16 @@ export function ingredientCostForSubmit(row: IngredientRowValue): {
   return out;
 }
 
-/** qty of this line expressed in its base unit (for live line/batch cost). */
+/** qty of this line expressed in its base/stock unit (for live line/batch cost).
+ *  Includes the content-per-unit bridge so a 30 ml tot line against a 750 ml/pc bottle
+ *  costs 0.04 × the per-piece cost. */
 function qtyInBaseUnit(row: IngredientRowValue): number {
   if (row.base_unit && row.unit) {
-    const conv = convertQuantity(row.qty, row.unit, row.base_unit);
+    const conv = convertToStockUnit(
+      { base_unit: row.base_unit, unit_content_qty: row.unit_content_qty, unit_content_uom: row.unit_content_uom },
+      row.qty,
+      row.unit,
+    );
     if (conv != null) return conv;
   }
   return row.qty;
@@ -157,9 +184,16 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
       : null;
 
   // Unit dropdown options for this line's dimension; keep a custom typed value selectable.
+  // Content-bridged items (750 ml/pc bottles) additionally offer the content dimension's
+  // units so a tot/pour line can be written in ml against a piece-stocked bottle.
   const unitOpts = unitOptionsForBase(row.base_unit || row.unit);
-  const hasCurrent = unitOpts.some((o) => o.value === normalizeUnit(row.unit));
-  const options = hasCurrent || !row.unit ? unitOpts : [{ value: normalizeUnit(row.unit), label: row.unit }, ...unitOpts];
+  const bridged = !!(row.unit_content_qty && row.unit_content_qty > 0 && row.unit_content_uom);
+  const bridgeOpts = bridged ? unitOptionsForBase(row.unit_content_uom) : [];
+  const mergedOpts = [...unitOpts, ...bridgeOpts.filter((b) => !unitOpts.some((o) => o.value === b.value))];
+  const hasCurrent = mergedOpts.some((o) => o.value === normalizeUnit(row.unit));
+  const options = hasCurrent || !row.unit ? mergedOpts : [{ value: normalizeUnit(row.unit), label: row.unit }, ...mergedOpts];
+  // Cross-dimension with no bridge: the API rejects it and stock could never deduct.
+  const mismatch = row.ingredient_sku ? lineUnitMismatch(row) : false;
 
   // Cost-basis controls: "52.50 per 500 ml". Defaults to per-1-base-unit, matching the
   // old plain EP-cost behavior when the user never touches the basis fields.
@@ -208,6 +242,8 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
               ingredient_sku:  item.sku,
               base_unit: nextBase,
               unit: nextUnit,
+              unit_content_qty: item.unit_content_qty ?? null,
+              unit_content_uom: item.unit_content_uom ?? null,
               cost_entered: hasPack
                 ? item.purchase_price ?? undefined
                 : item.cost_price ?? row.cost_entered,
@@ -245,13 +281,26 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
         <select
           value={normalizeUnit(row.unit)}
           onChange={(e) => onChange(index, withDerivedCost({ ...row, unit: e.target.value, unit_touched: true }))}
-          className="h-8 w-full rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-          title={row.base_unit ? `Stocked in ${row.base_unit}. Pick a smaller/other unit for this line — it's converted back to ${row.base_unit} on save.` : 'Unit for this ingredient line.'}
+          className={`h-8 w-full rounded-lg border bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none ${mismatch ? 'border-destructive text-destructive' : 'border-input'}`}
+          title={
+            mismatch
+              ? `"${row.ingredient_name}" is stocked in ${row.base_unit} — a ${row.unit} line can't deduct stock. Use a prepared ingredient, declare the item's content per unit (e.g. 750 ml/bottle), or change the unit.`
+              : bridged
+                ? `Stocked in ${row.base_unit} (${row.unit_content_qty} ${row.unit_content_uom} each). A ${row.unit_content_uom}-family line deducts fractional ${row.base_unit}.`
+                : row.base_unit
+                  ? `Stocked in ${row.base_unit}. Pick a smaller/other unit for this line — it's converted back to ${row.base_unit} on save.`
+                  : 'Unit for this ingredient line.'
+          }
         >
           {options.map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+        {mismatch && (
+          <p className="text-[10px] text-destructive leading-tight mt-0.5">
+            Can’t deduct {row.unit} from {row.base_unit} stock
+          </p>
+        )}
       </div>
 
       {/* Waste % */}

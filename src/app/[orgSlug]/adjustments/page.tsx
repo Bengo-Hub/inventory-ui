@@ -45,6 +45,9 @@ const REASON_OPTIONS = [
     { value: 'damaged', label: 'Damaged Goods' },
     { value: 'expired', label: 'Expired / Spoiled' },
     { value: 'shrinkage', label: 'Theft / Unexplained Loss' },
+    // Floor-stock issue of consumables (serviettes, tissues, handwashing supplies) not
+    // tied to any sale — treasury posts the value as an Operating Supplies expense.
+    { value: 'internal_consumption', label: 'Internal Use / Issue to Floor' },
     { value: 'found', label: 'Found / Surplus Discovered' },
     { value: 'initial_count', label: 'Initial Stock Count' },
     { value: 'return', label: 'Customer Return' },
