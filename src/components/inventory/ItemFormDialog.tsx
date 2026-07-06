@@ -453,8 +453,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // be converted (no unit picked, unknown unit, cross-dimension).
   const enteredCostNum = costPrice !== '' ? parseFloat(costPrice) : null;
   const packQtyNum = packQty !== '' ? parseFloat(packQty) || 1 : 1;
-  const packUnitEff = packUnit || unitAbbr;
-  const packIsUnitCost = packQtyNum === 1 && (!packUnit || normalizeUnit(packUnit) === normalizeUnit(unitAbbr));
+  // The pack is always expressed in the item's own unit when one is selected above —
+  // the cost row never asks for a unit twice. The unit picker only appears while the
+  // item has no unit yet (and picking there back-fills the Unit field).
+  const packUnitEff = unitAbbr || packUnit;
+  const packIsUnitCost = packQtyNum === 1;
   const costNum =
     enteredCostNum != null
       ? costPerBaseUnit(enteredCostNum, packQtyNum, packUnitEff, unitAbbr) ?? enteredCostNum
@@ -605,7 +608,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       mistaken for per-unit costs.
                     </InfoHint>
                   </label>
-                  <div className="flex items-center gap-2">
+                  {/* Responsive: price takes the row on mobile, the "per qty unit" basis wraps
+                      below; side-by-side from sm up. The unit is NOT asked twice — when the
+                      item's Unit is selected above it renders as a static suffix, and the
+                      picker only shows while no unit is chosen (picking one back-fills Unit). */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <Input
                       type="number"
                       min="0"
@@ -613,34 +620,57 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       placeholder="Price paid"
                       value={costPrice}
                       onChange={(e) => setCostPrice(e.target.value)}
-                      className="flex-1"
+                      className="sm:flex-1 sm:min-w-0"
                     />
-                    <span className="text-sm text-muted-foreground shrink-0">per</span>
-                    <Input
-                      type="number"
-                      min="0"
-                      step="any"
-                      placeholder="1"
-                      value={packQty}
-                      onChange={(e) => setPackQty(e.target.value)}
-                      className="w-24"
-                      title="Amount the price buys (e.g. 500 for a 500 ml packet)"
-                    />
-                    <select
-                      value={normalizeUnit(packUnitEff)}
-                      onChange={(e) => setPackUnit(e.target.value)}
-                      className={`${selectCls} w-32`}
-                      title="Unit of the amount the price buys"
-                    >
-                      {!packUnitEff && <option value="">unit…</option>}
-                      {unitOptionsForBase(unitAbbr).map((o) => (
-                        <option key={o.value} value={o.value}>{o.label}</option>
-                      ))}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground shrink-0">per</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder="1"
+                        value={packQty}
+                        onChange={(e) => setPackQty(e.target.value)}
+                        className="w-24 shrink-0"
+                        title={unitAbbr ? `Amount in ${unitAbbr} the price buys (e.g. 500 for a 500 ml packet)` : 'Amount the price buys (e.g. 500 for a 500 ml packet)'}
+                      />
+                      {unitAbbr ? (
+                        <span
+                          className="text-sm font-medium text-muted-foreground whitespace-nowrap"
+                          title="The item's unit, selected above"
+                        >
+                          {unitAbbr}
+                        </span>
+                      ) : (
+                        <select
+                          value={normalizeUnit(packUnit)}
+                          onChange={(e) => {
+                            const abbr = e.target.value;
+                            setPackUnit(abbr);
+                            // No item unit chosen yet — adopt this as the item's unit too so
+                            // the user never has to select the same unit in two places.
+                            if (abbr && !unitId) {
+                              const match = (units ?? []).find((u) => normalizeUnit(u.abbreviation) === abbr);
+                              if (match) {
+                                setUnitId(match.id);
+                                setPackUnit('');
+                              }
+                            }
+                          }}
+                          className="w-36 rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                          title="Unit of the amount the price buys — also sets the item's unit above"
+                        >
+                          <option value="">unit…</option>
+                          {unitOptionsForBase('').map((o) => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
-                  {!packIsUnitCost && costNum != null && unitAbbr && (
+                  {!packIsUnitCost && costNum != null && packUnitEff && (
                     <p className="text-xs text-muted-foreground tabular-nums">
-                      = KES {costNum.toFixed(4).replace(/\.?0+$/, '')} per {unitAbbr} — the figure used for recipe costing and margins.
+                      = KES {costNum.toFixed(4).replace(/\.?0+$/, '')} per {packUnitEff} — the figure used for recipe costing and margins.
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports.</p>
