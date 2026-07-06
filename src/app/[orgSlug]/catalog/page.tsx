@@ -750,39 +750,58 @@ export default function CatalogPage() {
                           </Badge>
                         </td>
                         {/* Wholesale (min) / Retail (max) price profiles — inline-editable; a
-                            RECIPE item is priced from its recipe, so its cells are read-only. */}
-                        <td className="px-6 py-4 text-right hidden lg:table-cell">
-                          <PriceCell
-                            value={item.min_selling_price ?? null}
-                            editable={canChange && item.type !== 'RECIPE'}
-                            saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
-                            onSave={(n) =>
-                              updateItem.mutate(
-                                { sku: item.sku, data: { ...itemToUpdateInput(item), min_selling_price: n } },
-                                {
-                                  onSuccess: () => toast.success(`${item.name} wholesale price updated`),
-                                  onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
-                                },
-                              )
-                            }
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <PriceCell
-                            value={item.max_selling_price ?? item.selling_price ?? null}
-                            editable={canChange && item.type !== 'RECIPE'}
-                            saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
-                            onSave={(n) =>
-                              updateItem.mutate(
-                                { sku: item.sku, data: { ...itemToUpdateInput(item), max_selling_price: n } },
-                                {
-                                  onSuccess: () => toast.success(`${item.name} retail price updated`),
-                                  onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
-                                },
-                              )
-                            }
-                          />
-                        </td>
+                            RECIPE item is priced from its recipe, so its cells are read-only.
+                            INGREDIENT items are never sold: no wholesale/retail is shown or
+                            derived — only the EP cost per BASE unit matters (it feeds recipe
+                            line/EP cost calculations). */}
+                        {item.type === 'INGREDIENT' ? (
+                          <>
+                            <td className="px-6 py-4 text-right hidden lg:table-cell text-muted-foreground">—</td>
+                            <td
+                              className="px-6 py-4 text-right font-mono text-xs text-muted-foreground tabular-nums"
+                              title="EP cost per base unit — ingredients are costed, not priced"
+                            >
+                              {item.cost_price != null
+                                ? `${item.cost_price.toFixed(4).replace(/\.?0+$/, '')} / unit (cost)`
+                                : '—'}
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-6 py-4 text-right hidden lg:table-cell">
+                              <PriceCell
+                                value={item.min_selling_price ?? null}
+                                editable={canChange && item.type !== 'RECIPE'}
+                                saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+                                onSave={(n) =>
+                                  updateItem.mutate(
+                                    { sku: item.sku, data: { ...itemToUpdateInput(item), min_selling_price: n } },
+                                    {
+                                      onSuccess: () => toast.success(`${item.name} wholesale price updated`),
+                                      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
+                                    },
+                                  )
+                                }
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <PriceCell
+                                value={item.max_selling_price ?? item.selling_price ?? null}
+                                editable={canChange && item.type !== 'RECIPE'}
+                                saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+                                onSave={(n) =>
+                                  updateItem.mutate(
+                                    { sku: item.sku, data: { ...itemToUpdateInput(item), max_selling_price: n } },
+                                    {
+                                      onSuccess: () => toast.success(`${item.name} retail price updated`),
+                                      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
+                                    },
+                                  )
+                                }
+                              />
+                            </td>
+                          </>
+                        )}
                         <td className="px-6 py-4">
                           <Badge variant={item.is_active ? 'success' : 'outline'}>
                             {item.is_active ? 'Active' : 'Inactive'}

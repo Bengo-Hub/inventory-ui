@@ -38,9 +38,9 @@ export interface IngredientRowValue {
 // Both variants are complete literal class strings so Tailwind's static scanner
 // picks them up — never build these with string interpolation.
 export const RECIPE_GRID_HEADER =
-  'grid-cols-[minmax(0,1fr)_64px_80px_56px_150px_92px_36px]';
+  'grid-cols-[minmax(0,1fr)_76px_72px_64px_172px_100px_36px]';
 export const RECIPE_GRID_ROW =
-  'lg:grid-cols-[minmax(0,1fr)_64px_80px_56px_150px_92px_36px]';
+  'lg:grid-cols-[minmax(0,1fr)_76px_72px_64px_172px_100px_36px]';
 
 /** The unit costing is expressed against: the ingredient's stock unit, or the line unit
  *  for a brand-new (auto-created) ingredient which will be stored in the line unit. */
@@ -292,8 +292,10 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
                   : 'Unit for this ingredient line.'
           }
         >
+          {/* Abbreviation only (g, ml, kg…) — the full name is in the option tooltip;
+              keeps the narrow unit column readable. */}
           {options.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+            <option key={o.value} value={o.value} title={o.label}>{o.value}</option>
           ))}
         </select>
         {mismatch && (
