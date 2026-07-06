@@ -46,6 +46,12 @@ export interface Item {
   reorder_quantity?: number;
   cost_price?: number | null;
   suggested_price?: number | null;
+  // Purchase pack fields — how the item is bought (e.g. 52.50 per 500 ml packet).
+  // purchase_pack_size is in BASE units per pack; cost_price = purchase_price / pack_size / yield_pct.
+  purchase_price?: number | null;
+  purchase_pack_size?: number | null;
+  purchase_unit?: string;
+  yield_pct?: number | null;
   min_selling_price?: number | null;
   max_selling_price?: number | null;
   target_margin_percent?: number | null;
@@ -125,6 +131,12 @@ export interface CreateItemInput {
   reorder_level?: number;
   reorder_quantity?: number;
   cost_price?: number;
+  // Purchase pack fields (see Item). Send these when cost is entered as a pack price
+  // so the API derives cost_price per base unit and records how the item is bought.
+  purchase_price?: number;
+  purchase_pack_size?: number;
+  purchase_unit?: string;
+  yield_pct?: number;
   min_selling_price?: number;
   max_selling_price?: number;
   target_margin_percent?: number;

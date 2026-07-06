@@ -8,6 +8,8 @@ export interface RecipeIngredient {
     item_sku?: string;
     item_name: string;
     item_cost_price?: number | null;
+    /** The ingredient item's own base/stock unit — item_cost_price is per this unit. */
+    item_unit_id?: string;
     quantity: number;
     unit_of_measure?: string;
     unit_id?: string;

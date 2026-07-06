@@ -4,7 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { InfoHint } from '@/components/ui/info-hint';
 import { CategoryCombobox } from '@/components/inventory/CategoryCombobox';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
-import { RecipeIngredientRow, ingredientLineForSubmit, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingredientLineForSubmit, recipeLineCost, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { itemsApi, type MenuItemCompositeRequest } from '@/lib/api/items';
 import { useUnits } from '@/hooks/useUnits';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -112,10 +112,9 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
   servings:       number;
 }) {
   const { data: units } = useUnits(orgSlug);
-  const batchCost = ingredients.reduce((sum, row) => {
-    if (!row.qty || !(row.cost_price ?? 0)) return sum;
-    return sum + row.qty * (row.cost_price ?? 0) * (1 + (row.waste_percent ?? 0) / 100);
-  }, 0);
+  // Sum of per-line costs with each line's qty converted to the ingredient's base unit —
+  // must match the row's Line column exactly (100 ml against a per-L cost = 0.1 × cost/L).
+  const batchCost = ingredients.reduce((sum, row) => sum + (recipeLineCost(row) ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -133,7 +132,7 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
       </div>
 
       <div className="space-y-0">
-        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_84px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+        <div className={`hidden lg:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
           <span>Ingredient</span>
           <span className="inline-flex items-center gap-1">Qty
             <InfoHint title="Quantity per portion">How much of this ingredient one serving uses, expressed in the Unit beside it. Must be greater than 0.</InfoHint>
@@ -145,7 +144,7 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
             <InfoHint title="Trim / prep loss">Extra percentage lost to peeling, trimming or cooking. Effective qty = Qty × (1 + Waste%/100), so 100 g at 10% waste costs as 110 g.</InfoHint>
           </span>
           <span className="inline-flex items-center gap-1">EP Cost
-            <InfoHint title="Edible-portion cost per unit">Cost of ONE base unit of the usable ingredient (e.g. cost per 1 g). Prefilled from the ingredient; edit to model current prices.</InfoHint>
+            <InfoHint title="Cost the way you buy it">Enter the price you pay and the amount it buys — e.g. a 500&nbsp;ml milk packet at KES&nbsp;52.50 is &ldquo;52.50 per 500&nbsp;ml&rdquo;. The per-base-unit cost is derived automatically for the Line total. Prefilled from the ingredient&apos;s purchase pack; edit to model current prices.</InfoHint>
           </span>
           <span className="inline-flex items-center gap-1">Line
             <InfoHint title="Line cost">Auto-calculated: Qty × EP&nbsp;Cost × (1 + Waste%/100). This is what this one ingredient contributes to the batch cost.</InfoHint>
@@ -371,7 +370,9 @@ export default function NewMenuItemPage() {
           unit,
           waste_percent:   r.waste_percent || 0,
           notes:           r.notes || undefined,
-          cost_price:      r.cost_price,
+          // Derived per-base-unit EP cost plus the purchase pack as entered
+          // (e.g. 52.50 per 500 ml) so auto-created ingredients record both.
+          ...ingredientCostForSubmit(r),
         };
       }),
       modifiers:     cleanModifiers.length > 0 ? cleanModifiers : undefined,

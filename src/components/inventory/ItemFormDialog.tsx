@@ -4,7 +4,8 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { InfoHint } from '@/components/ui/info-hint';
 import { RecurrenceEditor, generateRecurrencePattern } from '@/components/inventory/RecurrenceEditor';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
-import { RecipeIngredientRow, ingredientLineForSubmit, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingredientLineForSubmit, recipeLineCost, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { convertQuantity, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
@@ -114,7 +115,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Opening stock — create mode only. Seeds on-hand in the default warehouse as an
   // opening_balance adjustment; afterwards stock is managed via Adjustments / Stock Take.
   const [initialQty, setInitialQty] = useState('');
-  const [costPrice, setCostPrice] = useState(item?.cost_price != null ? String(item.cost_price) : '');
+  // Cost is captured pack-aware: costPrice is what you PAY for packQty of packUnit
+  // (e.g. 52.50 per 500 ml). The per-base-unit cost_price is derived on submit, so a
+  // pack price is never stored as a per-unit cost. Prefill from the purchase fields
+  // when present; otherwise the stored per-base-unit cost with a 1-unit basis.
+  const itemHasPack = item?.purchase_price != null && item?.purchase_pack_size != null && item.purchase_pack_size > 0;
+  const [costPrice, setCostPrice] = useState(
+    itemHasPack ? String(item!.purchase_price) : item?.cost_price != null ? String(item.cost_price) : '',
+  );
+  const [packQty, setPackQty] = useState(itemHasPack ? String(item!.purchase_pack_size) : '1');
+  const [packUnit, setPackUnit] = useState(''); // '' = the item's own base unit
   const [minSellingPrice, setMinSellingPrice] = useState(item?.min_selling_price != null ? String(item.min_selling_price) : '');
   const [maxSellingPrice, setMaxSellingPrice] = useState(item?.max_selling_price != null ? String(item.max_selling_price) : '');
   const [targetMargin, setTargetMargin] = useState(item?.target_margin_percent != null ? String(item.target_margin_percent) : '');
@@ -196,10 +206,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // reorder, perishable/lot/age) so they don't render for services/events/vouchers.
   const isEventMode = !!lockToEvent;
   const isStockable = ['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type);
-  const batchCost = recipeIngredients.reduce((sum, row) => {
-    if (!row.qty || !(row.cost_price ?? 0)) return sum;
-    return sum + row.qty * (row.cost_price ?? 0) * (1 + (row.waste_percent ?? 0) / 100);
-  }, 0);
+  // Sum of per-line costs with each line's qty converted to the ingredient's base unit —
+  // must match the row's Line column exactly (100 ml against a per-L cost = 0.1 × cost/L).
+  const batchCost = recipeIngredients.reduce((sum, row) => sum + (recipeLineCost(row) ?? 0), 0);
 
   useEffect(() => {
     if (item) {
@@ -214,7 +223,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setBarcode(item.barcode ?? '');
       setReorderLevel(String(item.reorder_level ?? ''));
       setReorderQty(String(item.reorder_quantity ?? ''));
-      setCostPrice(item.cost_price != null ? String(item.cost_price) : '');
+      const hasPack = item.purchase_price != null && item.purchase_pack_size != null && item.purchase_pack_size > 0;
+      setCostPrice(hasPack ? String(item.purchase_price) : item.cost_price != null ? String(item.cost_price) : '');
+      setPackQty(hasPack ? String(item.purchase_pack_size) : '1');
+      setPackUnit('');
       setMinSellingPrice(item.min_selling_price != null ? String(item.min_selling_price) : '');
       setMaxSellingPrice(item.max_selling_price != null ? String(item.max_selling_price) : '');
       setTargetMargin(item.target_margin_percent != null ? String(item.target_margin_percent) : '');
@@ -329,7 +341,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         image_url: imageUrl || undefined,
         ingredients: recipeIngredients.map((row) => {
           // Convert the line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it
-          // costs correctly against the per-base-unit cost.
+          // costs correctly against the per-base-unit cost. Cost fields carry the derived
+          // per-base-unit EP cost plus the purchase pack as entered (52.50 per 500 ml).
           const { qty, unit } = ingredientLineForSubmit(row);
           return {
             ingredient_name: row.ingredient_name,
@@ -338,7 +351,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
             unit,
             waste_percent:   row.waste_percent || 0,
             notes:           row.notes || undefined,
-            cost_price:      row.cost_price,
+            ...ingredientCostForSubmit(row),
           };
         }),
       });
@@ -376,7 +389,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       initial_quantity: !item && isStockable && initialQty !== '' ? parseFloat(initialQty) : undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
-      cost_price: costPrice !== '' ? parseFloat(costPrice) : undefined,
+      // cost_price is the derived per-base-unit EP cost; the purchase fields record the
+      // pack as entered (price, size in base units, human label) so the derivation is
+      // reproducible and the recipe builder can prefill the same basis.
+      cost_price: costNum ?? undefined,
+      purchase_price: isStockable && enteredCostNum != null ? enteredCostNum : undefined,
+      purchase_pack_size: isStockable && enteredCostNum != null && packSizeInBase != null && packSizeInBase > 0 ? packSizeInBase : undefined,
+      purchase_unit: isStockable && enteredCostNum != null && packUnitEff
+        ? (packIsUnitCost ? packUnitEff : `${packQtyNum} ${packUnitEff}`)
+        : undefined,
       min_selling_price: minSellingPrice !== '' ? parseFloat(minSellingPrice) : undefined,
       max_selling_price: maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : undefined,
       target_margin_percent: targetMargin !== '' ? parseFloat(targetMargin) : undefined,
@@ -427,7 +448,21 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const maxNum = maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : null;
   const minMaxInvalid = minNum != null && maxNum != null && minNum > maxNum;
   const marginNum = targetMargin !== '' ? parseFloat(targetMargin) : null;
-  const costNum = costPrice !== '' ? parseFloat(costPrice) : null;
+  // Pack-aware cost derivation: entered price ÷ pack size expressed in the item's base
+  // unit (52.50 per 500 ml → 0.105/ml). Falls back to the raw price when the pack can't
+  // be converted (no unit picked, unknown unit, cross-dimension).
+  const enteredCostNum = costPrice !== '' ? parseFloat(costPrice) : null;
+  const packQtyNum = packQty !== '' ? parseFloat(packQty) || 1 : 1;
+  const packUnitEff = packUnit || unitAbbr;
+  const packIsUnitCost = packQtyNum === 1 && (!packUnit || normalizeUnit(packUnit) === normalizeUnit(unitAbbr));
+  const costNum =
+    enteredCostNum != null
+      ? costPerBaseUnit(enteredCostNum, packQtyNum, packUnitEff, unitAbbr) ?? enteredCostNum
+      : null;
+  const packSizeInBase =
+    enteredCostNum != null
+      ? convertQuantity(packQtyNum, packUnitEff || unitAbbr, unitAbbr || packUnitEff) ?? packQtyNum
+      : null;
   const suggestedFromMargin =
     costNum != null && costNum > 0 && marginNum != null && marginNum > 0 && marginNum < 100
       ? costNum / (1 - marginNum / 100)
@@ -559,12 +594,56 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 onPrimaryChange={setImageUrl}
               />
 
-              {/* Cost Price */}
+              {/* Cost — pack-aware: price paid per pack/amount, e.g. 52.50 per 500 ml */}
               {['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type) && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Cost Price (KES)</label>
-                  <Input type="number" min="0" step="0.01" placeholder="Unit cost from supplier" value={costPrice} onChange={(e) => setCostPrice(e.target.value)} />
-                  <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports</p>
+                  <label className="text-sm font-medium inline-flex items-center gap-1">Cost (KES)
+                    <InfoHint title="Enter cost the way you buy it">
+                      The price you pay and the amount it buys — e.g. a 500&nbsp;ml milk packet at KES&nbsp;52.50 is
+                      &ldquo;52.50 per 500 ml&rdquo;. The system derives the cost per base unit
+                      {unitAbbr ? <> ({unitAbbr})</> : null} for recipe costing and margins, so pack prices are never
+                      mistaken for per-unit costs.
+                    </InfoHint>
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Price paid"
+                      value={costPrice}
+                      onChange={(e) => setCostPrice(e.target.value)}
+                      className="flex-1"
+                    />
+                    <span className="text-sm text-muted-foreground shrink-0">per</span>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="1"
+                      value={packQty}
+                      onChange={(e) => setPackQty(e.target.value)}
+                      className="w-24"
+                      title="Amount the price buys (e.g. 500 for a 500 ml packet)"
+                    />
+                    <select
+                      value={normalizeUnit(packUnitEff)}
+                      onChange={(e) => setPackUnit(e.target.value)}
+                      className={`${selectCls} w-32`}
+                      title="Unit of the amount the price buys"
+                    >
+                      {!packUnitEff && <option value="">unit…</option>}
+                      {unitOptionsForBase(unitAbbr).map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {!packIsUnitCost && costNum != null && unitAbbr && (
+                    <p className="text-xs text-muted-foreground tabular-nums">
+                      = KES {costNum.toFixed(4).replace(/\.?0+$/, '')} per {unitAbbr} — the figure used for recipe costing and margins.
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Used for recipe costing and food cost variance reports.</p>
                 </div>
               )}
 
@@ -803,7 +882,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
                       {/* Ingredient rows */}
                       <div className="space-y-0">
-                        <div className="hidden lg:grid grid-cols-[minmax(0,1fr)_72px_84px_64px_104px_100px_36px] gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border">
+                        <div className={`hidden lg:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
                           <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>EP Cost</span><span>Line</span><span/>
                         </div>
                         {recipeIngredients.map((row, i) => (

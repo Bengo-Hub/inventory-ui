@@ -127,3 +127,27 @@ export function unitOptionsForBase(baseUnit: string | undefined | null): { value
 export function unitsConvertible(a: string, b: string): boolean {
   return convertQuantity(1, a, b) !== null;
 }
+
+/**
+ * EP cost per base unit from a pack-style price entry: `price` buys `basisQty` of
+ * `basisUnit` (e.g. KES 52.50 per 500 ml). Converts the basis quantity into the
+ * base unit and divides — 52.50 / 500 ml against a base of ml → 0.105/ml; the same
+ * entry against a base of L → 52.50 / 0.5 L = 105/L. Returns null when the price
+ * is missing or the basis can't be expressed in the base unit (unknown or
+ * cross-dimension units), leaving the caller to fall back to the raw price.
+ */
+export function costPerBaseUnit(
+  price: number | undefined | null,
+  basisQty: number | undefined | null,
+  basisUnit: string | undefined | null,
+  baseUnit: string | undefined | null,
+): number | null {
+  if (price == null || Number.isNaN(price) || price < 0) return null;
+  const qty = basisQty != null && basisQty > 0 ? basisQty : 1;
+  const from = normalizeUnit(basisUnit) || normalizeUnit(baseUnit);
+  const to = normalizeUnit(baseUnit) || from;
+  if (!from || !to) return qty > 0 ? price / qty : null;
+  const inBase = convertQuantity(qty, from, to);
+  if (inBase == null || inBase <= 0) return null;
+  return price / inBase;
+}

@@ -21,6 +21,13 @@ export interface ItemResult {
   suggested_price?: number | null;
   unit_id?: string;
   type?: string;
+  // Purchase pack fields — how the item is actually bought (e.g. 52.50 per 500 ml
+  // packet). Used to prefill a recipe line's cost basis so a pack price is never
+  // mistaken for a per-base-unit cost. purchase_pack_size is in base units per pack.
+  purchase_price?: number | null;
+  purchase_pack_size?: number | null;
+  purchase_unit?: string;
+  yield_pct?: number | null;
 }
 
 interface Props {
@@ -46,6 +53,10 @@ function itemToResult(i: Item): ItemResult {
     suggested_price: i.suggested_price ?? null,
     unit_id: i.unit_id ?? undefined,
     type: i.type,
+    purchase_price: i.purchase_price ?? null,
+    purchase_pack_size: i.purchase_pack_size ?? null,
+    purchase_unit: i.purchase_unit,
+    yield_pct: i.yield_pct ?? null,
   };
 }
 

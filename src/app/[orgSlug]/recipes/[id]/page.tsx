@@ -5,6 +5,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipe, useUpdateRecipe } from '@/hooks/use-recipes';
 import { useUnits } from '@/hooks/useUnits';
 import type { RecipeIngredient } from '@/lib/api/recipes';
+import { convertQuantity } from '@/lib/units/convert';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -15,6 +16,9 @@ type IngredientRow = {
     item_id: string;
     item_name: string;
     item_cost_price: number | null;
+    /** The item's own base/stock unit — item_cost_price is per this unit; the line's
+     *  quantity is converted from unit_id's unit to this before costing. */
+    item_unit_id: string;
     quantity: string;
     unit_id: string;
     /** Legacy free-text unit (g/ml/pc) used to resolve unit_id when the row has none. */
@@ -23,7 +27,7 @@ type IngredientRow = {
 };
 
 function emptyRow(): IngredientRow {
-    return { item_id: '', item_name: '', item_cost_price: null, quantity: '', unit_id: '', unit_of_measure: '', waste_percent: '0' };
+    return { item_id: '', item_name: '', item_cost_price: null, item_unit_id: '', quantity: '', unit_id: '', unit_of_measure: '', waste_percent: '0' };
 }
 
 function formatCurrency(value?: number | null): string {
@@ -51,6 +55,7 @@ export default function RecipeDetailPage() {
                     item_id: ing.item_id,
                     item_name: ing.item_name ?? '',
                     item_cost_price: ing.item_cost_price ?? null,
+                    item_unit_id: ing.item_unit_id ?? '',
                     quantity: String(ing.quantity),
                     unit_id: ing.unit_id ?? '',
                     unit_of_measure: ing.unit_of_measure ?? '',
@@ -217,8 +222,20 @@ export default function RecipeDetailPage() {
                             {rows.map((row, idx) => {
                                 const qty = parseFloat(row.quantity) || 0;
                                 const waste = parseFloat(row.waste_percent) || 0;
+                                // item_cost_price is per the ITEM's base unit; the line may be in a
+                                // smaller unit (e.g. ml against a per-L cost), so convert before
+                                // multiplying — 100 ml × 105/L costs 0.1 L × 105 = 10.50, not 10,500.
+                                const lineUnitAbbr = row.unit_id
+                                    ? (units?.find((u) => u.id === row.unit_id)?.abbreviation ?? row.unit_of_measure)
+                                    : row.unit_of_measure;
+                                const baseUnitAbbr = row.item_unit_id
+                                    ? units?.find((u) => u.id === row.item_unit_id)?.abbreviation
+                                    : undefined;
+                                const qtyInBase = baseUnitAbbr && lineUnitAbbr
+                                    ? convertQuantity(qty, lineUnitAbbr, baseUnitAbbr) ?? qty
+                                    : qty;
                                 const lineCost = row.item_cost_price != null
-                                    ? row.item_cost_price * qty * (1 + waste / 100)
+                                    ? row.item_cost_price * qtyInBase * (1 + waste / 100)
                                     : null;
                                 return (
                                     <div key={idx} className="rounded-lg border border-border/50 p-3 space-y-2">
@@ -235,13 +252,14 @@ export default function RecipeDetailPage() {
                                                             item_id: item.id,
                                                             item_name: item.name,
                                                             item_cost_price: item.cost_price ?? null,
+                                                            item_unit_id: item.unit_id ?? '',
                                                             unit_id: resolveItemUnitId(item) || row.unit_id,
                                                         });
                                                     }}
                                                 />
                                                 {row.item_cost_price != null && (
                                                     <p className="text-xs text-muted-foreground mt-1">
-                                                        Unit cost: {formatCurrency(row.item_cost_price)}
+                                                        Unit cost: {formatCurrency(row.item_cost_price)}{baseUnitAbbr ? `/${baseUnitAbbr}` : ''}
                                                     </p>
                                                 )}
                                             </div>
