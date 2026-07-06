@@ -35,6 +35,8 @@ export interface Item {
   is_controlled_substance?: boolean;
   is_perishable: boolean;
   track_lots: boolean;
+  /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
+  non_billable?: boolean;
   track_serial_numbers: boolean;
   shelf_life_days?: number | null;
   weight_kg?: number;
@@ -133,6 +135,8 @@ export interface CreateItemInput {
   is_controlled_substance?: boolean;
   is_perishable?: boolean;
   track_lots?: boolean;
+  /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
+  non_billable?: boolean;
   track_serial_numbers?: boolean;
   shelf_life_days?: number;
   barcode_type?: string;

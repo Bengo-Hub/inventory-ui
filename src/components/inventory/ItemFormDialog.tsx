@@ -124,6 +124,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [isControlledSubstance, setIsControlledSubstance] = useState(item?.is_controlled_substance ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
   const [trackLots, setTrackLots] = useState(item?.track_lots ?? false);
+  // Never charged at the POS even if a selling price exists (free accompaniments,
+  // supplies like tissue/packaging); stock still deducts on sale.
+  const [nonBillable, setNonBillable] = useState(item?.non_billable ?? false);
   const [trackSerial, setTrackSerial] = useState(item?.track_serial_numbers ?? false);
   const [shelfLifeDays, setShelfLifeDays] = useState(item?.shelf_life_days != null ? String(item.shelf_life_days) : '');
   const [barcodeType, setBarcodeType] = useState(item?.barcode_type ?? '');
@@ -221,6 +224,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setIsControlledSubstance(item.is_controlled_substance ?? false);
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
+      setNonBillable(item.non_billable ?? false);
       setTrackSerial(item.track_serial_numbers ?? false);
       setShelfLifeDays(item.shelf_life_days != null ? String(item.shelf_life_days) : '');
       setBarcodeType(item.barcode_type ?? '');
@@ -383,6 +387,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       is_controlled_substance: isControlledSubstance,
       is_perishable: isPerishable,
       track_lots: trackLots,
+      non_billable: nonBillable,
       track_serial_numbers: trackSerial,
       shelf_life_days: shelfLifeDays !== '' ? parseInt(shelfLifeDays, 10) : undefined,
       weight_kg: weightKg !== '' ? parseFloat(weightKg) : undefined,
@@ -690,6 +695,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={trackLots} onChange={(e) => setTrackLots(e.target.checked)} className="rounded" />
                       Track Lots / Batches
+                    </label>
+                    <label className="flex items-center gap-2 text-sm cursor-pointer" title="Never charged at the POS even if a selling price exists (free accompaniments, supplies like tissue/packaging). Stock still deducts on sale.">
+                      <input type="checkbox" checked={nonBillable} onChange={(e) => setNonBillable(e.target.checked)} className="rounded" />
+                      Non-billable (never charged at POS)
                     </label>
                     {scope.showControlledSubstance && (
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
