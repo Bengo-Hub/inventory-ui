@@ -11,6 +11,7 @@ import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/u
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
+import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
@@ -411,6 +412,9 @@ export default function CatalogPage() {
     }
   }
   const { data: warehouses } = useWarehouses(orgSlug);
+  // Base-unit abbreviations for the ingredient cost cell ("0.13/g", "45/kg").
+  const { data: unitsList } = useUnits(orgSlug);
+  const unitAbbrById = new Map((unitsList ?? []).map((u) => [u.id, u.abbreviation]));
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -759,11 +763,15 @@ export default function CatalogPage() {
                             <td className="px-6 py-4 text-right hidden lg:table-cell text-muted-foreground">—</td>
                             <td
                               className="px-6 py-4 text-right font-mono text-xs text-muted-foreground tabular-nums"
-                              title="EP cost per base unit — ingredients are costed, not priced"
+                              title="Cost basis — ingredients are costed (per pack / base unit), not priced"
                             >
-                              {item.cost_price != null
-                                ? `${item.cost_price.toFixed(4).replace(/\.?0+$/, '')} / unit (cost)`
-                                : '—'}
+                              {/* Show the REAL cost basis: the purchase pack when known
+                                  ("52.5/500 ml", "158/kg"), else EP cost per base unit ("0.13/g"). */}
+                              {item.purchase_price != null && item.purchase_unit
+                                ? `${item.purchase_price.toFixed(2).replace(/\.?0+$/, '')}/${item.purchase_unit}`
+                                : item.cost_price != null
+                                  ? `${item.cost_price.toFixed(4).replace(/\.?0+$/, '')}/${unitAbbrById.get(item.unit_id ?? '') ?? 'unit'}`
+                                  : '—'}
                             </td>
                           </>
                         ) : (
