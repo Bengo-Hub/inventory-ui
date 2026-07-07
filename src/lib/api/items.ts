@@ -389,6 +389,8 @@ export interface MenuItemCompositeRequest {
   selling_price: number;
   tags?:         string[];
   is_perishable?: boolean;
+  /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
+  non_billable?: boolean;
   image_url?:    string;
   servings?:     number;
   target_margin_percent?: number;

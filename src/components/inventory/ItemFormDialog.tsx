@@ -337,14 +337,17 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       }
     }
 
-    // Composite path: RECIPE type with ingredients defined inline
-    if (isRecipe && recipeIngredients.length > 0 && sellingPrice) {
+    // Composite path: RECIPE type with ingredients defined inline. Non-billable
+    // accompaniments legitimately have no selling price, so the flag alone also
+    // routes here (price defaults to 0 — the POS never charges these anyway).
+    if (isRecipe && recipeIngredients.length > 0 && (sellingPrice || nonBillable)) {
       compositeMut.mutate({
         name: name.trim(),
         sku: sku.trim() || undefined,
         description: description.trim() || undefined,
         category_name: categories?.find((c) => c.id === categoryId)?.name,
-        selling_price: parseFloat(sellingPrice),
+        selling_price: sellingPrice !== '' ? parseFloat(sellingPrice) : 0,
+        non_billable: nonBillable,
         servings: parseFloat(servings) || 1,
         tags: [],
         is_perishable: isPerishable,
@@ -743,6 +746,23 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </div>
               )}
 
+              {/* Non-billable — applies to anything the POS can ring up or deduct: stockable
+                  goods/ingredients/equipment AND recipes (free accompaniments like ugali or
+                  greens are RECIPE items). Lives OUTSIDE the stockable-only section so recipe
+                  accompaniments can be flagged too. POS forces the price to 0 at the till. */}
+              {(isStockable || isRecipe) && (
+                <label className="flex items-start gap-2 text-sm cursor-pointer rounded-lg border border-border p-3" title="Never charged at the POS even if a selling price exists (free accompaniments, supplies like tissue/packaging). Stock still deducts on sale.">
+                  <input type="checkbox" checked={nonBillable} onChange={(e) => setNonBillable(e.target.checked)} className="rounded mt-0.5" />
+                  <span>
+                    Non-billable (never charged at POS)
+                    <br />
+                    <span className="text-xs text-muted-foreground font-normal">
+                      Free accompaniments (ugali, greens) and supplies (tissue, packaging) reach the till at KES 0 — stock still deducts on sale.
+                    </span>
+                  </span>
+                </label>
+              )}
+
               {/* Stock-only fields — irrelevant for services/events/vouchers/recipes */}
               {isStockable && (
                 <>
@@ -820,10 +840,6 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     <label className="flex items-center gap-2 text-sm cursor-pointer">
                       <input type="checkbox" checked={trackLots} onChange={(e) => setTrackLots(e.target.checked)} className="rounded" />
                       Track Lots / Batches
-                    </label>
-                    <label className="flex items-center gap-2 text-sm cursor-pointer" title="Never charged at the POS even if a selling price exists (free accompaniments, supplies like tissue/packaging). Stock still deducts on sale.">
-                      <input type="checkbox" checked={nonBillable} onChange={(e) => setNonBillable(e.target.checked)} className="rounded" />
-                      Non-billable (never charged at POS)
                     </label>
                     {scope.showControlledSubstance && (
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
