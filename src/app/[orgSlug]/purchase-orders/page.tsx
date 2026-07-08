@@ -2,7 +2,7 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Pagination } from '@/components/ui/pagination';
-import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
@@ -21,6 +21,9 @@ import {
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
+import { useUnits } from '@/hooks/useUnits';
+import { normalizeUnit } from '@/lib/units/convert';
+import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
 import { AlertTriangle, BarChart3, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
@@ -40,6 +43,30 @@ interface POLine {
     itemName: string;
     quantity: string;
     unitPrice: string;
+    unitId: string;
+}
+
+// Default the line's unit to the item's purchase_unit (how it's actually bought — e.g. "kg"),
+// matched against the tenant's units list by abbreviation/name; falls back to the item's stock
+// unit_id (same convention RecipeIngredientRow/adjustments use) when no purchase_unit match exists.
+function resolveDefaultUnitId(item: ItemResult, units: Unit[]): string {
+    if (item.purchase_unit) {
+        const norm = normalizeUnit(item.purchase_unit);
+        const match = units.find((u) => normalizeUnit(u.abbreviation) === norm || normalizeUnit(u.name) === norm);
+        if (match) return match.id;
+    }
+    if (item.unit_id && units.some((u) => u.id === item.unit_id)) return item.unit_id;
+    return '';
+}
+
+// Auto-fill the line's unit price from the item's known cost: prefer purchase_price (the price
+// actually paid per purchase_unit — "how it's bought"), falling back to cost_price (the derived
+// per-base-unit EP cost) when no purchase price is on file. Mirrors RecipeIngredientRow's
+// hasPack preference. The user can still edit the field afterwards — this only seeds it.
+function resolveDefaultUnitPrice(item: ItemResult): string {
+    if (item.purchase_price != null) return String(item.purchase_price);
+    if (item.cost_price != null) return String(item.cost_price);
+    return '';
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
@@ -73,9 +100,10 @@ export default function PurchaseOrdersPage() {
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
     const [additionalShipping, setAdditionalShipping] = useState('');
-    const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+    const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
+    const { data: units } = useUnits(orgSlug);
     const suppliers = suppliersPage?.data;
     // Branch resolution: PO posts stock into a warehouse — default to the active outlet's,
     // require an explicit pick under "All Outlets". Amend overrides via setWarehouseId below.
@@ -122,7 +150,7 @@ export default function PurchaseOrdersPage() {
     useMemo(() => { setPage(1); }, [search, statusFilter]);
 
     function addPOLine() {
-        setPoLines([...poLines, { itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+        setPoLines([...poLines, { itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
     }
 
     function removePOLine(idx: number) {
@@ -142,7 +170,7 @@ export default function PurchaseOrdersPage() {
         setPoNotes('');
         setPayTermDays('');
         setAdditionalShipping('');
-        setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+        setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
     }
 
     function closePODialog() {
@@ -174,10 +202,11 @@ export default function PurchaseOrdersPage() {
                 itemName: li.item_name ?? '',
                 quantity: String(li.quantity),
                 unitPrice: String(li.unit_cost),
+                unitId: li.unit_id ?? '',
             }))
         );
         if ((po.line_items?.length ?? 0) === 0) {
-            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '' }]);
+            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
         }
         setCreateOpen(true);
     }
@@ -192,6 +221,7 @@ export default function PurchaseOrdersPage() {
                 item_id: l.itemId,
                 quantity: parseFloat(l.quantity),
                 unit_cost: parseFloat(l.unitPrice) || 0,
+                unit_id: l.unitId || undefined,
             }));
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
 
@@ -438,12 +468,19 @@ export default function PurchaseOrdersPage() {
                                                 value={line.itemName}
                                                 onSelect={(item) => {
                                                     const updated = [...poLines];
-                                                    updated[idx] = { ...updated[idx], itemId: item.id, itemName: item.name };
+                                                    updated[idx] = {
+                                                        ...updated[idx],
+                                                        itemId: item.id,
+                                                        itemName: item.name,
+                                                        // Auto-fill from the picked item; both remain editable below.
+                                                        unitId: resolveDefaultUnitId(item, units ?? []),
+                                                        unitPrice: resolveDefaultUnitPrice(item),
+                                                    };
                                                     setPoLines(updated);
                                                 }}
                                                 placeholder="Search item..."
                                             />
-                                            <div className="grid grid-cols-3 gap-2 items-center">
+                                            <div className="grid grid-cols-4 gap-2 items-center">
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Qty</label>
                                                     <Input
@@ -454,6 +491,20 @@ export default function PurchaseOrdersPage() {
                                                         value={line.quantity}
                                                         onChange={(e) => updatePOLine(idx, 'quantity', e.target.value)}
                                                     />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-xs text-muted-foreground">Unit</label>
+                                                    <select
+                                                        value={line.unitId}
+                                                        onChange={(e) => updatePOLine(idx, 'unitId', e.target.value)}
+                                                        className="w-full rounded-lg border border-input bg-transparent px-2 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                                        aria-label="Unit"
+                                                    >
+                                                        <option value="">Unit</option>
+                                                        {(units ?? []).map((u) => (
+                                                            <option key={u.id} value={u.id}>{u.abbreviation || u.name}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Unit Cost</label>
@@ -628,6 +679,7 @@ export default function PurchaseOrdersPage() {
                                     <tr className="border-b border-border bg-muted/30">
                                         <th className="text-left px-3 py-2 font-medium text-muted-foreground">Item</th>
                                         <th className="text-right px-3 py-2 font-medium text-muted-foreground">Qty</th>
+                                        <th className="text-left px-3 py-2 font-medium text-muted-foreground">Unit</th>
                                         <th className="text-right px-3 py-2 font-medium text-muted-foreground">Recv</th>
                                         <th className="text-right px-3 py-2 font-medium text-muted-foreground">Unit Cost</th>
                                         <th className="text-right px-3 py-2 font-medium text-muted-foreground">Total</th>
@@ -635,7 +687,7 @@ export default function PurchaseOrdersPage() {
                                 </thead>
                                 <tbody className="divide-y divide-border">
                                     {(poDetail.line_items?.length ?? 0) === 0 ? (
-                                        <tr><td colSpan={5} className="px-3 py-6 text-center text-muted-foreground">No line items</td></tr>
+                                        <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">No line items</td></tr>
                                     ) : (
                                         poDetail.line_items?.map((line) => (
                                             <tr key={line.id}>
@@ -644,6 +696,7 @@ export default function PurchaseOrdersPage() {
                                                     {line.item_sku && <div className="font-mono text-xs text-muted-foreground">{line.item_sku}</div>}
                                                 </td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{line.quantity}</td>
+                                                <td className="px-3 py-2 text-muted-foreground">{line.unit || '—'}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{line.received_qty ?? 0}</td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
                                                 <td className="px-3 py-2 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
@@ -654,7 +707,7 @@ export default function PurchaseOrdersPage() {
                                 {(poDetail.line_items?.length ?? 0) > 0 && (
                                     <tfoot>
                                         <tr className="border-t-2 border-border bg-muted/30">
-                                            <td colSpan={4} className="px-3 py-2 text-right font-semibold">Grand Total</td>
+                                            <td colSpan={5} className="px-3 py-2 text-right font-semibold">Grand Total</td>
                                             <td className="px-3 py-2 text-right font-bold tabular-nums">{poDetail.total_amount.toLocaleString()}</td>
                                         </tr>
                                     </tfoot>

@@ -11,6 +11,8 @@ export interface POLineItem {
   received_qty: number;
   unit_cost: number;
   total_cost: number;
+  unit_id?: string;
+  unit?: string; // unit abbreviation, e.g. "kg"
 }
 
 export interface PurchaseOrder {
@@ -40,7 +42,7 @@ export interface CreatePOInput {
   notes?: string;
   pay_term_days?: number;
   additional_shipping_charges?: number;
-  line_items: { item_id: string; quantity: number; unit_cost: number }[];
+  line_items: { item_id: string; quantity: number; unit_cost: number; unit_id?: string }[];
 }
 
 export interface POListParams {
