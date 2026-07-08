@@ -90,7 +90,7 @@ Inventory-api uses auth-api as source of truth for roles/permissions; see invent
 |-------|--------|-------|
 | Framework | Next.js 15 (App Router) | Server components for data fetching |
 | Language | TypeScript | Strict mode |
-| Styling | Tailwind CSS + Shadcn UI | Consistent with other BengoBox frontends |
+| Styling | Tailwind CSS + Shadcn UI | Consistent with other Codevertex frontends |
 | State (global) | Zustand | Auth state, tenant context |
 | State (server) | TanStack Query v5 | API caching, refetching |
 | API client | Axios | Interceptors for JWT refresh |
@@ -135,4 +135,4 @@ Inventory-api uses auth-api as source of truth for roles/permissions; see invent
 | inventory-api deployed and accessible | Required | All data comes from API |
 | auth-ui SSO flow | Required | Login/logout |
 | shared-auth-client JWKS | Required | Token validation |
-| Shadcn UI components | Available | Use existing BengoBox component patterns |
+| Shadcn UI components | Available | Use existing Codevertex component patterns |

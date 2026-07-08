@@ -147,4 +147,4 @@ Post-MVP: tenant discovery from JWT claims, redirect to correct tenant path.
 - **Tailwind CSS** for utility-first styling
 - **Shadcn UI** for pre-built accessible components (Table, Card, Badge, Dialog, Form, Button)
 - **Dark mode** support via `next-themes` (toggle in header)
-- Design tokens aligned with BengoBox design system
+- Design tokens aligned with Codevertex design system

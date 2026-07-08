@@ -29,7 +29,7 @@ The inventory-ui repo is scaffolded (Next.js 16, React 19) with implemented page
   - Install core dependencies: TanStack Query, Zustand, Axios
 - [x] **F1-02:** Configure path aliases and project structure
   - `@/components`, `@/lib`, `@/stores`, `@/types`
-  - Set up ESLint + Prettier config aligned with BengoBox standards
+  - Set up ESLint + Prettier config aligned with Codevertex standards
 
 ### Authentication (SSO)
 

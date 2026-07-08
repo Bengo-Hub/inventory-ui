@@ -1,6 +1,6 @@
 # Inventory UI
 
-BengoBox inventory management UI. Catalog, warehouses, adjustments, platform admin.
+Codevertex inventory management UI. Catalog, warehouses, adjustments, platform admin.
 
 ## Dev
 

@@ -42,7 +42,7 @@ export function PWARegistration() {
   // App name = tenant's first word + service, e.g. "Urban Inventory". Keeps
   // installed apps distinguishable when several Bengo apps run for one tenant.
   const tenantFirstWord = tenant?.orgName?.trim().split(/\s+/)[0];
-  const appName = tenantFirstWord ? `${tenantFirstWord} Inventory` : 'BengoBox Inventory';
+  const appName = tenantFirstWord ? `${tenantFirstWord} Inventory` : 'Codevertex Inventory';
   const logoUrl = tenant?.logoUrl;
 
   useEffect(() => {

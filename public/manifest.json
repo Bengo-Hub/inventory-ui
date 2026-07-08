@@ -1,7 +1,7 @@
 {
-    "name": "BengoBox Inventory",
+    "name": "Codevertex Inventory",
     "short_name": "Inventory",
-    "description": "Inventory management for the BengoBox ecosystem.",
+    "description": "Inventory management for the Codevertex ecosystem.",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#0a0a0a",

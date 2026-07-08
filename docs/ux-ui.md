@@ -2,7 +2,7 @@
 
 **Target users:** Warehouse managers, stock keepers, tenant admins at Urban Loft Cafe
 **Device:** Desktop-first (responsive down to tablet)
-**Design system:** Shadcn UI + Tailwind CSS (BengoBox theme)
+**Design system:** Shadcn UI + Tailwind CSS (Codevertex theme)
 
 ---
 
@@ -129,7 +129,7 @@ Sidebar:
 
 ### Color Palette
 
-- **Primary:** BengoBox brand blue
+- **Primary:** Codevertex brand blue
 - **Success / In Stock:** Green (`emerald-500`)
 - **Warning / Low Stock:** Amber (`amber-500`)
 - **Danger / Out of Stock:** Red (`red-500`)
