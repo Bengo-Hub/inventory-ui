@@ -245,6 +245,9 @@ export default function RecipeDetailPage() {
                                                     orgSlug={orgSlug}
                                                     value={row.item_name}
                                                     placeholder="Search ingredient..."
+                                                    // Recipe ingredients are raw stock (goods/ingredients), never other
+                                                    // menu items.
+                                                    type="GOODS,INGREDIENT"
                                                     onSelect={(item) => {
                                                         // Auto-populate the unit (and cost) from the chosen item so the
                                                         // row never defaults to "—". Falls back to matching the unit name.

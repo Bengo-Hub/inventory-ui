@@ -220,6 +220,9 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
           orgSlug={orgSlug}
           value={row.ingredient_name}
           placeholder="Search ingredient…"
+          // A recipe's ingredients are raw stock (goods/ingredients), never other menu
+          // items — same reasoning as the purchase-order line picker.
+          type="GOODS,INGREDIENT"
           fixedDropdown
           onSelect={(item) => {
             // The ingredient's own base/stock unit — cost is expressed per this unit and the
