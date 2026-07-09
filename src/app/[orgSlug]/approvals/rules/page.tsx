@@ -8,6 +8,7 @@ import {
     useUpdateApprovalRule,
 } from '@/hooks/useApprovals';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { useRoles } from '@/hooks/useRBAC';
 import { APPROVAL_MODULES, APPROVAL_MODULE_LABELS, type ApprovalModule, type ApprovalRule, type ApprovalStep } from '@/lib/api/approvals';
 import { InfoHint } from '@/components/ui/info-hint';
 import { AlertTriangle, ArrowLeft, Minus, Plus, Shield, Trash2, X } from 'lucide-react';
@@ -19,9 +20,12 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 
 const MODULE_LABEL: Record<string, string> = APPROVAL_MODULE_LABELS;
 
-const ROLE_OPTIONS: { value: string; label: string }[] = [
+// Fallback shown only while the real roles list is still loading (or failed to load) — the
+// system roles are seeded on every tenant so this is a reasonable placeholder, not a ceiling.
+const FALLBACK_ROLE_OPTIONS: { value: string; label: string }[] = [
     { value: 'inventory_admin', label: 'Inventory Admin' },
     { value: 'warehouse_manager', label: 'Warehouse Manager' },
+    { value: 'accountant', label: 'Accountant' },
     { value: 'stock_clerk', label: 'Stock Clerk' },
     { value: 'viewer', label: 'Viewer' },
 ];
@@ -39,6 +43,18 @@ export default function ApprovalRulesPage() {
     const createRule = useCreateApprovalRule(orgSlug);
     const updateRule = useUpdateApprovalRule(orgSlug);
     const deleteRule = useDeleteApprovalRule(orgSlug);
+
+    // Real tenant roles (incl. any custom roles) as the approver-role choices, instead of a
+    // stale hardcoded list — an approval step should be assignable to any role that actually
+    // exists (e.g. accountant), not just whichever four were hardcoded when this page was built.
+    const { data: rolesData } = useRoles(orgSlug);
+    const roleOptions = useMemo(() => {
+        if (!rolesData || rolesData.length === 0) return FALLBACK_ROLE_OPTIONS;
+        return [...rolesData]
+            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((r) => ({ value: r.code, label: r.name }));
+    }, [rolesData]);
+    const roleLabel = (code: string) => roleOptions.find((r) => r.value === code)?.label ?? code;
 
     const { canAny } = usePermissions();
     const canAdd = canAny([P.APPROVALS_ADD, P.APPROVALS_MANAGE]);
@@ -218,7 +234,7 @@ export default function ApprovalRulesPage() {
                                                 <td className="px-6 py-4">
                                                     <div className="flex flex-wrap gap-1">
                                                         {rule.steps.map((s) => (
-                                                            <Badge key={s.id ?? s.sequence} variant="outline">{s.sequence}. {ROLE_OPTIONS.find((r) => r.value === s.approver_role)?.label ?? s.approver_role}</Badge>
+                                                            <Badge key={s.id ?? s.sequence} variant="outline">{s.sequence}. {roleLabel(s.approver_role)}</Badge>
                                                         ))}
                                                     </div>
                                                 </td>
@@ -322,7 +338,7 @@ export default function ApprovalRulesPage() {
                                                     onChange={(e) => updateStep(idx, 'approver_role', e.target.value)}
                                                     className="rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                                 >
-                                                    {ROLE_OPTIONS.map((r) => (
+                                                    {roleOptions.map((r) => (
                                                         <option key={r.value} value={r.value}>{r.label}</option>
                                                     ))}
                                                 </select>

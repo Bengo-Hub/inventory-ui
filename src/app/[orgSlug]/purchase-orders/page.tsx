@@ -22,7 +22,7 @@ import {
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useUnits } from '@/hooks/useUnits';
-import { normalizeUnit } from '@/lib/units/convert';
+import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
@@ -44,6 +44,16 @@ interface POLine {
     quantity: string;
     unitPrice: string;
     unitId: string;
+    // Cost basis retained from the selected item so unitPrice can be RECOMPUTED whenever
+    // the line's unit changes — e.g. an item costed at 500/kg must become 0.5 when the
+    // line unit is switched to "g", not keep showing 500 against the wrong unit.
+    costBasis?: {
+        costPrice: number | null;
+        purchasePrice: number | null;
+        purchasePackSize: number | null;
+        purchaseUnit: string | null;
+        itemUnitId: string | null;
+    };
 }
 
 // Default the line's unit to the item's purchase_unit (how it's actually bought — e.g. "kg"),
@@ -67,6 +77,47 @@ function resolveDefaultUnitPrice(item: ItemResult): string {
     if (item.purchase_price != null) return String(item.purchase_price);
     if (item.cost_price != null) return String(item.cost_price);
     return '';
+}
+
+/** Look up a unit's abbreviation (falling back to its name) from its id. */
+function unitAbbr(unitId: string | undefined | null, units: Unit[]): string {
+    if (!unitId) return '';
+    const u = units.find((x) => x.id === unitId);
+    return u ? (u.abbreviation || u.name) : '';
+}
+
+/**
+ * Compute the line's unit price FOR THE GIVEN TARGET UNIT — the piece resolveDefaultUnitPrice was
+ * missing: a price on file is only ever correct against the unit it was quoted in (purchase_unit
+ * for purchase_price, the item's own stock unit for cost_price). Whenever the PO line's unit
+ * differs, the price must be rescaled via costPerBaseUnit, not copied as-is (e.g. 500/kg shown
+ * unchanged against a line switched to "g" would be a 1000x overcharge).
+ */
+function computeUnitPriceForUnit(item: ItemResult, targetUnitAbbr: string, units: Unit[]): string {
+    const itemBaseAbbr = unitAbbr(item.unit_id, units);
+    if (item.purchase_price != null) {
+        const basisUnit = item.purchase_unit || itemBaseAbbr;
+        const derived = costPerBaseUnit(item.purchase_price, item.purchase_pack_size, basisUnit, targetUnitAbbr || basisUnit);
+        if (derived != null) return String(derived);
+    }
+    if (item.cost_price != null) {
+        const derived = costPerBaseUnit(item.cost_price, 1, itemBaseAbbr, targetUnitAbbr || itemBaseAbbr);
+        if (derived != null) return String(derived);
+    }
+    return resolveDefaultUnitPrice(item);
+}
+
+/** Recompute a line's unitPrice for a newly selected unit, using its retained cost basis. */
+function recalcUnitPriceForNewUnit(line: POLine, newUnitId: string, units: Unit[]): string {
+    if (!line.costBasis) return line.unitPrice;
+    const cb = line.costBasis;
+    const pseudoItem: ItemResult = {
+        id: line.itemId, sku: '', name: line.itemName,
+        cost_price: cb.costPrice, purchase_price: cb.purchasePrice,
+        purchase_pack_size: cb.purchasePackSize, purchase_unit: cb.purchaseUnit ?? undefined,
+        unit_id: cb.itemUnitId ?? undefined,
+    };
+    return computeUnitPriceForUnit(pseudoItem, unitAbbr(newUnitId, units), units);
 }
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
@@ -472,14 +523,24 @@ export default function PurchaseOrdersPage() {
                                                 type="GOODS,INGREDIENT"
                                                 onSelect={(item) => {
                                                     const updated = [...poLines];
+                                                    const defaultUnitId = resolveDefaultUnitId(item, units ?? []);
                                                     updated[idx] = {
                                                         ...updated[idx],
                                                         itemId: item.id,
                                                         itemName: item.name,
                                                         // Auto-fill from the picked item; all remain editable below.
-                                                        unitId: resolveDefaultUnitId(item, units ?? []),
-                                                        unitPrice: resolveDefaultUnitPrice(item),
+                                                        unitId: defaultUnitId,
+                                                        unitPrice: computeUnitPriceForUnit(item, unitAbbr(defaultUnitId, units ?? []), units ?? []),
                                                         quantity: item.reorder_quantity ? String(item.reorder_quantity) : updated[idx].quantity,
+                                                        // Retained so switching the unit below rescales the price instead of
+                                                        // leaving it quoted against the wrong unit.
+                                                        costBasis: {
+                                                            costPrice: item.cost_price ?? null,
+                                                            purchasePrice: item.purchase_price ?? null,
+                                                            purchasePackSize: item.purchase_pack_size ?? null,
+                                                            purchaseUnit: item.purchase_unit ?? null,
+                                                            itemUnitId: item.unit_id ?? null,
+                                                        },
                                                     };
                                                     setPoLines(updated);
                                                 }}
@@ -501,7 +562,18 @@ export default function PurchaseOrdersPage() {
                                                     <label className="text-xs text-muted-foreground">Unit</label>
                                                     <select
                                                         value={line.unitId}
-                                                        onChange={(e) => updatePOLine(idx, 'unitId', e.target.value)}
+                                                        onChange={(e) => {
+                                                            const newUnitId = e.target.value;
+                                                            const updated = [...poLines];
+                                                            updated[idx] = {
+                                                                ...updated[idx],
+                                                                unitId: newUnitId,
+                                                                // Rescale the price for the newly selected unit — see
+                                                                // recalcUnitPriceForNewUnit / computeUnitPriceForUnit above.
+                                                                unitPrice: recalcUnitPriceForNewUnit(updated[idx], newUnitId, units ?? []),
+                                                            };
+                                                            setPoLines(updated);
+                                                        }}
                                                         className="w-full rounded-lg border border-input bg-transparent px-2 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                                         aria-label="Unit"
                                                     >
