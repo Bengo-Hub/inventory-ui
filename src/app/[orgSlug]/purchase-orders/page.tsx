@@ -466,15 +466,20 @@ export default function PurchaseOrdersPage() {
                                             <ItemSearchInput
                                                 orgSlug={orgSlug}
                                                 value={line.itemName}
+                                                // Purchase orders restock stock-tracked items — exclude RECIPE/menu
+                                                // items so e.g. "Beef" the raw ingredient isn't buried under a dozen
+                                                // "Beef ..." menu items that can't actually be purchased as stock.
+                                                type="GOODS,INGREDIENT"
                                                 onSelect={(item) => {
                                                     const updated = [...poLines];
                                                     updated[idx] = {
                                                         ...updated[idx],
                                                         itemId: item.id,
                                                         itemName: item.name,
-                                                        // Auto-fill from the picked item; both remain editable below.
+                                                        // Auto-fill from the picked item; all remain editable below.
                                                         unitId: resolveDefaultUnitId(item, units ?? []),
                                                         unitPrice: resolveDefaultUnitPrice(item),
+                                                        quantity: item.reorder_quantity ? String(item.reorder_quantity) : updated[idx].quantity,
                                                     };
                                                     setPoLines(updated);
                                                 }}

@@ -32,6 +32,10 @@ export interface ItemResult {
   // cost + deduct fractional stock units of count-stocked packaged goods.
   unit_content_qty?: number | null;
   unit_content_uom?: string | null;
+  // System-configured restock quantity — used to prefill an order/count qty when
+  // the caller wants a sane default rather than leaving it blank.
+  reorder_level?: number | null;
+  reorder_quantity?: number | null;
 }
 
 interface Props {
@@ -46,6 +50,12 @@ interface Props {
   allowCreate?: boolean;
   /** Show the camera barcode-scan button (default: true). Scanning fills the search query. */
   enableScan?: boolean;
+  /**
+   * Restrict results to these item type(s), comma-separated (e.g. "GOODS,INGREDIENT") —
+   * passed straight through to the backend's `type` filter. Omit to search every type
+   * (e.g. ModifierGroupDialog deliberately searches both RECIPE and GOODS items).
+   */
+  type?: string;
 }
 
 function itemToResult(i: Item): ItemResult {
@@ -63,10 +73,12 @@ function itemToResult(i: Item): ItemResult {
     yield_pct: i.yield_pct ?? null,
     unit_content_qty: i.unit_content_qty ?? null,
     unit_content_uom: i.unit_content_uom ?? null,
+    reorder_level: i.reorder_level ?? null,
+    reorder_quantity: i.reorder_quantity ?? null,
   };
 }
 
-export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true }: Props) {
+export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -76,11 +88,11 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
   const createItem = useCreateItem(orgSlug);
 
   const { data: results } = useQuery<ItemResult[]>({
-    queryKey: ['item-search', orgSlug, query],
+    queryKey: ['item-search', orgSlug, query, type],
     queryFn: async () => {
       const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
         `/api/v1/${orgSlug}/inventory/items`,
-        { search: query }
+        type ? { search: query, type } : { search: query }
       );
       return Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
     },
