@@ -81,6 +81,20 @@ export function fetchRecipe(orgSlug: string, id: string) {
     return apiClient.get<Recipe>(`/api/v1/${orgSlug}/inventory/recipes/${id}`);
 }
 
+/**
+ * Fetch the recipe for a menu/BOM item by its SKU. The list endpoint's ?sku= form returns a
+ * raw array (exact match) rather than a paginated envelope, so this tolerates both shapes and
+ * returns the single recipe (or null when the item has none / the outlet can't read recipes).
+ */
+export async function fetchRecipeBySku(orgSlug: string, sku: string): Promise<Recipe | null> {
+    const res = await apiClient.get<Recipe[] | PaginatedRecipes>(
+        `/api/v1/${orgSlug}/inventory/recipes`,
+        { sku },
+    );
+    const rows = Array.isArray(res) ? res : res?.data ?? [];
+    return rows.find((r) => r.sku === sku) ?? rows[0] ?? null;
+}
+
 export function createRecipe(orgSlug: string, data: RecipePayload) {
     return apiClient.post<Recipe>(`/api/v1/${orgSlug}/inventory/recipes`, data);
 }

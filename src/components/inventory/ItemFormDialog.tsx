@@ -23,6 +23,7 @@ import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
+import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -205,6 +206,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
       queryClient.invalidateQueries({ queryKey: ['recipes', orgSlug] });
+      // Refresh the item-detail + BOM views when a recipe is edited from the detail page.
+      queryClient.invalidateQueries({ queryKey: ['catalog'] });
       if (data.warnings?.length) {
         toast.warning(data.warnings.join('; '));
       } else {
@@ -301,6 +304,49 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Abbreviation of the selected base unit (e.g. "L", "kg"), shown as a suffix on
   // quantity fields so opening stock / reorder values read in the right unit.
   const unitAbbr = (units ?? []).find((u) => u.id === unitId)?.abbreviation ?? '';
+
+  // Editing a RECIPE: load its recipe so the Selling Price, Servings, and ingredient rows
+  // hydrate from the saved BOM instead of showing an empty section (the recipe's fields live
+  // on the recipe record, not the item, so they must be fetched separately). Failures degrade
+  // silently — the section simply starts empty. Resubmitting keeps them via the composite path.
+  const { data: recipeData } = useQuery<Recipe | null>({
+    queryKey: ['item-form-recipe', orgSlug, item?.sku],
+    queryFn: () => fetchRecipeBySku(orgSlug, item!.sku),
+    enabled: !!item && item.type === 'RECIPE',
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!recipeData) return;
+    if (recipeData.selling_price != null) setSellingPrice(String(recipeData.selling_price));
+    if (recipeData.output_qty) setServings(String(recipeData.output_qty));
+    if (recipeData.target_margin_percent != null && targetMargin === '') {
+      setTargetMargin(String(recipeData.target_margin_percent));
+    }
+    const rows: IngredientRowValue[] = (recipeData.ingredients ?? []).map((ing) => {
+      // The ingredient's own base/stock unit — cost_price is expressed per this unit and the
+      // Line column converts the line qty back to it. Resolve the abbreviation from the units list.
+      const baseAbbr = ing.item_unit_id
+        ? (units ?? []).find((u) => u.id === ing.item_unit_id)?.abbreviation
+        : undefined;
+      return {
+        ingredient_name: ing.item_name,
+        ingredient_sku: ing.item_sku ?? '',
+        qty: ing.quantity,
+        unit: ing.unit_of_measure || baseAbbr || 'g',
+        waste_percent: ing.waste_percent ?? 0,
+        notes: ing.notes ?? '',
+        base_unit: baseAbbr,
+        // Per-base-unit EP cost carried by the recipe read — feeds the Line/batch cost. Not
+        // routed through withDerivedCost (which would clear it without a raw cost basis).
+        cost_price: ing.item_cost_price ?? undefined,
+        unit_touched: true,
+      };
+    });
+    setRecipeIngredients(rows);
+    if (rows.length > 0) setRecipeOpen(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipeData, units]);
 
   // Duplicate-name warning — debounced server search (items can number in the
   // thousands, so unlike suppliers/units/categories we can't hold the full list

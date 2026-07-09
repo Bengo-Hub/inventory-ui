@@ -264,6 +264,20 @@ export const itemsApi = {
   get: (orgSlug: string, sku: string) =>
     apiClient.get<Item>(`${itemsBase(orgSlug)}/${sku}`),
 
+  // Fetch a single fully-enriched item by its UUID. The list endpoint supports an ?id=
+  // filter that reuses the full enrichment (category name, effective/tax price, on-hand,
+  // images), so the detail page renders the same shape as a catalog row — unlike
+  // GET /items/{sku}, which resolves by SKU only and returns availability numbers.
+  getById: async (orgSlug: string, id: string): Promise<Item | null> => {
+    const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), {
+      id,
+      status: 'all',
+      limit: 1,
+    });
+    const rows = Array.isArray(res) ? res : res.data ?? [];
+    return rows[0] ?? null;
+  },
+
   create: (orgSlug: string, data: CreateItemInput) =>
     apiClient.post<Item>(itemsBase(orgSlug), data),
 
