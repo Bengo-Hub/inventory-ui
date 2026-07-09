@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { useItems } from '@/hooks/useItems';
+import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Eye, Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -118,6 +119,27 @@ export default function UnitsPage() {
         placeholderData: [],
     });
 
+    // Unfiltered list for the duplicate-name/abbreviation check below — decoupled
+    // from the search box above, which can be actively filtering when the dialog opens.
+    const { data: allUnits } = useQuery<Unit[]>({
+        queryKey: ['units', orgSlug],
+        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/units`),
+        placeholderData: [],
+    });
+    const normalizedFormName = normalizeName(formName);
+    const normalizedFormAbbr = normalizeName(formAbbreviation);
+    const dupNameUnit = normalizedFormName.length > 0
+        ? (allUnits ?? []).find((u) => (!editing || u.id !== editing.id) && normalizeName(u.name) === normalizedFormName)
+        : undefined;
+    const dupAbbrUnit = !dupNameUnit && normalizedFormAbbr.length > 0
+        ? (allUnits ?? []).find((u) => (!editing || u.id !== editing.id) && normalizeName(u.abbreviation) === normalizedFormAbbr)
+        : undefined;
+    const unitDuplicateError = dupNameUnit
+        ? `A unit named "${dupNameUnit.name}" already exists.`
+        : dupAbbrUnit
+            ? `Abbreviation "${dupAbbrUnit.abbreviation}" is already used by "${dupAbbrUnit.name}".`
+            : null;
+
     const mutation = useMutation({
         mutationFn: (payload: UnitPayload) =>
             editing
@@ -128,8 +150,8 @@ export default function UnitsPage() {
             queryClient.invalidateQueries({ queryKey: ['units'] });
             closeDialog();
         },
-        onError: () => {
-            toast.error(editing ? 'Failed to update unit' : 'Failed to create unit');
+        onError: async (e) => {
+            toast.error(await apiErrorMessage(e, editing ? 'Failed to update unit' : 'Failed to create unit'));
         },
     });
 
@@ -177,6 +199,10 @@ export default function UnitsPage() {
         e.preventDefault();
         if (!formName.trim() || !formAbbreviation.trim()) {
             toast.error('Name and abbreviation are required');
+            return;
+        }
+        if (unitDuplicateError) {
+            toast.error(unitDuplicateError);
             return;
         }
         mutation.mutate({
@@ -336,6 +362,7 @@ export default function UnitsPage() {
                                             />
                                         </div>
                                     </div>
+                                    {unitDuplicateError && <p className="text-xs text-destructive -mt-2">{unitDuplicateError}</p>}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Type</label>
                                         <select
@@ -356,7 +383,7 @@ export default function UnitsPage() {
                                         <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>
                                             Cancel
                                         </Button>
-                                        <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+                                        <Button type="submit" className="flex-1" disabled={mutation.isPending || !!unitDuplicateError}>
                                             {mutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
                                         </Button>
                                     </div>

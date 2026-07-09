@@ -17,6 +17,8 @@ import { type CreateSupplierInput } from '@/lib/api/suppliers';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
+import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
+import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
@@ -67,6 +69,12 @@ interface Props {
   initialName?: string;
   /** Lock the form to event editing: type fixed to SERVICE; category/unit/type read-only (predefined). */
   lockToEvent?: boolean;
+  /**
+   * When given, a matched duplicate becomes a "Use this instead" action that picks the
+   * existing item and closes the form (e.g. ItemSearchInput's inline create). Omitted
+   * elsewhere — the duplicate warning still shows, just without a pick affordance.
+   */
+  onSelectExisting?: (item: Item) => void;
   onClose: () => void;
   onSubmit: (data: CreateItemInput) => void;
   isPending: boolean;
@@ -81,7 +89,7 @@ function toLocalDatetimeValue(iso?: string | null): string {
   return iso.slice(0, 16); // "YYYY-MM-DDTHH:mm"
 }
 
-export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockToEvent, onClose, onSubmit, isPending }: Props) {
+export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockToEvent, onSelectExisting, onClose, onSubmit, isPending }: Props) {
   // Selected-outlet use_case drives which item types / use-cases / sections are offered.
   // Event mode (the Events pages) is unrestricted: type is fixed to SERVICE regardless.
   const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
@@ -293,6 +301,30 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Abbreviation of the selected base unit (e.g. "L", "kg"), shown as a suffix on
   // quantity fields so opening stock / reorder values read in the right unit.
   const unitAbbr = (units ?? []).find((u) => u.id === unitId)?.abbreviation ?? '';
+
+  // Duplicate-name warning — debounced server search (items can number in the
+  // thousands, so unlike suppliers/units/categories we can't hold the full list
+  // client-side) scoped to the item's own type so a Goods item isn't flagged
+  // against an unrelated Service of the same name.
+  const [dupSearch, setDupSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDupSearch(name.trim()), 300);
+    return () => clearTimeout(t);
+  }, [name]);
+  const { data: dupCandidates } = useQuery<Item[]>({
+    queryKey: ['item-dup-check', orgSlug, dupSearch, type],
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(
+        `/api/v1/${orgSlug}/inventory/items`,
+        { search: dupSearch, type },
+      );
+      return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
+    },
+    enabled: !!orgSlug && dupSearch.length >= 2,
+    placeholderData: [],
+    staleTime: 15_000,
+  });
+  const dupMatches = useDuplicateNameWarning(dupCandidates, name, { excludeId: item?.id });
 
   // In event mode show only event categories; fall back to all if the tenant has none seeded.
   const eventCategories = categories?.filter(isEventCategory) ?? [];
@@ -520,6 +552,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   <Input placeholder="Auto-generated if blank" value={sku} onChange={(e) => setSku(e.target.value)} />
                 </div>
               </div>
+
+              {dupMatches.length > 0 && (
+                <DuplicateNameWarning
+                  matches={dupMatches}
+                  entityLabel={itemNoun.toLowerCase()}
+                  renderDetail={(i) => i.sku}
+                  onUseExisting={onSelectExisting ? (i) => onSelectExisting(i) : undefined}
+                />
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -1201,7 +1242,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         <AddCategoryDialog
           orgSlug={orgSlug}
           initialName=""
-          categories={[]}
+          categories={categories ?? []}
           onClose={() => setAddCategoryOpen(false)}
           onCreated={(cat) => { setCategoryId(cat.id); setAddCategoryOpen(false); }}
         />
@@ -1232,6 +1273,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
               },
               onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to add vendor')),
             });
+          }}
+          onSelectExisting={(supplier) => {
+            setPreferredSupplierId(supplier.id);
+            setPreferredSupplierName(supplier.name);
+            setAddVendorOpen(false);
+            toast.success('Using existing vendor as preferred supplier');
           }}
         />
       )}

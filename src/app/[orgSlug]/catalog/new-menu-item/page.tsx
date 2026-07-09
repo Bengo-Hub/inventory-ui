@@ -3,14 +3,17 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
 import { CategoryCombobox } from '@/components/inventory/CategoryCombobox';
+import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingredientLineForSubmit, recipeLineCost, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
-import { itemsApi, type MenuItemCompositeRequest } from '@/lib/api/items';
+import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
+import { apiClient } from '@/lib/api/client';
+import { itemsApi, type Item, type MenuItemCompositeRequest } from '@/lib/api/items';
 import { useUnits } from '@/hooks/useUnits';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 const STEPS = ['Basic Info', 'Ingredients', 'Modifiers'] as const;
@@ -51,6 +54,30 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
   function set(key: keyof Step1Data, val: string) {
     onChange({ ...data, [key]: val });
   }
+
+  // Duplicate-name warning — debounced server search restricted to RECIPE (menu) items,
+  // mirroring ItemFormDialog's item dup-check. Informational only; this wizard has no
+  // natural "pick existing instead" target, unlike the inline create-from-search flow.
+  const [dupSearch, setDupSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDupSearch(data.name.trim()), 300);
+    return () => clearTimeout(t);
+  }, [data.name]);
+  const { data: dupCandidates } = useQuery<Item[]>({
+    queryKey: ['item-dup-check', orgSlug, dupSearch, 'RECIPE'],
+    queryFn: async () => {
+      const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(
+        `/api/v1/${orgSlug}/inventory/items`,
+        { search: dupSearch, type: 'RECIPE' },
+      );
+      return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
+    },
+    enabled: !!orgSlug && dupSearch.length >= 2,
+    placeholderData: [],
+    staleTime: 15_000,
+  });
+  const dupMatches = useDuplicateNameWarning(dupCandidates, data.name);
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -63,6 +90,11 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
           <Input placeholder="e.g. BEE006" value={data.sku} onChange={(e) => set('sku', e.target.value)} />
         </div>
       </div>
+
+      {dupMatches.length > 0 && (
+        <DuplicateNameWarning matches={dupMatches} entityLabel="menu item" renderDetail={(i) => i.sku} />
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <label className="text-sm font-medium">Category</label>

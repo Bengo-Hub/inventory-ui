@@ -2,6 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useCategories } from '@/hooks/useCategories';
+import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { categoriesApi, type Category } from '@/lib/api/categories';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
@@ -149,7 +150,9 @@ export function AddCategoryDialog({
 }: {
   orgSlug:     string;
   initialName: string;
-  categories:  Category[];
+  // Only id/name are needed here (the parent picker + duplicate check) — a narrower
+  // shape than the full Category lets callers pass a lighter-weight local list.
+  categories:  { id: string; name: string }[];
   onClose:     () => void;
   onCreated:   (cat: Category) => void;
 }) {
@@ -158,6 +161,11 @@ export function AddCategoryDialog({
   const [code, setCode] = useState('');
   const [parentId, setParentId] = useState('');
   const [description, setDescription] = useState('');
+
+  // Real duplicate prevention (not just a soft warning) — case-insensitive, no
+  // network round-trip since the category list is already loaded by the parent.
+  const normalizedName = normalizeName(name);
+  const isDuplicate = normalizedName.length > 0 && categories.some((c) => normalizeName(c.name) === normalizedName);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -179,6 +187,10 @@ export function AddCategoryDialog({
     e.preventDefault();
     if (!name.trim()) {
       toast.error('Name is required');
+      return;
+    }
+    if (isDuplicate) {
+      toast.error(`A category named "${name.trim()}" already exists`);
       return;
     }
     mutation.mutate();
@@ -203,6 +215,9 @@ export function AddCategoryDialog({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Name *</label>
                   <Input placeholder="e.g. Main Dishes" value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+                  {isDuplicate && (
+                    <p className="text-xs text-destructive">A category named &quot;{name.trim()}&quot; already exists.</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Code</label>
@@ -234,7 +249,7 @@ export function AddCategoryDialog({
               </div>
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-                <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+                <Button type="submit" className="flex-1" disabled={mutation.isPending || isDuplicate}>
                   {mutation.isPending ? 'Saving…' : 'Create'}
                 </Button>
               </div>

@@ -4,6 +4,8 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
+import { useCategories } from '@/hooks/useCategories';
+import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -56,6 +58,14 @@ export default function CategoriesPage() {
         },
         placeholderData: [],
     });
+
+    // Unfiltered list for the duplicate-name check below — decoupled from the search
+    // box above, which can be actively filtering the table when "Add Category" is clicked.
+    const { data: allCategories } = useCategories(orgSlug);
+    const normalizedFormName = normalizeName(formName);
+    const isDuplicateCategory = normalizedFormName.length > 0 && (allCategories ?? []).some(
+        (c) => (!editing || c.id !== editing.id) && normalizeName(c.name) === normalizedFormName,
+    );
 
     const mutation = useMutation({
         mutationFn: (payload: CategoryPayload) =>
@@ -164,6 +174,10 @@ export default function CategoriesPage() {
         e.preventDefault();
         if (!formName.trim()) {
             toast.error('Name is required');
+            return;
+        }
+        if (isDuplicateCategory) {
+            toast.error(`A category named "${formName.trim()}" already exists`);
             return;
         }
         mutation.mutate({
@@ -315,6 +329,9 @@ export default function CategoriesPage() {
                                                 onChange={(e) => setFormName(e.target.value)}
                                                 required
                                             />
+                                            {isDuplicateCategory && (
+                                                <p className="text-xs text-destructive">A category named &quot;{formName.trim()}&quot; already exists.</p>
+                                            )}
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Code</label>
@@ -353,7 +370,7 @@ export default function CategoriesPage() {
                                         <Button type="button" variant="outline" className="flex-1" onClick={closeDialog}>
                                             Cancel
                                         </Button>
-                                        <Button type="submit" className="flex-1" disabled={mutation.isPending}>
+                                        <Button type="submit" className="flex-1" disabled={mutation.isPending || isDuplicateCategory}>
                                             {mutation.isPending ? 'Saving...' : editing ? 'Update' : 'Create'}
                                         </Button>
                                     </div>

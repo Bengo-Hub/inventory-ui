@@ -231,6 +231,10 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
           onClose={() => setCreateOpen(false)}
           onSubmit={handleCreateSubmit}
           isPending={createItem.isPending}
+          onSelectExisting={(existing) => {
+            setCreateOpen(false);
+            handleSelect(itemToResult(existing));
+          }}
         />
       )}
     </div>
