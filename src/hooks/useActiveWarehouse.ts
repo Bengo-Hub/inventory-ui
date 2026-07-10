@@ -11,9 +11,13 @@ import { useEffect, useMemo, useState } from 'react';
  * create, Goods Receipt, Stock Adjustment, Transfer). Confirmed UX:
  *
  *  - Default the active warehouse to the currently selected OUTLET FILTER.
- *  - If "All Outlets" is selected, fall back to the user's HOME/default outlet, but the
- *    resolution is NOT authoritative — `mustPick` is true and the caller MUST require an
- *    explicit warehouse pick before submit (block with an inline prompt if unresolved).
+ *  - If the outlet filter is unset AND the user has no fixed home outlet either (HQ-capable
+ *    users who have explicitly chosen "All Outlets" — OutletFilter's applyAll() clears both
+ *    stores together), the resolution is a best-effort guess only — `mustPick` is true and the
+ *    caller MUST require an explicit warehouse pick before submit (block with an inline prompt
+ *    if unresolved). Scoped staff/managers never touch the drill-down filter at all (it's
+ *    hidden for them) but always have a home outlet fixed at login, so for them the home-outlet
+ *    resolution IS authoritative and `mustPick` must be false — don't demand a redundant pick.
  *  - Reads stay filter-scoped; only writes use this hook.
  *
  * A warehouse "belongs" to an outlet via Warehouse.outlet_id. The default warehouse for an
@@ -61,9 +65,14 @@ export function useActiveWarehouse(orgSlug: string): UseActiveWarehouseResult {
   const activeOutletId = filterOutlet?.id ?? homeOutlet?.id ?? null;
   const activeOutletName = filterOutlet?.name ?? homeOutlet?.name;
 
-  // When "All Outlets" is selected (no filter), the resolution is a best-effort fallback to the
-  // home outlet and the user MUST explicitly confirm the warehouse before submitting.
-  const mustPick = !filterOutlet;
+  // A pick is only required when NEITHER source resolves an outlet — i.e. an HQ-capable user
+  // has explicitly selected "All Outlets" (OutletFilter.applyAll() clears filterOutlet AND
+  // homeOutlet together). Scoped staff/managers never have a filter selection (the drill-down
+  // is hidden for them), but their homeOutlet is always fixed at login, so `!filterOutlet` alone
+  // must NOT force a pick for them — that was the bug: it treated every scoped-staff session as
+  // ambiguous "All Outlets", showing a false "choose the warehouse" warning on a form whose
+  // outlet was never actually in question.
+  const mustPick = !filterOutlet && !homeOutlet;
 
   // Scope the picker options to the active outlet's warehouses when we can; otherwise show all.
   const scopedOptions = useMemo(() => {
