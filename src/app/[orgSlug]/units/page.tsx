@@ -357,7 +357,7 @@ export default function UnitsPage() {
                                             <Input
                                                 placeholder="e.g. kg"
                                                 value={formAbbreviation}
-                                                onChange={(e) => setFormAbbreviation(e.target.value)}
+                                                onChange={(e) => setFormAbbreviation(e.target.value.toLowerCase())}
                                                 required
                                             />
                                         </div>

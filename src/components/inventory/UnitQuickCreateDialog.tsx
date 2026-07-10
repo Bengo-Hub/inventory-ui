@@ -69,7 +69,7 @@ export function UnitQuickCreateDialog({ orgSlug, initialName = '', onClose, onCr
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Abbreviation</label>
-                <Input value={abbreviation} onChange={(e) => setAbbreviation(e.target.value)} placeholder="e.g. kg (auto if blank)" />
+                <Input value={abbreviation} onChange={(e) => setAbbreviation(e.target.value.toLowerCase())} placeholder="e.g. kg (auto if blank)" />
               </div>
               {duplicateError && <p className="text-xs text-destructive">{duplicateError}</p>}
               <div className="flex gap-3 pt-2">
