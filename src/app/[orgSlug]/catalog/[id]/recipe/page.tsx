@@ -1,45 +1,35 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { apiClient } from '@/lib/api/client';
+import { itemsApi } from '@/lib/api/items';
+import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChefHat, Package } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-
-interface RecipeIngredient {
-    id: string;
-    item_id: string;
-    item_name: string;
-    sku?: string;
-    quantity: number;
-    unit_name: string;
-    waste_percent: number;
-    cost?: number;
-}
-
-interface RecipeDetail {
-    id: string;
-    name: string;
-    description?: string;
-    servings: number;
-    total_cost: number;
-    cost_per_portion: number;
-    suggested_price: number;
-    target_margin_percent: number;
-    ingredients: RecipeIngredient[];
-}
 
 export default function ItemRecipePage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const id = params?.id as string;
 
-    const { data: recipe, isLoading, isError } = useQuery<RecipeDetail>({
-        queryKey: ['item-recipe', orgSlug, id],
-        queryFn: () => apiClient.get(`/api/v1/${orgSlug}/inventory/items/${id}/recipe`),
+    // There is no GET /inventory/items/{id}/recipe route — recipes are looked up by SKU
+    // (see catalog/[id]/page.tsx). Resolve the item first to get its SKU, then fetch the
+    // recipe the same way the item detail page's BOM card does.
+    const { data: item, isLoading: itemLoading } = useQuery({
+        queryKey: ['catalog', 'item', orgSlug, id],
+        queryFn: () => itemsApi.getById(orgSlug, id),
         enabled: !!orgSlug && !!id,
     });
+
+    const { data: recipe, isLoading: recipeLoading, isError } = useQuery<Recipe | null>({
+        queryKey: ['catalog', 'recipe', orgSlug, item?.sku],
+        queryFn: () => fetchRecipeBySku(orgSlug, item!.sku),
+        enabled: !!orgSlug && !!item?.sku,
+        retry: false,
+    });
+
+    const isLoading = itemLoading || (!!item?.sku && recipeLoading);
 
     return (
         <div className="p-6 space-y-6">
@@ -83,9 +73,9 @@ export default function ItemRecipePage() {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {[
                             { label: 'Servings', value: recipe.servings },
-                            { label: 'Total Cost', value: recipe.total_cost.toLocaleString() },
-                            { label: 'Cost / Portion', value: recipe.cost_per_portion.toLocaleString() },
-                            { label: 'Suggested Price', value: recipe.suggested_price.toLocaleString() },
+                            { label: 'Total Cost', value: (recipe.total_cost ?? 0).toLocaleString() },
+                            { label: 'Cost / Portion', value: (recipe.cost_per_portion ?? 0).toLocaleString() },
+                            { label: 'Suggested Price', value: (recipe.suggested_price ?? 0).toLocaleString() },
                         ].map(({ label, value }) => (
                             <Card key={label}>
                                 <CardContent className="p-4">
@@ -124,12 +114,12 @@ export default function ItemRecipePage() {
                                             <tr key={ing.id ?? ing.item_id} className="hover:bg-accent/30 transition-colors">
                                                 <td className="px-6 py-4 font-medium">{ing.item_name}</td>
                                                 <td className="px-6 py-4 text-right tabular-nums font-semibold">{ing.quantity}</td>
-                                                <td className="px-6 py-4 text-muted-foreground">{ing.unit_name}</td>
+                                                <td className="px-6 py-4 text-muted-foreground">{ing.unit_of_measure}</td>
                                                 <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
                                                     {ing.waste_percent}%
                                                 </td>
                                                 <td className="px-6 py-4 text-right tabular-nums hidden md:table-cell">
-                                                    {ing.cost != null ? ing.cost.toLocaleString() : '—'}
+                                                    {ing.item_cost_price != null ? ing.item_cost_price.toLocaleString() : '—'}
                                                 </td>
                                             </tr>
                                         ))}
