@@ -17,6 +17,7 @@ import {
   FileSignature,
   FileText,
   FolderTree,
+  Gauge,
   Key,
   LayoutDashboard,
   Layers,
@@ -292,6 +293,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Stock Valuation', icon: BarChart3, href: '/reports/stock-valuation', moduleKey: 'stock' },
         { label: 'Deadstock', icon: Boxes, href: '/reports/deadstock', moduleKey: 'stock' },
+        { label: 'Ingredient Utilization', icon: Gauge, href: '/reports/ingredient-utilization', moduleKey: 'stock' },
         { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes' },
         { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes' },
       ],

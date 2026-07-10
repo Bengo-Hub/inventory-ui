@@ -1,16 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { purchaseOrdersApi, type CreatePOInput, type POListParams } from '@/lib/api/purchase-orders';
+import { purchaseOrdersApi, type CreatePOInput, type POListParams, type PaginatedPOs } from '@/lib/api/purchase-orders';
 
 const PO_KEY = 'purchase-orders';
+const EMPTY: PaginatedPOs = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
 
 export function usePurchaseOrders(orgSlug: string, params?: POListParams) {
-  return useQuery({
+  return useQuery<PaginatedPOs>({
     queryKey: [PO_KEY, orgSlug, params],
     queryFn: () => purchaseOrdersApi.list(orgSlug, params),
     enabled: !!orgSlug,
-    placeholderData: [],
+    placeholderData: EMPTY,
     staleTime: 30_000,
   });
 }

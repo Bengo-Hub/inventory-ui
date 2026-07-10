@@ -19,7 +19,7 @@ import {
     useReceivePurchaseOrder,
     useCancelPurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
-import type { PurchaseOrder } from '@/lib/api/purchase-orders';
+import type { PurchaseOrder, POStatus } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { useUnits } from '@/hooks/useUnits';
 import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
@@ -162,7 +162,13 @@ export default function PurchaseOrdersPage() {
     const createSupplier = useCreateSupplier(orgSlug);
     const [addSupplierOpen, setAddSupplierOpen] = useState(false);
     const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
-    const { data: orders, isLoading, isError, refetch } = usePurchaseOrders(orgSlug);
+    const { data, isLoading, isError, refetch } = usePurchaseOrders(orgSlug, {
+        search: search || undefined,
+        status: (statusFilter || undefined) as POStatus | undefined,
+        page,
+        limit: ITEMS_PER_PAGE,
+    });
+    const orders = data?.data;
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
     const createPO = useCreatePurchaseOrder(orgSlug);
     const amendPO = useAmendPurchaseOrder(orgSlug);
@@ -187,16 +193,8 @@ export default function PurchaseOrdersPage() {
         );
     }
 
-    const filtered = (orders ?? []).filter((o) => {
-        const matchesSearch = !search ||
-            o.po_number.toLowerCase().includes(search.toLowerCase()) ||
-            (o.supplier_name ?? '').toLowerCase().includes(search.toLowerCase());
-        const matchesStatus = !statusFilter || o.status === statusFilter;
-        return matchesSearch && matchesStatus;
-    });
-
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const paginatedItems = orders ?? [];
 
     useMemo(() => { setPage(1); }, [search, statusFilter]);
 
@@ -387,7 +385,7 @@ export default function PurchaseOrdersPage() {
                                             <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
                                         </td>
                                     </tr>
-                                ) : (filtered?.length ?? 0) === 0 ? (
+                                ) : paginatedItems.length === 0 ? (
                                     <tr>
                                         <td colSpan={6} className="px-6 py-12 text-center">
                                             <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
@@ -426,7 +424,7 @@ export default function PurchaseOrdersPage() {
                             </tbody>
                         </table>
                     </div>
-                    {!isLoading && (filtered?.length ?? 0) > 0 && (
+                    {!isLoading && paginatedItems.length > 0 && (
                         <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
                     )}
                 </CardContent>

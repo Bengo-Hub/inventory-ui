@@ -79,6 +79,74 @@ export interface DeadstockReport {
   items: DeadstockItem[];
 }
 
+export type UtilizationGranularity = 'day' | 'week' | 'biweek' | 'month';
+
+export interface IngredientUtilizationParams {
+  item_id: string;
+  warehouse_id: string;
+  from?: string;
+  to?: string;
+}
+
+export interface IngredientUtilizationSummary {
+  item_id: string;
+  item_sku: string;
+  item_name: string;
+  unit?: string;
+  warehouse_id: string;
+  period_start: string;
+  period_end: string;
+  purchased_qty: number;
+  purchased_cost: number;
+  consumed_qty: number;
+  consumed_cost: number;
+  on_hand: number;
+  available: number;
+  reorder_level: number;
+  daily_velocity: number;
+  projected_days_of_cover?: number;
+  last_restock_at?: string;
+}
+
+export interface TimeseriesRecipeSlice {
+  recipe_id?: string;
+  recipe_sku?: string;
+  recipe_name: string;
+  quantity: number;
+  cost: number;
+}
+
+export interface TimeseriesPoint {
+  bucket_start: string;
+  bucket_end: string;
+  quantity: number;
+  cost: number;
+  by_recipe: TimeseriesRecipeSlice[];
+}
+
+export interface StockLevelEventDTO {
+  event_type: 'low' | 'out' | 'restocked';
+  occurred_at: string;
+  on_hand_at_event: number;
+  reorder_level_at_event: number;
+}
+
+export interface IngredientUtilizationTimeseries {
+  granularity: UtilizationGranularity;
+  points: TimeseriesPoint[];
+  reorder_level: number;
+  stock_level_events: StockLevelEventDTO[];
+}
+
+export interface RecipeBreakdownRow {
+  recipe_id?: string;
+  recipe_sku?: string;
+  recipe_name: string;
+  quantity: number;
+  cost: number;
+  pct_of_total: number;
+}
+
 export const reportsApi = {
   foodCostVariance: (orgSlug: string, params?: FoodCostVarianceParams): Promise<VarianceReportItem[]> =>
     apiClient.get<VarianceReportItem[]>(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance`, params as Record<string, string | boolean | undefined>),
@@ -106,4 +174,16 @@ export const reportsApi = {
 
   menuEngineeringDoc: (orgSlug: string, params?: MenuEngineeringParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/menu-engineering.pdf`, params as Record<string, string | undefined>),
+
+  ingredientUtilizationSummary: (orgSlug: string, params: IngredientUtilizationParams): Promise<IngredientUtilizationSummary> =>
+    apiClient.get<IngredientUtilizationSummary>(`/api/v1/${orgSlug}/inventory/reports/ingredient-utilization/summary`, params as unknown as Record<string, string>),
+
+  ingredientUtilizationTimeseries: (
+    orgSlug: string,
+    params: IngredientUtilizationParams & { granularity: UtilizationGranularity; recipe_id?: string[] },
+  ): Promise<IngredientUtilizationTimeseries> =>
+    apiClient.get<IngredientUtilizationTimeseries>(`/api/v1/${orgSlug}/inventory/reports/ingredient-utilization/timeseries`, params as unknown as Record<string, string>),
+
+  ingredientUtilizationByRecipe: (orgSlug: string, params: IngredientUtilizationParams): Promise<RecipeBreakdownRow[]> =>
+    apiClient.get<RecipeBreakdownRow[]>(`/api/v1/${orgSlug}/inventory/reports/ingredient-utilization/by-recipe`, params as unknown as Record<string, string>),
 };

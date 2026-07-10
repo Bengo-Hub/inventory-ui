@@ -47,15 +47,18 @@ export interface CreatePOInput {
 
 export interface POListParams {
   status?: POStatus;
+  search?: string;
   supplier_id?: string;
   warehouse_id?: string;
   page?: number;
   limit?: number;
 }
 
+export interface PaginatedPOs { data: PurchaseOrder[]; total: number; page: number; limit: number; hasMore: boolean; }
+
 export const purchaseOrdersApi = {
-  list: (orgSlug: string, params?: POListParams) =>
-    apiClient.get<PurchaseOrder[]>(`/api/v1/${orgSlug}/inventory/purchase-orders`, params),
+  list: (orgSlug: string, params?: POListParams): Promise<PaginatedPOs> =>
+    apiClient.get<PaginatedPOs>(`/api/v1/${orgSlug}/inventory/purchase-orders`, params),
 
   get: (orgSlug: string, id: string) =>
     apiClient.get<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}`),

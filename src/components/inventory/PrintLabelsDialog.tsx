@@ -54,7 +54,8 @@ export function PrintLabelsDialog({
   const { data: categories } = useCategories(orgSlug, { hasItems: true });
   const suppliersQuery = useSuppliers(orgSlug, { limit: 200 });
   const suppliers = suppliersQuery.data?.data ?? [];
-  const { data: purchaseOrders } = usePurchaseOrders(orgSlug);
+  const purchaseOrdersQuery = usePurchaseOrders(orgSlug, { limit: 100 });
+  const purchaseOrders = purchaseOrdersQuery.data?.data ?? [];
 
   const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
 
@@ -191,7 +192,7 @@ export function PrintLabelsDialog({
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                 >
                   <option value="">Select a purchase order…</option>
-                  {(purchaseOrders ?? []).map((po) => (
+                  {purchaseOrders.map((po) => (
                     <option key={po.id} value={po.id}>{po.po_number}</option>
                   ))}
                 </select>

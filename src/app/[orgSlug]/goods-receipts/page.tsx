@@ -30,7 +30,10 @@ export default function GoodsReceiptsPage() {
 
     const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
     const post = usePostGoodsReceipt(org);
-    const { data: orders } = usePurchaseOrders(org);
+    // Only used to resolve PO numbers for display — pull the max page size rather than
+    // paginating, since this isn't a user-facing list of purchase orders.
+    const { data: ordersPage } = usePurchaseOrders(org, { limit: 100 });
+    const orders = ordersPage?.data;
     const { data: viewGRN } = useGoodsReceipt(org, viewId ?? '');
 
     const { canAny } = usePermissions();

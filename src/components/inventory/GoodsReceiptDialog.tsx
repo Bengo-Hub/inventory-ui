@@ -35,8 +35,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [lotNumber, setLotNumber] = useState<Record<string, string>>({});
     const [expiryDate, setExpiryDate] = useState<Record<string, string>>({});
 
-    const { data: orders } = usePurchaseOrders(org);
-    const receivablePOs = (orders ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
+    // Dropdown of open POs to receive against — pull the max page size rather than paginating.
+    const { data: ordersPage } = usePurchaseOrders(org, { limit: 100 });
+    const receivablePOs = (ordersPage?.data ?? []).filter((o) => ['sent', 'partially_received', 'draft'].includes(o.status));
     const { data: po } = usePurchaseOrder(org, poId);
     const create = useCreateGoodsReceipt(org, poId);
 
@@ -156,8 +157,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                         <p className="text-sm font-medium truncate">{l.item_name ?? l.item_sku ?? l.item_id.slice(0, 8)}</p>
                                                         <p className="text-xs text-muted-foreground">ordered {l.quantity} · prev. received {l.received_qty ?? 0} · outstanding {out} · accepted {acc}</p>
                                                     </div>
-                                                    <Input className="col-span-2" type="number" min="0" value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
-                                                    <Input className="col-span-2" type="number" min="0" max={rec} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" step="any" value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" max={rec} step="any" value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                   </div>
                                                   <details className="text-xs">
