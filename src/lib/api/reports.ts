@@ -186,4 +186,7 @@ export const reportsApi = {
 
   ingredientUtilizationByRecipe: (orgSlug: string, params: IngredientUtilizationParams): Promise<RecipeBreakdownRow[]> =>
     apiClient.get<RecipeBreakdownRow[]>(`/api/v1/${orgSlug}/inventory/reports/ingredient-utilization/by-recipe`, params as unknown as Record<string, string>),
+
+  ingredientUtilizationDoc: (orgSlug: string, params: IngredientUtilizationParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/ingredient-utilization.pdf`, params as unknown as Record<string, string>),
 };

@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Card, CardContent, CardHeader, Table } from '@/components/ui/base';
+import { Badge, Button, Card, CardContent, CardHeader, Table } from '@/components/ui/base';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
@@ -13,7 +13,10 @@ import {
   useIngredientUtilizationTimeseries,
 } from '@/hooks/useReports';
 import { itemsApi } from '@/lib/api/items';
-import type { UtilizationGranularity } from '@/lib/api/reports';
+import { reportsApi, type UtilizationGranularity } from '@/lib/api/reports';
+import { Printer } from 'lucide-react';
+import { toast } from 'sonner';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { UtilizationChart } from './_components/UtilizationChart';
 
 function formatNumber(v: number, decimals = 2): string {
@@ -112,13 +115,28 @@ export default function IngredientUtilizationPage() {
     }));
   }, [timeseries.data, excludedRecipes]);
 
+  const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+  function printReport() {
+    openPreview(() => reportsApi.ingredientUtilizationDoc(orgSlug, { ...baseParams, format: 'pdf' }), {
+      fileName: `ingredient-utilization-${itemId}-${from}_${to}.pdf`,
+      title: 'Ingredient Utilization',
+    });
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold">Ingredient Utilization</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          How much of an ingredient was consumed, by which recipe, relative to its reorder level
-        </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold">Ingredient Utilization</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            How much of an ingredient was consumed, by which recipe, relative to its reorder level
+          </p>
+        </div>
+        {ready && (
+          <Button variant="outline" onClick={printReport}>
+            <Printer className="h-4 w-4 mr-2" /> Print / Export
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -302,6 +320,8 @@ export default function IngredientUtilizationPage() {
           </Card>
         </>
       )}
+
+      <PdfPreview {...previewProps} />
     </div>
   );
 }
