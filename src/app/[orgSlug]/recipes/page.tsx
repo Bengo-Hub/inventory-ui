@@ -4,13 +4,15 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
+import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
 import { useOutletStore } from '@/store/outlet';
 import { AlertTriangle, ChefHat, Factory, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -55,6 +57,18 @@ export default function RecipesPage() {
     const deleteMutation = useDeleteRecipe(orgSlug);
 
     const mutation = editing ? updateMutation : createMutation;
+
+    // Duplicate-name warning — debounced server search, same pattern as the New Menu
+    // Item wizard's item dup-check. Informational only; recipe names collide silently
+    // today (there's no uniqueness constraint), so this is the only guard against it.
+    const [dupSearch, setDupSearch] = useState('');
+    useEffect(() => {
+        if (!dialogOpen) { setDupSearch(''); return; }
+        const t = setTimeout(() => setDupSearch(formName.trim()), 300);
+        return () => clearTimeout(t);
+    }, [formName, dialogOpen]);
+    const { data: dupData } = useRecipes(orgSlug, { search: dupSearch, page: 1, limit: 5 });
+    const dupMatches = useDuplicateNameWarning(dupSearch.length >= 2 ? dupData?.data : undefined, formName, { excludeId: editing?.id });
 
     // Re-rank the returned page so an active search surfaces the matched recipe
     // to the very top row. We match on name, SKU and produced-item name, ordering
@@ -299,6 +313,9 @@ export default function RecipesPage() {
                                             required
                                         />
                                     </div>
+                                    {dupMatches.length > 0 && (
+                                        <DuplicateNameWarning matches={dupMatches} entityLabel={docLabel.toLowerCase()} renderDetail={(r) => r.sku} />
+                                    )}
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">SKU</label>
                                         <Input
