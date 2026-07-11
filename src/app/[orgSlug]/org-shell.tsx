@@ -13,6 +13,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import { useParams, usePathname } from 'next/navigation';
 import { Footer } from '@/components/footer';
 import { SubscriptionBanner } from '@/components/subscription/subscription-banner';
+import { VerifyEmailPrompt } from '@/components/auth/VerifyEmailPrompt';
 import { PWAUpdateBanner } from '@/components/pwa-update-banner';
 import { PWARegistration } from '@/components/pwa-registration';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
@@ -95,6 +96,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
                         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
                             <Header onMenuClick={() => setSidebarOpen(true)} />
                             <SubscriptionBanner />
+                            <VerifyEmailPrompt />
                             <main className="flex-1 min-h-0 overflow-y-auto bg-accent/5">
                                 {/* Bottom padding on mobile clears the fixed bottom nav bar. */}
                                 <div className="min-h-full flex flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0">

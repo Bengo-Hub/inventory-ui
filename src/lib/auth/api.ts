@@ -15,6 +15,7 @@ export async function fetchInventoryProfile(tenantSlug: string): Promise<{
     tenant_slug: string;
     isPlatformOwner: boolean;
     isSuperUser: boolean;
+    email_verification?: import('@bengo-hub/shared-ui-lib/auth').EmailVerificationState;
 }> {
     const data = await apiClient.get<{
         id: string;
@@ -25,6 +26,7 @@ export async function fetchInventoryProfile(tenantSlug: string): Promise<{
         permissions: string[];
         is_platform_owner: boolean;
         is_superuser: boolean;
+        email_verification?: import('@bengo-hub/shared-ui-lib/auth').EmailVerificationState;
     }>(`/api/v1/${tenantSlug}/auth/me`);
 
     const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
@@ -37,6 +39,7 @@ export async function fetchInventoryProfile(tenantSlug: string): Promise<{
         tenant_id: data.tenant_id ?? '',
         tenant_slug: data.tenant_slug ?? tenantSlug,
         isPlatformOwner: data.is_platform_owner === true,
+        email_verification: data.email_verification,
         // Honour the server's is_superuser flag (set for tenant admins/owners) and recognise
         // tenant-admin role aliases directly, so a tenant admin always gets full access.
         isSuperUser: data.is_superuser === true || roles.some((r) => ADMIN_ROLE_ALIASES.has(r.toLowerCase())),

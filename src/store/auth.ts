@@ -21,6 +21,8 @@ export interface UserProfile {
     tenant_slug: string;
     isPlatformOwner?: boolean;
     isSuperUser?: boolean;
+    // auth-api's computed graduated email-verification state (forwarded by /auth/me).
+    email_verification?: import('@bengo-hub/shared-ui-lib/auth').EmailVerificationState;
 }
 
 interface Session {
