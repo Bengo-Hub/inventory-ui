@@ -8,6 +8,7 @@ import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -72,8 +73,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         const lines: CreateGRNLineInput[] = (po.line_items ?? [])
             .map((l) => {
                 const out = outstanding(l.quantity, l.received_qty);
-                const rec = received[l.id] !== undefined ? Number(received[l.id]) : out;
-                const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
+                const rec = received[l.id] !== undefined ? parseDecimal(received[l.id]) : out;
+                const rej = rejected[l.id] !== undefined ? parseDecimal(rejected[l.id]) : 0;
                 const acc = rec - rej;
                 if (rej > rec || acc < 0) invalid = true;
                 const sn = parseSerials(serials[l.id]);
@@ -144,8 +145,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                     <div className="rounded-lg border border-border divide-y divide-border">
                                         {(po.line_items ?? []).map((l) => {
                                             const out = outstanding(l.quantity, l.received_qty);
-                                            const rec = received[l.id] !== undefined ? Number(received[l.id]) : out;
-                                            const rej = rejected[l.id] !== undefined ? Number(rejected[l.id]) : 0;
+                                            const rec = received[l.id] !== undefined ? parseDecimal(received[l.id]) : out;
+                                            const rej = rejected[l.id] !== undefined ? parseDecimal(rejected[l.id]) : 0;
                                             const acc = Math.max(0, rec - rej);
                                             const snCount = parseSerials(serials[l.id]).length;
                                             const snMismatch = snCount > 0 && snCount !== acc;
@@ -157,8 +158,8 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                         <p className="text-sm font-medium truncate">{l.item_name ?? l.item_sku ?? l.item_id.slice(0, 8)}</p>
                                                         <p className="text-xs text-muted-foreground">ordered {l.quantity} · prev. received {l.received_qty ?? 0} · outstanding {out} · accepted {acc}</p>
                                                     </div>
-                                                    <Input className="col-span-2" type="number" min="0" step="any" value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
-                                                    <Input className="col-span-2" type="number" min="0" max={rec} step="any" value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" step={DECIMAL_STEP} value={received[l.id] ?? String(out)} onChange={(e) => setReceived((s) => ({ ...s, [l.id]: e.target.value }))} />
+                                                    <Input className="col-span-2" type="number" min="0" max={rec} step={DECIMAL_STEP} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                   </div>
                                                   <details className="text-xs">

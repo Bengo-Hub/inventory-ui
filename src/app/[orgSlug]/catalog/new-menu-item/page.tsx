@@ -15,6 +15,7 @@ import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const STEPS = ['Basic Info', 'Ingredients', 'Modifiers'] as const;
 
@@ -102,7 +103,7 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium">Selling Price (KES) *</label>
-          <Input type="number" min={0} step={0.01} placeholder="e.g. 900" value={data.sellingPrice} onChange={(e) => set('sellingPrice', e.target.value)} />
+          <Input type="number" min={0} step={DECIMAL_STEP} placeholder="e.g. 900" value={data.sellingPrice} onChange={(e) => set('sellingPrice', e.target.value)} />
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -110,14 +111,14 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
           <label className="text-sm font-medium inline-flex items-center gap-1">Servings (batch yield)
             <InfoHint title="Batch yield">The number of portions the ingredient quantities in Step 2 produce. Enter 1 if you list ingredients for a single serving; enter 10 if the recipe is written for a batch of 10. Cost per portion = batch cost ÷ servings.</InfoHint>
           </label>
-          <Input type="number" min={0.1} step={0.5} placeholder="1" value={data.servings} onChange={(e) => set('servings', e.target.value)} />
+          <Input type="number" min={0.1} step={DECIMAL_STEP} placeholder="1" value={data.servings} onChange={(e) => set('servings', e.target.value)} />
           <p className="text-xs text-muted-foreground">How many portions this batch produces (usually 1).</p>
         </div>
         <div className="space-y-2">
           <label className="text-sm font-medium inline-flex items-center gap-1">Target Margin % <span className="text-muted-foreground font-normal">(optional)</span>
             <InfoHint title="Target food-cost margin">The gross margin you aim to keep on this dish. The food-cost bar in Step 2 turns red when ingredient cost eats into this target, warning you to raise the price or trim the recipe. Leave blank to use the tenant default.</InfoHint>
           </label>
-          <Input type="number" min={0} max={99} step={1} placeholder="e.g. 30" value={data.targetMargin} onChange={(e) => set('targetMargin', e.target.value)} />
+          <Input type="number" min={0} max={99} step={DECIMAL_STEP} placeholder="e.g. 30" value={data.targetMargin} onChange={(e) => set('targetMargin', e.target.value)} />
         </div>
       </div>
       <div className="space-y-2">
@@ -297,7 +298,7 @@ function Step3({ modifiers, setModifiers }: { modifiers: ModGroup[]; setModifier
           {g.options.map((opt, oi) => (
             <div key={oi} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_140px] gap-2">
               <Input placeholder="Option name" value={opt.name} onChange={(e) => setOptionField(gi, oi, 'name', e.target.value)} />
-              <Input type="number" placeholder="Adj (KES)" value={opt.price_adjustment || ''} onChange={(e) => setOptionField(gi, oi, 'price_adjustment', parseFloat(e.target.value) || 0)} />
+              <Input type="number" step={DECIMAL_STEP} placeholder="Adj (KES)" value={opt.price_adjustment || ''} onChange={(e) => setOptionField(gi, oi, 'price_adjustment', parseDecimal(e.target.value))} />
               <Input placeholder="Stock SKU" value={opt.stock_sku} onChange={(e) => setOptionField(gi, oi, 'stock_sku', e.target.value)} />
             </div>
           ))}
@@ -342,8 +343,8 @@ export default function NewMenuItemPage() {
     onError: (err: Error) => toast.error(err.message),
   });
 
-  const sellingPrice = parseFloat(step1.sellingPrice) || 0;
-  const servings     = parseFloat(step1.servings) || 1;
+  const sellingPrice = parseDecimal(step1.sellingPrice);
+  const servings     = parseDecimal(step1.servings, 1);
 
   function canAdvance() {
     if (step === 0) return step1.name.trim().length > 0;
@@ -390,7 +391,7 @@ export default function NewMenuItemPage() {
       description:   step1.description.trim() || undefined,
       selling_price: sellingPrice,
       servings,
-      target_margin_percent: step1.targetMargin ? parseFloat(step1.targetMargin) : undefined,
+      target_margin_percent: step1.targetMargin ? parseDecimal(step1.targetMargin) : undefined,
       // Convert each line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it stores
       // and costs correctly against the ingredient's per-base-unit cost.
       ingredients:   cleanIngredients.map((r) => {

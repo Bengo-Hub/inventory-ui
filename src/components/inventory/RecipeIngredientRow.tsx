@@ -3,6 +3,7 @@
 import { Input } from '@/components/ui/base';
 import { ItemSearchInput } from './ItemSearchInput';
 import { convertQuantity, convertToStockUnit, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -265,13 +266,12 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
         <Input
           type="number"
           min={0}
-          step="any"
+          step={DECIMAL_STEP}
           inputMode="decimal"
           value={qtyText}
           onChange={(e) => {
             setQtyText(e.target.value);
-            const n = parseFloat(e.target.value);
-            set('qty', Number.isNaN(n) ? 0 : n);
+            set('qty', parseDecimal(e.target.value));
           }}
           className="h-8 text-sm"
           placeholder="0"
@@ -315,8 +315,9 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
           type="number"
           min={0}
           max={99}
+          step={DECIMAL_STEP}
           value={row.waste_percent || ''}
-          onChange={(e) => set('waste_percent', parseFloat(e.target.value) || 0)}
+          onChange={(e) => set('waste_percent', parseDecimal(e.target.value))}
           className="h-8 text-sm"
           placeholder="0"
         />
@@ -330,10 +331,10 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
           <Input
             type="number"
             min={0}
-            step={0.0001}
+            step={DECIMAL_STEP}
             inputMode="decimal"
             value={row.cost_entered ?? ''}
-            onChange={(e) => set('cost_entered', e.target.value === '' ? undefined : parseFloat(e.target.value) || 0)}
+            onChange={(e) => set('cost_entered', e.target.value === '' ? undefined : parseDecimal(e.target.value))}
             className="h-8 text-sm"
             placeholder="0.00"
             title="What you pay for the amount specified below (e.g. 52.50 for a 500 ml packet)."
@@ -343,10 +344,10 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
             <Input
               type="number"
               min={0}
-              step="any"
+              step={DECIMAL_STEP}
               inputMode="decimal"
               value={row.cost_basis_qty ?? 1}
-              onChange={(e) => set('cost_basis_qty', e.target.value === '' ? 1 : parseFloat(e.target.value) || 1)}
+              onChange={(e) => set('cost_basis_qty', e.target.value === '' ? 1 : parseDecimal(e.target.value, 1))}
               className="h-6 w-12 px-1 text-xs"
               title="Pack/basis size the price above buys (e.g. 500 for a 500 ml packet)."
             />

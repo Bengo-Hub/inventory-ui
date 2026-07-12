@@ -26,6 +26,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -96,14 +97,14 @@ function PriceCell({ value, editable, saving, onSave }: {
   if (editing) {
     const commit = () => {
       setEditing(false);
-      const n = parseFloat(draft);
+      const n = parseDecimal(draft, NaN);
       if (!isNaN(n) && n >= 0 && n !== value) onSave(n);
     };
     return (
       <input
         type="number"
         min="0"
-        step="0.01"
+        step="0.0001"
         autoFocus
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

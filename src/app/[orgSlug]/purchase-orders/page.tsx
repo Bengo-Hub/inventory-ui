@@ -34,6 +34,7 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 const ITEMS_PER_PAGE = 20;
@@ -268,8 +269,8 @@ export default function PurchaseOrdersPage() {
             .filter((l) => l.itemId && parseFloat(l.quantity) > 0)
             .map((l) => ({
                 item_id: l.itemId,
-                quantity: parseFloat(l.quantity),
-                unit_cost: parseFloat(l.unitPrice) || 0,
+                quantity: parseDecimal(l.quantity),
+                unit_cost: parseDecimal(l.unitPrice),
                 unit_id: l.unitId || undefined,
             }));
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
@@ -280,7 +281,7 @@ export default function PurchaseOrdersPage() {
             expected_date: expectedDate || undefined,
             notes: poNotes.trim() || undefined,
             pay_term_days: parseInt(payTermDays) > 0 ? parseInt(payTermDays) : undefined,
-            additional_shipping_charges: parseFloat(additionalShipping) > 0 ? parseFloat(additionalShipping) : undefined,
+            additional_shipping_charges: parseDecimal(additionalShipping) > 0 ? parseDecimal(additionalShipping) : undefined,
             line_items: lines,
         };
 
@@ -494,7 +495,7 @@ export default function PurchaseOrdersPage() {
                                         <Input
                                             type="number"
                                             min="0"
-                                            step="0.01"
+                                            step={DECIMAL_STEP}
                                             placeholder="0.00"
                                             value={additionalShipping}
                                             onChange={(e) => setAdditionalShipping(e.target.value)}
@@ -550,7 +551,7 @@ export default function PurchaseOrdersPage() {
                                                     <Input
                                                         type="number"
                                                         min="0"
-                                                        step="any"
+                                                        step={DECIMAL_STEP}
                                                         placeholder="1"
                                                         value={line.quantity}
                                                         onChange={(e) => updatePOLine(idx, 'quantity', e.target.value)}
@@ -586,7 +587,7 @@ export default function PurchaseOrdersPage() {
                                                     <Input
                                                         type="number"
                                                         min="0"
-                                                        step="0.01"
+                                                        step={DECIMAL_STEP}
                                                         placeholder="0.00"
                                                         value={line.unitPrice}
                                                         onChange={(e) => updatePOLine(idx, 'unitPrice', e.target.value)}

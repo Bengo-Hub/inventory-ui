@@ -21,6 +21,7 @@ import { ArrowLeft, Award, CheckCircle2, FileQuestion, Send, Trash2, Truck, X } 
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     draft: 'outline', sent: 'default', closed: 'warning', awarded: 'success', cancelled: 'error',
@@ -102,7 +103,7 @@ export default function RFQDetailPage() {
             .filter(([, v]) => v.unit_price !== '')
             .map(([rfq_line_id, v]) => ({
                 rfq_line_id,
-                unit_price: parseFloat(v.unit_price) || 0,
+                unit_price: parseDecimal(v.unit_price),
                 lead_time_days: parseInt(v.lead_time_days, 10) || 0,
                 available: v.available,
             }));
@@ -460,7 +461,7 @@ export default function RFQDetailPage() {
                                             <div className="grid grid-cols-3 gap-2 items-end">
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Unit Price</label>
-                                                    <Input type="number" min="0" step="0.01" value={row.unit_price}
+                                                    <Input type="number" min="0" step={DECIMAL_STEP} value={row.unit_price}
                                                         onChange={(e) => setQuoteRows({ ...quoteRows, [line.id]: { ...row, unit_price: e.target.value } })} />
                                                 </div>
                                                 <div className="space-y-1">

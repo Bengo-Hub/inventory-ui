@@ -24,6 +24,7 @@ import { useOutletStore } from '@/store/outlet';
 import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
+import { DECIMAL_STEP, parseDecimal, roundDecimal } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -424,9 +425,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         sku: sku.trim() || undefined,
         description: description.trim() || undefined,
         category_name: categories?.find((c) => c.id === categoryId)?.name,
-        selling_price: sellingPrice !== '' ? parseFloat(sellingPrice) : 0,
+        selling_price: sellingPrice !== '' ? parseDecimal(sellingPrice) : 0,
         non_billable: nonBillable,
-        servings: parseFloat(servings) || 1,
+        servings: parseDecimal(servings, 1),
         tags: [],
         is_perishable: isPerishable,
         image_url: imageUrl || undefined,
@@ -477,7 +478,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       barcode: barcode.trim() || undefined,
       // Opening stock is a create-time seed only — on edit, stock is changed via Adjustments /
       // Stock Take so the ledger stays the single source of truth (avoids double-counting).
-      initial_quantity: !item && isStockable && initialQty !== '' ? parseFloat(initialQty) : undefined,
+      initial_quantity: !item && isStockable && initialQty !== '' ? parseDecimal(initialQty) : undefined,
       reorder_level: reorderLevel ? parseInt(reorderLevel, 10) : undefined,
       reorder_quantity: reorderQty ? parseInt(reorderQty, 10) : undefined,
       // cost_price is the derived per-base-unit EP cost; the purchase fields record the
@@ -495,9 +496,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         : (item && isStockable && item.unit_content_qty != null ? 0 : undefined),
       unit_content_uom: isStockable && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
       stock_tracking_mode: stockTrackingMode !== 'default' || item ? stockTrackingMode : undefined,
-      min_selling_price: minSellingPrice !== '' ? parseFloat(minSellingPrice) : undefined,
-      max_selling_price: maxSellingPrice !== '' ? parseFloat(maxSellingPrice) : undefined,
-      target_margin_percent: targetMargin !== '' ? parseFloat(targetMargin) : undefined,
+      min_selling_price: minSellingPrice !== '' ? parseDecimal(minSellingPrice) : undefined,
+      max_selling_price: maxSellingPrice !== '' ? parseDecimal(maxSellingPrice) : undefined,
+      target_margin_percent: targetMargin !== '' ? parseDecimal(targetMargin) : undefined,
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
       barcode_type: barcodeType || undefined,
@@ -508,12 +509,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       non_billable: nonBillable,
       track_serial_numbers: trackSerial,
       shelf_life_days: shelfLifeDays !== '' ? parseInt(shelfLifeDays, 10) : undefined,
-      weight_kg: weightKg !== '' ? parseFloat(weightKg) : undefined,
+      weight_kg: weightKg !== '' ? parseDecimal(weightKg) : undefined,
       dimensions_cm: (dimLength !== '' || dimWidth !== '' || dimHeight !== '')
         ? {
-            ...(dimLength !== '' ? { length: parseFloat(dimLength) } : {}),
-            ...(dimWidth !== '' ? { width: parseFloat(dimWidth) } : {}),
-            ...(dimHeight !== '' ? { height: parseFloat(dimHeight) } : {}),
+            ...(dimLength !== '' ? { length: parseDecimal(dimLength) } : {}),
+            ...(dimWidth !== '' ? { width: parseDecimal(dimWidth) } : {}),
+            ...(dimHeight !== '' ? { height: parseDecimal(dimHeight) } : {}),
           }
         : undefined,
       duration_minutes: isService && durationMinutes !== '' ? parseInt(durationMinutes, 10) : undefined,
@@ -534,7 +535,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       occupancy_basis: isService && useCase === 'HOSPITALITY_ROOM' && occupancyBasis ? (occupancyBasis as CreateItemInput['occupancy_basis']) : undefined,
       max_adults: isService && useCase === 'HOSPITALITY_ROOM' && maxAdults ? parseInt(maxAdults, 10) : undefined,
       max_children: isService && useCase === 'HOSPITALITY_ROOM' && maxChildren ? parseInt(maxChildren, 10) : undefined,
-      single_supplement: isService && useCase === 'HOSPITALITY_ROOM' && singleSupplement ? parseFloat(singleSupplement) : undefined,
+      single_supplement: isService && useCase === 'HOSPITALITY_ROOM' && singleSupplement ? parseDecimal(singleSupplement) : undefined,
       extra_bed_allowed: isService && useCase === 'HOSPITALITY_ROOM' ? extraBedAllowed : undefined,
     });
   }
@@ -548,8 +549,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Pack-aware cost derivation: entered price ÷ pack size expressed in the item's base
   // unit (52.50 per 500 ml → 0.105/ml). Falls back to the raw price when the pack can't
   // be converted (no unit picked, unknown unit, cross-dimension).
-  const enteredCostNum = costPrice !== '' ? parseFloat(costPrice) : null;
-  const packQtyNum = packQty !== '' ? parseFloat(packQty) || 1 : 1;
+  const enteredCostNum = costPrice !== '' ? parseDecimal(costPrice) : null;
+  const packQtyNum = packQty !== '' ? parseDecimal(packQty, 1) : 1;
   // The pack is always expressed in the item's own unit when one is selected above —
   // the cost row never asks for a unit twice. The unit picker only appears while the
   // item has no unit yet (and picking there back-fills the Unit field).
@@ -722,7 +723,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     <Input
                       type="number"
                       min="0"
-                      step="0.01"
+                      step={DECIMAL_STEP}
                       placeholder="Price paid"
                       value={costPrice}
                       onChange={(e) => setCostPrice(e.target.value)}
@@ -733,7 +734,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       <Input
                         type="number"
                         min="0"
-                        step="any"
+                        step={DECIMAL_STEP}
                         placeholder="1"
                         value={packQty}
                         onChange={(e) => setPackQty(e.target.value)}
@@ -790,15 +791,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Wholesale / Min Price (KES)</label>
-                      <Input type="number" min="0" step="0.01" placeholder="Wholesale" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
+                      <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Wholesale" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Retail / Max Price (KES)</label>
-                      <Input type="number" min="0" step="0.01" placeholder="Retail" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
+                      <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Retail" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Target Margin (%) <span className="text-muted-foreground font-normal">(optional)</span></label>
-                      <Input type="number" min="0" max="99.9" step="0.1" placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
+                      <Input type="number" min="0" max="99.9" step={DECIMAL_STEP} placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
                     </div>
                   </div>
                   {minMaxInvalid && (
@@ -871,7 +872,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                         <Input
                           type="number"
                           min="0"
-                          step="any"
+                          step={DECIMAL_STEP}
                           placeholder="0"
                           value={initialQty}
                           onChange={(e) => setInitialQty(e.target.value)}
@@ -993,14 +994,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Weight (kg)</label>
-                        <Input type="number" min="0" step="0.001" placeholder="Unit weight for shipping/logistics" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
+                        <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Unit weight for shipping/logistics" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Dimensions (cm) — L × W × H</label>
                         <div className="grid grid-cols-3 gap-2">
-                          <Input type="number" min="0" step="0.1" placeholder="L" value={dimLength} onChange={(e) => setDimLength(e.target.value)} />
-                          <Input type="number" min="0" step="0.1" placeholder="W" value={dimWidth} onChange={(e) => setDimWidth(e.target.value)} />
-                          <Input type="number" min="0" step="0.1" placeholder="H" value={dimHeight} onChange={(e) => setDimHeight(e.target.value)} />
+                          <Input type="number" min="0" step={DECIMAL_STEP} placeholder="L" value={dimLength} onChange={(e) => setDimLength(e.target.value)} />
+                          <Input type="number" min="0" step={DECIMAL_STEP} placeholder="W" value={dimWidth} onChange={(e) => setDimWidth(e.target.value)} />
+                          <Input type="number" min="0" step={DECIMAL_STEP} placeholder="H" value={dimHeight} onChange={(e) => setDimHeight(e.target.value)} />
                         </div>
                         <p className="text-xs text-muted-foreground">Used for shipping/packing and shelf planning.</p>
                       </div>
@@ -1069,7 +1070,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                           <Input
                             type="number"
                             min={0}
-                            step={0.01}
+                            step={DECIMAL_STEP}
                             placeholder="e.g. 900"
                             value={sellingPrice}
                             onChange={(e) => setSellingPrice(e.target.value)}
@@ -1081,7 +1082,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                           <Input
                             type="number"
                             min={0.1}
-                            step={0.5}
+                            step={DECIMAL_STEP}
                             placeholder="1"
                             value={servings}
                             onChange={(e) => setServings(e.target.value)}
@@ -1178,7 +1179,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                         </div>
                         <div className="space-y-2">
                           <label className="text-sm font-medium">Single Supplement (KES)</label>
-                          <Input type="number" min="0" step="0.01" placeholder="0" value={singleSupplement} onChange={(e) => setSingleSupplement(e.target.value)} />
+                          <Input type="number" min="0" step={DECIMAL_STEP} placeholder="0" value={singleSupplement} onChange={(e) => setSingleSupplement(e.target.value)} />
                         </div>
                       </div>
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
@@ -1250,7 +1251,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                         </div>
                         <div className="space-y-1">
                           {i === 0 && <label className="text-xs text-muted-foreground">Price (KES)</label>}
-                          <Input type="number" min="0" placeholder="0" value={tier.price || ''} onChange={(e) => updateTier(i, 'price', parseFloat(e.target.value) || 0)} />
+                          <Input type="number" min="0" step={DECIMAL_STEP} placeholder="0" value={tier.price || ''} onChange={(e) => updateTier(i, 'price', roundDecimal(parseFloat(e.target.value) || 0))} />
                         </div>
                         <div className="space-y-1">
                           {i === 0 && <label className="text-xs text-muted-foreground">Capacity</label>}

@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { goodsReceiptsApi, type MatchResult } from '@/lib/api/goods-receipts';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -25,7 +26,7 @@ export function ThreeWayMatchPanel({ org, poId }: Props) {
     async function run() {
         setLoading(true);
         try {
-            const res = await goodsReceiptsApi.match(org, poId, invQty ? Number(invQty) : undefined, invTotal ? Number(invTotal) : undefined);
+            const res = await goodsReceiptsApi.match(org, poId, invQty ? parseDecimal(invQty) : undefined, invTotal ? parseDecimal(invTotal) : undefined);
             setResult(res);
         } catch (e) {
             toast.error(await apiErrorMessage(e, 'Failed to run 3-way match'));
@@ -41,11 +42,11 @@ export function ThreeWayMatchPanel({ org, poId }: Props) {
                 <div className="flex flex-wrap items-end gap-3">
                     <label className="space-y-1">
                         <span className="text-xs text-muted-foreground">Invoiced qty (from supplier invoice)</span>
-                        <Input type="number" min="0" className="w-44" value={invQty} onChange={(e) => setInvQty(e.target.value)} placeholder="optional" />
+                        <Input type="number" min="0" step={DECIMAL_STEP} className="w-44" value={invQty} onChange={(e) => setInvQty(e.target.value)} placeholder="optional" />
                     </label>
                     <label className="space-y-1">
                         <span className="text-xs text-muted-foreground">Invoice total</span>
-                        <Input type="number" min="0" step="0.01" className="w-44" value={invTotal} onChange={(e) => setInvTotal(e.target.value)} placeholder="optional" />
+                        <Input type="number" min="0" step={DECIMAL_STEP} className="w-44" value={invTotal} onChange={(e) => setInvTotal(e.target.value)} placeholder="optional" />
                     </label>
                     <Button type="button" disabled={loading} onClick={run}>{loading ? 'Matching…' : 'Run match'}</Button>
                 </div>

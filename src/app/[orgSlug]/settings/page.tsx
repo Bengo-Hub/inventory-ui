@@ -37,6 +37,7 @@ import {
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { parseDecimal } from '@/lib/utils';
 
 type Tab = 'general' | 'stock' | 'modules' | 'tax' | 'documents' | 'integrations' | 'platform';
 
@@ -269,9 +270,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                 type="number"
                 min={0}
                 max={100}
-                step={0.1}
+                step="0.0001"
                 value={form.lowStockPct}
-                onChange={(e) => setForm((f) => ({ ...f, lowStockPct: parseFloat(e.target.value) || 20 }))}
+                onChange={(e) => setForm((f) => ({ ...f, lowStockPct: parseDecimal(e.target.value, 20) }))}
                 disabled={!canEdit}
                 className={`${inputClass} font-mono`}
               />
@@ -283,9 +284,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                 type="number"
                 min={0}
                 max={100}
-                step={0.1}
+                step="0.0001"
                 value={form.criticalStockPct}
-                onChange={(e) => setForm((f) => ({ ...f, criticalStockPct: parseFloat(e.target.value) || 5 }))}
+                onChange={(e) => setForm((f) => ({ ...f, criticalStockPct: parseDecimal(e.target.value, 5) }))}
                 disabled={!canEdit}
                 className={`${inputClass} font-mono`}
               />
@@ -309,9 +310,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                 type="number"
                 min={0}
                 max={99}
-                step={1}
+                step="0.0001"
                 value={form.defaultTargetMargin}
-                onChange={(e) => setForm((f) => ({ ...f, defaultTargetMargin: parseFloat(e.target.value) || 30 }))}
+                onChange={(e) => setForm((f) => ({ ...f, defaultTargetMargin: parseDecimal(e.target.value, 30) }))}
                 disabled={!canEdit}
                 className={`${inputClass} font-mono`}
               />

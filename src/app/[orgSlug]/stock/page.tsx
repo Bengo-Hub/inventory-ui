@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 25;
 
@@ -90,7 +91,7 @@ function StockDrawer({
 
     function handleAdjSubmit(e: React.FormEvent) {
         e.preventDefault();
-        const qty = parseFloat(adjQty);
+        const qty = parseDecimal(adjQty);
         if (!adjItemSku || isNaN(qty) || qty <= 0 || !adjReason) {
             toast.error('Fill in all required fields');
             return;
@@ -133,8 +134,8 @@ function StockDrawer({
 
     function handleBreakdownSubmit(e: React.FormEvent) {
         e.preventDefault();
-        const parentQty = parseFloat(bdParentQty);
-        const conversion = parseFloat(bdConversion);
+        const parentQty = parseDecimal(bdParentQty);
+        const conversion = parseDecimal(bdConversion);
         if (!bdChildSku || isNaN(parentQty) || parentQty <= 0 || isNaN(conversion) || conversion <= 0) {
             toast.error('Fill in all required fields');
             return;
@@ -264,7 +265,7 @@ function StockDrawer({
                                         type="number"
                                         placeholder="0"
                                         min="0"
-                                        step="any"
+                                        step={DECIMAL_STEP}
                                         value={adjQty}
                                         onChange={(e) => setAdjQty(e.target.value)}
                                         required
@@ -377,7 +378,7 @@ function StockDrawer({
                                         type="number"
                                         placeholder="0"
                                         min="0"
-                                        step="any"
+                                        step={DECIMAL_STEP}
                                         value={bdParentQty}
                                         onChange={(e) => setBdParentQty(e.target.value)}
                                         required
@@ -389,7 +390,7 @@ function StockDrawer({
                                         type="number"
                                         placeholder="e.g. 24"
                                         min="0"
-                                        step="any"
+                                        step={DECIMAL_STEP}
                                         value={bdConversion}
                                         onChange={(e) => setBdConversion(e.target.value)}
                                         required

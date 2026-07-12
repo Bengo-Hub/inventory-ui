@@ -11,6 +11,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 type IngredientRow = {
     item_id: string;
@@ -143,9 +144,9 @@ export default function RecipeDetailPage() {
                 const unit = r.unit_id ? activeUnits.find((u) => u.id === r.unit_id) : undefined;
                 return {
                     item_id: r.item_id,
-                    quantity: Number(r.quantity),
+                    quantity: parseDecimal(r.quantity),
                     unit_id: r.unit_id || undefined,
-                    waste_percent: Number(r.waste_percent) || 0,
+                    waste_percent: parseDecimal(r.waste_percent),
                     unit_of_measure: unit?.abbreviation ?? unit?.name ?? r.unit_of_measure ?? '',
                     notes: '',
                 };
@@ -271,7 +272,7 @@ export default function RecipeDetailPage() {
                                                 <Input
                                                     type="number"
                                                     min="0"
-                                                    step="0.001"
+                                                    step={DECIMAL_STEP}
                                                     placeholder="0"
                                                     value={row.quantity}
                                                     onChange={(e) => updateRow(idx, 'quantity', e.target.value)}
@@ -300,6 +301,7 @@ export default function RecipeDetailPage() {
                                                     type="number"
                                                     min="0"
                                                     max="100"
+                                                    step={DECIMAL_STEP}
                                                     placeholder="0"
                                                     value={row.waste_percent}
                                                     onChange={(e) => updateRow(idx, 'waste_percent', e.target.value)}

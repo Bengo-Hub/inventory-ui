@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const STATUS_VARIANT: Record<BatchStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     planned: 'outline', in_progress: 'warning', completed: 'success', cancelled: 'error', failed: 'error',
@@ -54,9 +55,9 @@ export default function BatchDetailPage() {
         });
     }
     function doComplete() {
-        const qty = Number(actualQty);
+        const qty = parseDecimal(actualQty);
         if (!Number.isFinite(qty) || qty <= 0) { toast.error('Enter a valid actual quantity'); return; }
-        complete.mutate({ id: batchId, actualQuantity: qty, scrapQuantity: Number(scrapQty) || 0 }, {
+        complete.mutate({ id: batchId, actualQuantity: qty, scrapQuantity: parseDecimal(scrapQty) }, {
             onSuccess: () => toast.success('Batch completed — finished goods received'),
             onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to complete (a passing QC may be required)')),
         });
@@ -116,8 +117,8 @@ export default function BatchDetailPage() {
                         {batch.status === 'in_progress' && canChange && (
                             <div className="mt-5 border-t border-border pt-4 space-y-2">
                                 <p className="text-sm font-medium">Complete batch</p>
-                                <Input type="number" min="0" placeholder="Actual quantity produced" value={actualQty} onChange={(e) => setActualQty(e.target.value)} />
-                                <Input type="number" min="0" placeholder="Scrap quantity (optional)" value={scrapQty} onChange={(e) => setScrapQty(e.target.value)} />
+                                <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Actual quantity produced" value={actualQty} onChange={(e) => setActualQty(e.target.value)} />
+                                <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Scrap quantity (optional)" value={scrapQty} onChange={(e) => setScrapQty(e.target.value)} />
                                 <Button className="w-full" disabled={complete.isPending} onClick={doComplete}>{complete.isPending ? 'Completing…' : 'Complete & Receive Goods'}</Button>
                             </div>
                         )}

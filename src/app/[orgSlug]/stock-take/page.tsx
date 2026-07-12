@@ -19,6 +19,7 @@ import {
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { StockCount, StockCountLine, StockCountStatus } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { CheckCircle2, ClipboardCheck, ClipboardList, Plus, Send, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -136,7 +137,7 @@ function CountLineRow({ orgSlug, countId, line, editable }: {
     function save() {
         if (value === '' || parseFloat(value) === line.counted_qty) return;
         upsert.mutate(
-            { item_id: line.item_id, sku: line.sku, counted_qty: parseFloat(value) || 0 },
+            { item_id: line.item_id, sku: line.sku, counted_qty: parseDecimal(value) },
             { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save line')) },
         );
     }
@@ -149,7 +150,7 @@ function CountLineRow({ orgSlug, countId, line, editable }: {
                 {editable ? (
                     <Input
                         type="number"
-                        step="any"
+                        step={DECIMAL_STEP}
                         value={value}
                         onChange={(e) => setValue(e.target.value)}
                         onBlur={save}

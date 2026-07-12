@@ -15,6 +15,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
@@ -81,7 +82,7 @@ export default function ContractsPage() {
         const data = {
             supplier_id: supplierId,
             title: title.trim(),
-            value: value ? Number(value) : undefined,
+            value: value ? parseDecimal(value) : undefined,
             project_id: projectId.trim() || undefined,
             start_date: startDate ? new Date(startDate).toISOString() : undefined,
             end_date: endDate ? new Date(endDate).toISOString() : undefined,
@@ -206,7 +207,7 @@ export default function ContractsPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Value</label>
-                                            <Input type="number" min="0" step="0.01" value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />
+                                            <Input type="number" min="0" step={DECIMAL_STEP} value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Project (optional)</label>

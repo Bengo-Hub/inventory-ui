@@ -13,6 +13,7 @@ import { Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 interface Props {
     isPending: boolean;
@@ -95,13 +96,13 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                 expected_deliverables: expectedDeliverables.trim() || undefined,
                 duration: duration.trim() || undefined,
                 supplier_id: serviceSupplierId || undefined,
-                estimated_price: serviceEstPrice ? Number(serviceEstPrice) : undefined,
+                estimated_price: serviceEstPrice ? parseDecimal(serviceEstPrice) : undefined,
             }];
         }
         if (isInventory) {
             const lines = invLines
                 .filter((l) => l.itemId)
-                .map<RequisitionLine>((l) => ({ item_type: 'inventory', item_id: l.itemId, quantity: Number(l.quantity) || 1, urgent: l.urgent }));
+                .map<RequisitionLine>((l) => ({ item_type: 'inventory', item_id: l.itemId, quantity: parseDecimal(l.quantity, 1), urgent: l.urgent }));
             if (lines.length === 0) { setError('Add at least one inventory item.'); return null; }
             return lines;
         }
@@ -114,8 +115,8 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                 item_id: l.itemId || undefined,
                 description: (l.description.trim() || l.itemName) || undefined,
                 specifications: l.specifications.trim() || undefined,
-                quantity: Number(l.quantity) || 1,
-                estimated_price: l.estimatedPrice ? Number(l.estimatedPrice) : undefined,
+                quantity: parseDecimal(l.quantity, 1),
+                estimated_price: l.estimatedPrice ? parseDecimal(l.estimatedPrice) : undefined,
                 supplier_id: l.supplierId || undefined,
                 urgent: l.urgent,
             }));
@@ -236,7 +237,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                                 placeholder="Search catalog item…"
                                             />
                                             <div className="grid grid-cols-12 gap-2 items-center">
-                                                <Input className="col-span-4" type="number" min="1" placeholder="Qty" value={l.quantity} onChange={(e) => setInv(i, { quantity: e.target.value })} />
+                                                <Input className="col-span-4" type="number" min="1" step={DECIMAL_STEP} placeholder="Qty" value={l.quantity} onChange={(e) => setInv(i, { quantity: e.target.value })} />
                                                 <label className="col-span-6 flex items-center gap-2 text-xs text-muted-foreground">
                                                     <input type="checkbox" checked={l.urgent} onChange={(e) => setInv(i, { urgent: e.target.checked })} className="rounded" /> Urgent
                                                 </label>
@@ -280,8 +281,8 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                             <Input placeholder={l.itemId ? 'Description (optional — defaults to the item name)' : 'Item description *'} value={l.description} onChange={(e) => setExt(i, { description: e.target.value })} />
                                             <Input placeholder="Specifications (brand, model, spec…)" value={l.specifications} onChange={(e) => setExt(i, { specifications: e.target.value })} />
                                             <div className="grid grid-cols-2 gap-2">
-                                                <Input type="number" min="1" placeholder="Qty" value={l.quantity} onChange={(e) => setExt(i, { quantity: e.target.value })} />
-                                                <Input type="number" min="0" step="0.01" placeholder="Est. price" value={l.estimatedPrice} onChange={(e) => setExt(i, { estimatedPrice: e.target.value })} />
+                                                <Input type="number" min="1" step={DECIMAL_STEP} placeholder="Qty" value={l.quantity} onChange={(e) => setExt(i, { quantity: e.target.value })} />
+                                                <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Est. price" value={l.estimatedPrice} onChange={(e) => setExt(i, { estimatedPrice: e.target.value })} />
                                             </div>
                                             <CreatableSelect
                                                 value={l.supplierId}
@@ -337,7 +338,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Estimated Cost</label>
-                                            <Input type="number" min="0" step="0.01" value={serviceEstPrice} onChange={(e) => setServiceEstPrice(e.target.value)} placeholder="e.g. 50000" />
+                                            <Input type="number" min="0" step={DECIMAL_STEP} value={serviceEstPrice} onChange={(e) => setServiceEstPrice(e.target.value)} placeholder="e.g. 50000" />
                                         </div>
                                     </div>
                                     <p className="text-xs text-muted-foreground">Set a provider so the approved request can auto-raise a purchase order to them.</p>

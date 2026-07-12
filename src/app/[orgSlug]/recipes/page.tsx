@@ -15,6 +15,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -132,12 +133,12 @@ export default function RecipesPage() {
             sku,
             name: formName.trim(),
             item_id: formItemId.trim() || undefined,
-            output_qty: Number(formServings) || 1,
+            output_qty: parseDecimal(formServings, 1),
             unit_of_measure: kind === 'bom' ? 'UNIT' : 'PORTION',
             is_active: true,
             kind,
             requires_qc: kind === 'bom' ? formRequiresQC : undefined,
-            target_margin_percent: kind === 'bom' ? null : (Number(formMargin) || null),
+            target_margin_percent: kind === 'bom' ? null : (parseDecimal(formMargin) || null),
             ingredients: editing?.ingredients?.map((ing) => ({
                 item_id: ing.item_id,
                 item_sku: ing.item_sku,
@@ -340,7 +341,7 @@ export default function RecipesPage() {
                                             <Input
                                                 type="number"
                                                 min="1"
-                                                step="any"
+                                                step={DECIMAL_STEP}
                                                 value={formServings}
                                                 onChange={(e) => setFormServings(e.target.value)}
                                             />
@@ -364,6 +365,7 @@ export default function RecipesPage() {
                                                     type="number"
                                                     min="0"
                                                     max="100"
+                                                    step={DECIMAL_STEP}
                                                     value={formMargin}
                                                     onChange={(e) => setFormMargin(e.target.value)}
                                                 />

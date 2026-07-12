@@ -12,6 +12,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
@@ -53,7 +54,7 @@ export default function AssetCategoriesPage() {
             name: name.trim(),
             description: description.trim() || undefined,
             parent_id: parentId || undefined,
-            depreciation_rate: depRate ? Number(depRate) : undefined,
+            depreciation_rate: depRate ? parseDecimal(depRate) : undefined,
             useful_life_years: life ? Number(life) : undefined,
         };
         const done = () => { toast.success(editing ? 'Category updated' : 'Category created'); setOpen(false); };
@@ -166,7 +167,7 @@ export default function AssetCategoriesPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Depreciation rate %</label>
-                                            <Input type="number" min="0" step="0.01" value={depRate} onChange={(e) => setDepRate(e.target.value)} placeholder="e.g. 20" />
+                                            <Input type="number" min="0" step={DECIMAL_STEP} value={depRate} onChange={(e) => setDepRate(e.target.value)} placeholder="e.g. 20" />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Useful life (years)</label>

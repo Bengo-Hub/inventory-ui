@@ -25,6 +25,7 @@ import { AlertTriangle, ArrowRightLeft, Package, Plus, Search, X } from 'lucide-
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -229,7 +230,7 @@ export default function TransfersPage() {
         }
         const validItems = transferItems
             .filter((i) => i.itemId.trim() && parseFloat(i.quantity) > 0)
-            .map((i) => ({ item_id: i.itemId.trim(), quantity: parseFloat(i.quantity) }));
+            .map((i) => ({ item_id: i.itemId.trim(), quantity: parseDecimal(i.quantity) }));
 
         if (validItems.length === 0) {
             toast.error('Add at least one item with a valid quantity');
@@ -241,7 +242,7 @@ export default function TransfersPage() {
             destination_warehouse_id: toWarehouse,
             notes: note.trim() || undefined,
             reference_no: referenceNo.trim() || undefined,
-            shipping_charges: parseFloat(shippingCharges) > 0 ? parseFloat(shippingCharges) : undefined,
+            shipping_charges: parseDecimal(shippingCharges) > 0 ? parseDecimal(shippingCharges) : undefined,
             carrier: carrier.trim() || undefined,
             items: validItems,
         }, {
@@ -422,7 +423,7 @@ export default function TransfersPage() {
                                                 type="number"
                                                 placeholder="0.00"
                                                 min="0"
-                                                step="any"
+                                                step={DECIMAL_STEP}
                                                 value={shippingCharges}
                                                 onChange={(e) => setShippingCharges(e.target.value)}
                                             />
@@ -468,7 +469,7 @@ export default function TransfersPage() {
                                                             type="number"
                                                             placeholder="0"
                                                             min="0"
-                                                            step="any"
+                                                            step={DECIMAL_STEP}
                                                             value={item.quantity}
                                                             onChange={(e) => updateItem(idx, 'quantity', e.target.value)}
                                                         />

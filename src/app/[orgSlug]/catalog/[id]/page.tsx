@@ -17,6 +17,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const KES = (n?: number | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
@@ -100,7 +101,7 @@ export default function ItemDetailPage() {
 
   function savePricing() {
     const entries = Object.entries(tierPrices)
-      .map(([pricing_tier_id, v]) => ({ pricing_tier_id, price: Number(v), currency: 'KES' }))
+      .map(([pricing_tier_id, v]) => ({ pricing_tier_id, price: parseDecimal(v), currency: 'KES' }))
       .filter((e) => Number.isFinite(e.price) && e.price > 0);
     if (entries.length === 0) {
       toast.error('Enter at least one tier price');
@@ -470,6 +471,7 @@ export default function ItemDetailPage() {
                             <Input
                               type="number"
                               inputMode="decimal"
+                              step={DECIMAL_STEP}
                               className="pl-10 text-right"
                               placeholder="0"
                               value={tierPrices[t.id] ?? ''}

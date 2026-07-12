@@ -15,6 +15,7 @@ import {
 } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 // PricingProfilesPage lets admins / store managers manage price tiers (e.g. Retail, Wholesale).
 // Per-item prices for each profile are set from the product detail page.
@@ -46,8 +47,8 @@ export default function PricingProfilesPage() {
     if (!genTier) return;
     const body =
       genSource === 'default_tier'
-        ? { source: 'default_tier' as const, factor: parseFloat(genFactor) || 0, overwrite: genOverwrite }
-        : { source: 'cost_margin' as const, margin_percent: parseFloat(genMargin) || 0, overwrite: genOverwrite };
+        ? { source: 'default_tier' as const, factor: parseDecimal(genFactor), overwrite: genOverwrite }
+        : { source: 'cost_margin' as const, margin_percent: parseDecimal(genMargin), overwrite: genOverwrite };
     generatePricing.mutate(
       { tierId: genTier.id, body },
       {
@@ -301,13 +302,13 @@ export default function PricingProfilesPage() {
                   {genSource === 'default_tier' ? (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Factor</label>
-                      <Input type="number" min="0" step="0.01" value={genFactor} onChange={(e) => setGenFactor(e.target.value)} />
+                      <Input type="number" min="0" step={DECIMAL_STEP} value={genFactor} onChange={(e) => setGenFactor(e.target.value)} />
                       <p className="text-xs text-muted-foreground">e.g. 0.9 = 10% below the default (Retail) price.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Margin (%)</label>
-                      <Input type="number" min="0" max="99.9" step="0.1" value={genMargin} onChange={(e) => setGenMargin(e.target.value)} />
+                      <Input type="number" min="0" max="99.9" step={DECIMAL_STEP} value={genMargin} onChange={(e) => setGenMargin(e.target.value)} />
                       <p className="text-xs text-muted-foreground">price = cost ÷ (1 − margin). Items without a cost price are skipped.</p>
                     </div>
                   )}

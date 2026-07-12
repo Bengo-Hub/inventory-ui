@@ -13,6 +13,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
@@ -213,10 +214,10 @@ export default function LotsPage() {
             updateLot.mutate({
                 id: editing.id,
                 data: {
-                    quantity: Number(formQuantity),
+                    quantity: parseDecimal(formQuantity),
                     expiry_date: formExpiryDate || undefined,
                     manufacture_date: formMfgDate || undefined,
-                    cost_per_unit: formCostPerUnit ? Number(formCostPerUnit) : undefined,
+                    cost_per_unit: formCostPerUnit ? parseDecimal(formCostPerUnit) : undefined,
                     supplier_reference: formSupplierRef.trim() || undefined,
                     notes: formNotes.trim() || undefined,
                 },
@@ -230,10 +231,10 @@ export default function LotsPage() {
                 item_id: formItemId,
                 warehouse_id: formWarehouseId,
                 lot_number: formLotNumber.trim(),
-                quantity: Number(formQuantity),
+                quantity: parseDecimal(formQuantity),
                 expiry_date: formExpiryDate || undefined,
                 manufacture_date: formMfgDate || undefined,
-                cost_per_unit: formCostPerUnit ? Number(formCostPerUnit) : undefined,
+                cost_per_unit: formCostPerUnit ? parseDecimal(formCostPerUnit) : undefined,
                 supplier_reference: formSupplierRef.trim() || undefined,
                 notes: formNotes.trim() || undefined,
             };
@@ -467,6 +468,7 @@ export default function LotsPage() {
                                             <Input
                                                 type="number"
                                                 min="0"
+                                                step={DECIMAL_STEP}
                                                 value={formQuantity}
                                                 onChange={(e) => setFormQuantity(e.target.value)}
                                                 required
@@ -477,7 +479,7 @@ export default function LotsPage() {
                                             <Input
                                                 type="number"
                                                 min="0"
-                                                step="0.01"
+                                                step={DECIMAL_STEP}
                                                 placeholder="0.00"
                                                 value={formCostPerUnit}
                                                 onChange={(e) => setFormCostPerUnit(e.target.value)}

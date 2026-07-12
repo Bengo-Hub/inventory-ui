@@ -7,6 +7,7 @@ import { type CreateBatchInput } from '@/lib/api/productionBatches';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 interface Props {
     isPending: boolean;
@@ -29,7 +30,7 @@ export function BatchFormDialog({ isPending, onSubmit, onClose }: Props) {
 
     const { data: recipesPage } = useRecipes(org, { limit: 200 });
     const recipes = recipesPage?.data ?? [];
-    const qtyNum = Number(plannedQuantity) || 0;
+    const qtyNum = parseDecimal(plannedQuantity);
     // Live material-availability preview for the chosen recipe + quantity.
     const { data: check } = useMaterialCheck(org, recipeId, qtyNum);
 
@@ -40,8 +41,8 @@ export function BatchFormDialog({ isPending, onSubmit, onClose }: Props) {
             recipe_id: recipeId,
             planned_quantity: qtyNum || 1,
             scheduled_date: scheduledDate ? new Date(scheduledDate).toISOString() : undefined,
-            labor_cost: laborCost ? Number(laborCost) : undefined,
-            overhead_cost: overheadCost ? Number(overheadCost) : undefined,
+            labor_cost: laborCost ? parseDecimal(laborCost) : undefined,
+            overhead_cost: overheadCost ? parseDecimal(overheadCost) : undefined,
             notes: notes.trim() || undefined,
         });
     }
@@ -67,7 +68,7 @@ export function BatchFormDialog({ isPending, onSubmit, onClose }: Props) {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Planned Quantity *</span>
-                                <Input type="number" min="1" value={plannedQuantity} onChange={(e) => setPlannedQuantity(e.target.value)} required />
+                                <Input type="number" min="1" step={DECIMAL_STEP} value={plannedQuantity} onChange={(e) => setPlannedQuantity(e.target.value)} required />
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Scheduled Date</span>
@@ -75,11 +76,11 @@ export function BatchFormDialog({ isPending, onSubmit, onClose }: Props) {
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Labor Cost</span>
-                                <Input type="number" step="0.01" value={laborCost} onChange={(e) => setLaborCost(e.target.value)} placeholder="0.00" />
+                                <Input type="number" step={DECIMAL_STEP} value={laborCost} onChange={(e) => setLaborCost(e.target.value)} placeholder="0.00" />
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Overhead Cost</span>
-                                <Input type="number" step="0.01" value={overheadCost} onChange={(e) => setOverheadCost(e.target.value)} placeholder="0.00" />
+                                <Input type="number" step={DECIMAL_STEP} value={overheadCost} onChange={(e) => setOverheadCost(e.target.value)} placeholder="0.00" />
                             </label>
                         </div>
 

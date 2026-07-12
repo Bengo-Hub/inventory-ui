@@ -14,6 +14,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
@@ -56,7 +57,7 @@ export default function PurchaseReturnsPage() {
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        const payloadLines = lines.filter((l) => l.itemId).map((l) => ({ item_id: l.itemId, quantity: Number(l.quantity) || 1, sub_total: Number(l.subTotal) || 0 }));
+        const payloadLines = lines.filter((l) => l.itemId).map((l) => ({ item_id: l.itemId, quantity: parseDecimal(l.quantity, 1), sub_total: parseDecimal(l.subTotal) }));
         if (payloadLines.length === 0) { toast.error('Add at least one item'); return; }
         create.mutate({ supplier_id: supplierId || undefined, reason: reason.trim() || undefined, lines: payloadLines }, {
             onSuccess: () => { toast.success('Return created'); setOpen(false); setSupplierId(''); setReason(''); setLines([emptyLine()]); },
@@ -170,8 +171,8 @@ export default function PurchaseReturnsPage() {
                                             <div key={i} className="space-y-2 p-3 rounded-lg border border-border">
                                                 <ItemSearchInput orgSlug={org} value={l.itemName} onSelect={(item) => setLine(i, { itemId: item.id, itemName: item.name })} placeholder="Search item…" />
                                                 <div className="grid grid-cols-12 gap-2 items-center">
-                                                    <Input className="col-span-5" type="number" min="1" placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
-                                                    <Input className="col-span-6" type="number" min="0" step="0.01" placeholder="Sub-total" value={l.subTotal} onChange={(e) => setLine(i, { subTotal: e.target.value })} />
+                                                    <Input className="col-span-5" type="number" min="1" step={DECIMAL_STEP} placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
+                                                    <Input className="col-span-6" type="number" min="0" step={DECIMAL_STEP} placeholder="Sub-total" value={l.subTotal} onChange={(e) => setLine(i, { subTotal: e.target.value })} />
                                                     {lines.length > 1 && <button type="button" onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} className="col-span-1 text-muted-foreground hover:text-red-500"><Minus className="h-4 w-4" /></button>}
                                                 </div>
                                             </div>

@@ -13,6 +13,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     draft: 'outline',
@@ -95,7 +96,7 @@ export default function RFQListPage() {
             .map((l) => ({
                 item_id: l.itemId || null,
                 description: l.itemName,
-                quantity: parseFloat(l.quantity) || 1,
+                quantity: parseDecimal(l.quantity, 1),
                 uom: l.uom || undefined,
             }));
         if (cleaned.length === 0) {
@@ -273,7 +274,7 @@ export default function RFQListPage() {
                                                 <div className="grid grid-cols-3 gap-2 items-end">
                                                     <div className="space-y-1">
                                                         <label className="text-xs text-muted-foreground">Qty</label>
-                                                        <Input type="number" min="0" step="any" value={line.quantity} onChange={(e) => updateLine(idx, 'quantity', e.target.value)} />
+                                                        <Input type="number" min="0" step={DECIMAL_STEP} value={line.quantity} onChange={(e) => updateLine(idx, 'quantity', e.target.value)} />
                                                     </div>
                                                     <div className="space-y-1">
                                                         <label className="text-xs text-muted-foreground">UoM</label>

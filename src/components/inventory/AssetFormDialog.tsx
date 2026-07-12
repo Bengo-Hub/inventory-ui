@@ -5,6 +5,7 @@ import { type Asset, type CreateAssetInput } from '@/lib/api/assets';
 import { useAssetCategories } from '@/hooks/useAssets';
 import { X } from 'lucide-react';
 import { useState } from 'react';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 interface Props {
     org: string;
@@ -45,9 +46,9 @@ export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Pr
             manufacturer: manufacturer.trim() || undefined,
             model: model.trim() || undefined,
             purchase_date: purchaseDate ? new Date(purchaseDate).toISOString() : undefined,
-            purchase_cost: purchaseCost ? Number(purchaseCost) : undefined,
-            salvage_value: salvageValue ? Number(salvageValue) : undefined,
-            depreciation_rate: depreciationRate ? Number(depreciationRate) : undefined,
+            purchase_cost: purchaseCost ? parseDecimal(purchaseCost) : undefined,
+            salvage_value: salvageValue ? parseDecimal(salvageValue) : undefined,
+            depreciation_rate: depreciationRate ? parseDecimal(depreciationRate) : undefined,
             depreciation_method: depreciationMethod || undefined,
             location: location.trim() || undefined,
             condition: condition || undefined,
@@ -101,15 +102,15 @@ export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Pr
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Purchase Cost</span>
-                                <Input type="number" step="0.01" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="0.00" />
+                                <Input type="number" step={DECIMAL_STEP} value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} placeholder="0.00" />
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Salvage Value</span>
-                                <Input type="number" step="0.01" value={salvageValue} onChange={(e) => setSalvageValue(e.target.value)} placeholder="0.00" />
+                                <Input type="number" step={DECIMAL_STEP} value={salvageValue} onChange={(e) => setSalvageValue(e.target.value)} placeholder="0.00" />
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Depreciation Rate (%)</span>
-                                <Input type="number" step="0.01" value={depreciationRate} onChange={(e) => setDepreciationRate(e.target.value)} placeholder="0.00" />
+                                <Input type="number" step={DECIMAL_STEP} value={depreciationRate} onChange={(e) => setDepreciationRate(e.target.value)} placeholder="0.00" />
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Depreciation Method</span>

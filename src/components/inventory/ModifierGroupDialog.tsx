@@ -5,6 +5,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 interface OptionRow {
     name: string;
@@ -79,7 +80,7 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                 .map((o, idx) => ({
                     name: o.name.trim(),
                     display_name: o.display_name.trim() || o.name.trim(),
-                    price_adjustment: Number(o.price_adjustment) || 0,
+                    price_adjustment: parseDecimal(o.price_adjustment),
                     sort_order: Number(o.sort_order) || idx + 1,
                     is_default: o.is_default,
                     is_active: o.is_active,
@@ -212,7 +213,7 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                                                 <label className="text-xs text-muted-foreground">Price Adj. (KES)</label>
                                                 <Input
                                                     type="number"
-                                                    step="0.01"
+                                                    step={DECIMAL_STEP}
                                                     placeholder="0"
                                                     value={opt.price_adjustment}
                                                     onChange={(e) => updateOption(idx, 'price_adjustment', e.target.value)}

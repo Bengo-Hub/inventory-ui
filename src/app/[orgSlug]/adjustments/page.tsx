@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 /**
  * When a large adjustment is routed through the approval workflow the API returns a 422
@@ -81,7 +82,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        const qty = parseFloat(quantity);
+        const qty = parseDecimal(quantity);
         if (!itemSku || isNaN(qty) || qty <= 0 || !reason) {
             toast.error('Please fill in all required fields');
             return;
@@ -169,7 +170,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                         type="number"
                                         placeholder="0"
                                         min="0"
-                                        step="any"
+                                        step={DECIMAL_STEP}
                                         value={quantity}
                                         onChange={(e) => setQuantity(e.target.value)}
                                         required

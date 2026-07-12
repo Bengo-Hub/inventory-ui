@@ -17,6 +17,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const MODULE_LABEL: Record<string, string> = APPROVAL_MODULE_LABELS;
 
@@ -140,8 +141,8 @@ export default function ApprovalRulesPage() {
         const payload = {
             module,
             name: name.trim(),
-            min_amount: parseFloat(minAmount) || 0,
-            max_amount: maxAmount.trim() === '' ? null : parseFloat(maxAmount),
+            min_amount: parseDecimal(minAmount),
+            max_amount: maxAmount.trim() === '' ? null : parseDecimal(maxAmount),
             is_active: isActive,
             steps: cleanSteps,
         };
@@ -304,11 +305,11 @@ export default function ApprovalRulesPage() {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Min Amount</label>
-                                            <Input type="number" min="0" step="0.01" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
+                                            <Input type="number" min="0" step={DECIMAL_STEP} value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Max Amount</label>
-                                            <Input type="number" min="0" step="0.01" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="(blank = and above)" />
+                                            <Input type="number" min="0" step={DECIMAL_STEP} value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="(blank = and above)" />
                                         </div>
                                     </div>
 
