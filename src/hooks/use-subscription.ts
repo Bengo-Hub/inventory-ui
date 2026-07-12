@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useAuthStore } from "@/store/auth";
 import type { SubscriptionInfo } from "@/lib/auth/subscription";
 import { fetchSubscriptionInfo } from "@/lib/auth/subscription";
@@ -14,6 +14,8 @@ export function useSubscription() {
   const setSubscriptionInfo = useAuthStore((s) => s.setSubscriptionInfo);
 
   const subStore = useSubscriptionStore();
+  // Bounded retry counter for a FAILED subscription lookup (see the fetch effect). Reset per auth.
+  const lookupRetries = useRef(0);
 
   const tenantSlug = user?.tenant_slug as string | undefined;
   const roles = (((user as any)?.roles ?? []) as string[]).map((r) => String(r).toLowerCase());
@@ -58,20 +60,52 @@ export function useSubscription() {
       return;
     }
 
+    // A FAILED lookup (network/5xx/timeout) is NOT the same as "no subscription".
+    // fetchSubscriptionInfo returns null ONLY on failure — never collapse that to
+    // status:'none', which would trigger the full-page "Subscription Required" lockout for
+    // a genuinely-active tenant (e.g. while subscription-api is mid-redeploy). Instead FAIL
+    // OPEN: keep the last-known-good cached entitlements (so active tenants stay in), else a
+    // non-blocking 'unknown' status; and retry a few times so it self-heals when the API returns.
+    const handleLookupFailure = () => {
+      const cached = useSubscriptionStore.getState();
+      if (cached.hydrated && cached.status) {
+        setSubscriptionInfo({
+          status: String(cached.status).toLowerCase(),
+          planCode: (cached.plan as string) ?? '',
+          planName: '',
+          features: cached.features ?? [],
+          limits: cached.limits ?? {},
+        } as any);
+      } else {
+        // No cache yet: 'unknown' is deliberately NOT 'none', so needsSubscription stays false
+        // and the tenant is never locked out on a transient lookup failure.
+        setSubscriptionInfo({ status: 'unknown', planCode: '', planName: '', features: [], limits: {} } as any);
+      }
+      if (lookupRetries.current < 4) {
+        lookupRetries.current += 1;
+        // Re-arm the effect (subscriptionInfo → undefined) after a short delay to re-fetch.
+        setTimeout(() => setSubscriptionInfo(undefined as any), 8000);
+      }
+    };
+
     fetchSubscriptionInfo(tenantId, slug, session.accessToken)
       .then((info) => {
-        const resolved = info ?? { status: 'none', planCode: '', planName: '', features: [], limits: {} };
-        setSubscriptionInfo(resolved as any);
+        if (info === null) {
+          handleLookupFailure();
+          return;
+        }
+        lookupRetries.current = 0;
+        setSubscriptionInfo(info as any);
         useSubscriptionStore.getState().setFromRaw(
           {
-            plan: resolved.planCode || null, status: resolved.status || null,
-            expiresAt: (resolved as any).currentPeriodEnd ?? (resolved as any).trialEndsAt ?? null,
-            features: resolved.features, limits: resolved.limits,
+            plan: info.planCode || null, status: info.status || null,
+            expiresAt: (info as any).currentPeriodEnd ?? (info as any).trialEndsAt ?? null,
+            features: info.features, limits: info.limits,
           },
           slug,
         );
       })
-      .catch(() => setSubscriptionInfo({ status: 'none', planCode: '', planName: '', features: [], limits: {} } as any));
+      .catch(() => handleLookupFailure());
   }, [status, session?.accessToken, user, subscriptionInfo, setSubscriptionInfo, tenantSlug, isPlatformOwner]);
 
   const info = subscriptionInfo as SubscriptionInfo | null | undefined;
