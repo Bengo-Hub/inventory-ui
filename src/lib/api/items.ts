@@ -89,6 +89,21 @@ export interface Item {
   max_children?: number | null;
   extra_bed_allowed?: boolean;
   single_supplement?: number | null;
+  // E-commerce / marketplace attributes — online storefront + marketplace feeds (Google
+  // Shopping / Jumia etc.). Additive; surfaced by inventory-api on every item read.
+  gtin?: string;                 // GTIN-8/12/13/14 barcode for marketplace feeds
+  mpn?: string;                  // manufacturer part number
+  condition?: string;            // NEW | REFURBISHED | USED | OPEN_BOX (or '' = unset)
+  slug?: string;                 // storefront URL slug
+  short_description?: string;    // product-card description
+  meta_title?: string;           // SEO
+  meta_description?: string;      // SEO
+  country_of_origin?: string;    // customs / marketplace compliance
+  hs_code?: string;              // customs tariff code
+  is_returnable?: boolean;       // customer return allowed (backend default true)
+  return_window_days?: number | null; // null = tenant default
+  allow_backorder?: boolean;     // orderable when out of stock
+  is_discontinued?: boolean;     // hidden from new listings, existing stock still sellable
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +198,21 @@ export interface CreateItemInput {
   max_children?: number;
   extra_bed_allowed?: boolean;
   single_supplement?: number;
+  // E-commerce / marketplace attributes (see Item). All optional/additive.
+  gtin?: string;
+  mpn?: string;
+  condition?: 'NEW' | 'REFURBISHED' | 'USED' | 'OPEN_BOX';
+  slug?: string;
+  short_description?: string;
+  meta_title?: string;
+  meta_description?: string;
+  country_of_origin?: string;
+  hs_code?: string;
+  is_returnable?: boolean;
+  /** Omit (undefined) to inherit the tenant default; a number sets an explicit window. */
+  return_window_days?: number;
+  allow_backorder?: boolean;
+  is_discontinued?: boolean;
 }
 
 export type UpdateItemInput = Partial<CreateItemInput>;

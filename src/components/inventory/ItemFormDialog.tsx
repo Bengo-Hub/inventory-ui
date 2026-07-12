@@ -18,6 +18,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
+import { ItemEcommerceFields, ecommerceValuesFromItem, ecommercePayload, type EcommerceFieldValues } from '@/components/inventory/ItemEcommerceFields';
 import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
@@ -164,6 +165,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [durationMinutes, setDurationMinutes] = useState(item?.duration_minutes != null ? String(item.duration_minutes) : '');
   const [isActive, setIsActive] = useState(item?.is_active !== false);
 
+  // E-commerce / marketplace attributes (GTIN, MPN, condition, SEO, customs, returns).
+  // Held as one grouped value object rendered by the collapsible ItemEcommerceFields section.
+  const [ecommerce, setEcommerce] = useState<EcommerceFieldValues>(() => ecommerceValuesFromItem(item));
+
   // Image — primary image URL (mirrored to image_url). The multi-image gallery is managed
   // by ItemImagesManager; this holds the create-mode single-image fallback / primary URL.
   const [imageUrl, setImageUrl] = useState(item?.image_url ?? '');
@@ -268,6 +273,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setDimHeight(item.dimensions_cm?.height != null ? String(item.dimensions_cm.height) : '');
       setDurationMinutes(item.duration_minutes != null ? String(item.duration_minutes) : '');
       setIsActive(item.is_active !== false);
+      setEcommerce(ecommerceValuesFromItem(item));
       setImageUrl(item.image_url ?? '');
       setEventStartAt(toLocalDatetimeValue(item.event_start_at));
       setEventEndAt(toLocalDatetimeValue(item.event_end_at));
@@ -537,6 +543,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       max_children: isService && useCase === 'HOSPITALITY_ROOM' && maxChildren ? parseInt(maxChildren, 10) : undefined,
       single_supplement: isService && useCase === 'HOSPITALITY_ROOM' && singleSupplement ? parseDecimal(singleSupplement) : undefined,
       extra_bed_allowed: isService && useCase === 'HOSPITALITY_ROOM' ? extraBedAllowed : undefined,
+      // E-commerce / marketplace attributes (flows into both create and update).
+      ...ecommercePayload(ecommerce),
     });
   }
 
@@ -1272,6 +1280,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* E-commerce / Marketplace — additive online-store attributes. Hidden for events
+                  (irrelevant) and recipes (saved via the composite menu-item endpoint, which
+                  doesn't accept these fields). Collapsed by default so it never clutters. */}
+              {!isEventMode && !isRecipe && (
+                <ItemEcommerceFields value={ecommerce} onChange={setEcommerce} />
               )}
 
               <div className="flex gap-3 pt-2">
