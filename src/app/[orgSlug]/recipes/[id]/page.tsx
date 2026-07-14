@@ -5,7 +5,7 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useRecipe, useUpdateRecipe } from '@/hooks/use-recipes';
 import { useUnits } from '@/hooks/useUnits';
 import type { RecipeIngredient } from '@/lib/api/recipes';
-import { convertQuantity } from '@/lib/units/convert';
+import { convertToStockUnit } from '@/lib/units/convert';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -20,6 +20,10 @@ type IngredientRow = {
     /** The item's own base/stock unit — item_cost_price is per this unit; the line's
      *  quantity is converted from unit_id's unit to this before costing. */
     item_unit_id: string;
+    /** Content-per-unit bridge (700 ml bottle stocked in btl → 700 + 'ml'): lets a
+     *  cross-dimension line (30 ml of a btl item) cost/deduct fractional stock units. */
+    unit_content_qty: number | null;
+    unit_content_uom: string | null;
     quantity: string;
     unit_id: string;
     /** Legacy free-text unit (g/ml/pc) used to resolve unit_id when the row has none. */
@@ -28,7 +32,7 @@ type IngredientRow = {
 };
 
 function emptyRow(): IngredientRow {
-    return { item_id: '', item_name: '', item_cost_price: null, item_unit_id: '', quantity: '', unit_id: '', unit_of_measure: '', waste_percent: '0' };
+    return { item_id: '', item_name: '', item_cost_price: null, item_unit_id: '', unit_content_qty: null, unit_content_uom: null, quantity: '', unit_id: '', unit_of_measure: '', waste_percent: '0' };
 }
 
 function formatCurrency(value?: number | null): string {
@@ -57,6 +61,8 @@ export default function RecipeDetailPage() {
                     item_name: ing.item_name ?? '',
                     item_cost_price: ing.item_cost_price ?? null,
                     item_unit_id: ing.item_unit_id ?? '',
+                    unit_content_qty: ing.item_unit_content_qty ?? null,
+                    unit_content_uom: ing.item_unit_content_uom ?? null,
                     quantity: String(ing.quantity),
                     unit_id: ing.unit_id ?? '',
                     unit_of_measure: ing.unit_of_measure ?? '',
@@ -232,8 +238,16 @@ export default function RecipeDetailPage() {
                                 const baseUnitAbbr = row.item_unit_id
                                     ? units?.find((u) => u.id === row.item_unit_id)?.abbreviation
                                     : undefined;
+                                // Same-dimension conversion first, then the content-per-unit bridge
+                                // (30 ml of a 700 ml/btl bottle → 30/700 btl) — mirrors the API's
+                                // deduction path so a tot line costs a fraction of the bottle, not
+                                // 30 × the whole-bottle cost.
                                 const qtyInBase = baseUnitAbbr && lineUnitAbbr
-                                    ? convertQuantity(qty, lineUnitAbbr, baseUnitAbbr) ?? qty
+                                    ? convertToStockUnit(
+                                        { base_unit: baseUnitAbbr, unit_content_qty: row.unit_content_qty, unit_content_uom: row.unit_content_uom },
+                                        qty,
+                                        lineUnitAbbr,
+                                    ) ?? qty
                                     : qty;
                                 const lineCost = row.item_cost_price != null
                                     ? row.item_cost_price * qtyInBase * (1 + waste / 100)
@@ -257,6 +271,8 @@ export default function RecipeDetailPage() {
                                                             item_name: item.name,
                                                             item_cost_price: item.cost_price ?? null,
                                                             item_unit_id: item.unit_id ?? '',
+                                                            unit_content_qty: item.unit_content_qty ?? null,
+                                                            unit_content_uom: item.unit_content_uom ?? null,
                                                             unit_id: resolveItemUnitId(item) || row.unit_id,
                                                         });
                                                     }}

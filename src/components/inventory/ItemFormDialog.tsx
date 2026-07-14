@@ -344,9 +344,20 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         waste_percent: ing.waste_percent ?? 0,
         notes: ing.notes ?? '',
         base_unit: baseAbbr,
-        // Per-base-unit EP cost carried by the recipe read — feeds the Line/batch cost. Not
-        // routed through withDerivedCost (which would clear it without a raw cost basis).
+        // Content-per-unit bridge from the ingredient item (700 ml/btl). Without it a
+        // hydrated ml-line against a btl-stocked bottle false-flags "can't deduct" AND
+        // miscosts (30 ml × per-btl cost instead of 30/700 of it) — the fresh-pick path
+        // (ItemSearchInput) always carried these; the edit hydration must too.
+        unit_content_qty: ing.item_unit_content_qty ?? null,
+        unit_content_uom: ing.item_unit_content_uom ?? null,
+        // Per-base-unit EP cost carried by the recipe read — feeds the Line/batch cost.
         cost_price: ing.item_cost_price ?? undefined,
+        // Seed the cost basis as "per 1 base unit" so the EP Cost field shows the real
+        // figure (not 0.00) and a later edit (withDerivedCost re-derivation) reproduces
+        // the same cost_price instead of clearing it.
+        cost_entered: ing.item_cost_price ?? undefined,
+        cost_basis_qty: 1,
+        cost_basis_unit: baseAbbr,
         unit_touched: true,
       };
     });

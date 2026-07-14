@@ -10,6 +10,10 @@ export interface RecipeIngredient {
     item_cost_price?: number | null;
     /** The ingredient item's own base/stock unit — item_cost_price is per this unit. */
     item_unit_id?: string;
+    /** Content-per-unit bridge from the ingredient item (700 ml bottle stocked in btl →
+     *  700 + 'ml'): a cross-dimension line (30 ml of a btl item) deducts fractional units. */
+    item_unit_content_qty?: number | null;
+    item_unit_content_uom?: string | null;
     quantity: number;
     unit_of_measure?: string;
     unit_id?: string;
