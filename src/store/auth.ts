@@ -221,25 +221,33 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: async () => {
+                // Capture the tenant we're leaving BEFORE clearing any state/storage, so
+                // re-login returns to the SAME tenant rather than a default one: URL path
+                // first (every tenant page is /{orgSlug}/...), then the signed-in profile,
+                // then the last-used localStorage hint. Never a hardcoded tenant.
+                let slug = '';
+                if (typeof window !== 'undefined') {
+                    const first = window.location.pathname.split('/').filter(Boolean)[0] ?? '';
+                    if (first && first !== 'auth') slug = first;
+                }
+                slug = slug || get().user?.tenant_slug || '';
+
                 const token = get().session?.accessToken;
                 await revokeServerSession(token);
                 set({ status: 'idle', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
                 if (typeof window !== 'undefined') {
-                    // Capture the tenant we're leaving BEFORE clearing storage, so re-login returns
-                    // to the SAME tenant rather than the bare origin (which would default to the
-                    // wrong tenant and fail SSO with "not a member of the requested tenant").
-                    const slugFromPath = window.location.pathname.split('/').filter(Boolean)[0] || '';
-                    let slug = slugFromPath;
                     try { slug = slug || (localStorage.getItem('tenantSlug') ?? ''); } catch { /* no-op */ }
                     try { localStorage.removeItem('tenantId'); } catch { /* no-op */ }
                     // Keep `tenantSlug` as the last-used hint so the bare-root landing routes back here.
                     try { localStorage.removeItem('inventory-auth-storage'); } catch { /* no-op */ }
                     try { sessionStorage.clear(); } catch { /* no-op */ }
-                    const dest = slug ? `${window.location.origin}/${slug}` : window.location.origin;
-                    const returnTo = encodeURIComponent(dest);
-                    window.location.href = buildLogoutUrl(`https://accounts.codevertexitsolutions.com/login?return_to=${returnTo}`);
+                    // Land on the tenant app root: arriving there unauthenticated re-triggers
+                    // SSO with tenant=<slug>, so the login screen shows the RIGHT organisation.
+                    window.location.href = slug
+                        ? buildLogoutUrl(`${window.location.origin}/${slug}`)
+                        : buildLogoutUrl(`https://accounts.codevertexitsolutions.com/login?return_to=${encodeURIComponent(window.location.origin)}`);
                 }
             },
 
