@@ -3,9 +3,26 @@
 import { useBiometric } from '@/hooks/use-biometric';
 import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
+import { SSOCallbackError } from '@bengo-hub/shared-ui-lib/auth';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
+
+// The stored return URL was captured BEFORE the SSO hop. If the user switched
+// organisation mid-login, its slug is stale — re-point the first path segment
+// at the org the token was actually issued for. Cross-origin values are dropped.
+function sanitizedReturnTo(raw: string | null, orgSlug: string): string | null {
+    if (!raw) return null;
+    try {
+        const url = raw.startsWith('http') ? new URL(raw) : new URL(raw, window.location.origin);
+        if (url.origin !== window.location.origin) return null;
+        const segments = url.pathname.split('/');
+        if (segments[1] && segments[1] !== orgSlug) segments[1] = orgSlug;
+        return segments.join('/') + url.search + url.hash;
+    } catch {
+        return null;
+    }
+}
 
 function AuthCallbackContent() {
     const router = useRouter();
@@ -66,7 +83,7 @@ function AuthCallbackContent() {
     useEffect(() => {
         if (status === 'authenticated') {
             if (typeof window !== 'undefined') sessionStorage.removeItem('sso_org_slug');
-            const returnTo = sessionStorage.getItem('sso_return_to');
+            const returnTo = sanitizedReturnTo(sessionStorage.getItem('sso_return_to'), orgSlug);
             sessionStorage.removeItem('sso_return_to');
             const storedOutlet = typeof window !== 'undefined'
                 ? localStorage.getItem('inventory-selected-outlet-id') : null;
@@ -96,32 +113,20 @@ function AuthCallbackContent() {
     }, [status, orgSlug, router]);
 
     if (error || authError) {
-        // Wrong-tenant rescue: SSO denied the URL's tenant but we remember a different one the
-        // user belongs to — offer to sign into that instead of looping on the wrong slug.
-        const wrongTenant = error === 'access_denied' && !!lastTenant && lastTenant !== urlSlug;
+        // Shared error card: renders wrong-organisation copy for access_denied /
+        // membership errors and offers a "Continue to {lastTenant}" rescue when a
+        // remembered tenant differs from the URL's slug. Since /authorize now sends
+        // wrong-org users to the accounts organisation picker, "Sign in again"
+        // genuinely recovers those sessions.
         return (
-            <div className="min-h-screen flex items-center justify-center bg-background p-4">
-                <div className="text-center p-8 border border-destructive/20 rounded-xl bg-destructive/5 max-w-md">
-                    <h1 className="text-xl font-bold text-destructive mb-2">Authentication Failed</h1>
-                    <p className="text-muted-foreground">{errorDescription || error || authError}</p>
-                    <div className="mt-6 flex flex-col gap-2">
-                        {wrongTenant && (
-                            <button
-                                onClick={() => router.replace(`/${lastTenant}/auth/login`)}
-                                className="px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium"
-                            >
-                                Sign in to {lastTenant}
-                            </button>
-                        )}
-                        <button
-                            onClick={() => router.replace(`/${orgSlug}/auth/login`)}
-                            className={wrongTenant ? 'px-4 py-2 rounded-lg border border-border text-foreground' : 'px-4 py-2 bg-primary text-primary-foreground rounded-lg'}
-                        >
-                            Try Again
-                        </button>
-                    </div>
-                </div>
-            </div>
+            <SSOCallbackError
+                error={error}
+                errorDescription={errorDescription ?? authError}
+                orgSlug={urlSlug}
+                lastKnownTenant={lastTenant}
+                onRetry={() => router.replace(`/${orgSlug}/auth/login`)}
+                onSwitchTenant={(slug) => router.replace(`/${slug}/auth/login`)}
+            />
         );
     }
 
