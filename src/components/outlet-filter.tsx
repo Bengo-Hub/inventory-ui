@@ -103,6 +103,27 @@ export function OutletFilter({ className }: { className?: string }) {
     apiClient.setOutletID(selectedOutlet?.id ?? null);
   }, [selectedOutlet]);
 
+  // Default branch preselect: an admin/manager with NO outlet of their own starts scoped to
+  // the tenant's default branch (the HQ outlet, else the first) instead of the unscoped
+  // "All Outlets" superset. An explicit "All Outlets" choice (localStorage marker 'all') and
+  // a remembered last-used outlet are both honoured first.
+  const homeOutlet = useOutletStore((s) => s.outlet);
+  useEffect(() => {
+    if (selectedOutlet || homeOutlet || outlets.length === 0) return;
+    let marker: string | null = null;
+    try { marker = localStorage.getItem(INVENTORY_SELECTED_OUTLET_KEY); } catch { /* ignore */ }
+    if (marker === 'all') return; // the user explicitly chose the HQ superset
+    const preferred =
+      (marker ? outlets.find((o) => o.id === marker) : undefined) ??
+      outlets.find((o) => o.isHq) ??
+      outlets[0];
+    if (preferred) {
+      selectOutlet(preferred);
+      setHomeOutlet({ id: preferred.id, code: preferred.code, name: preferred.name, use_case: preferred.useCase, is_hq: preferred.isHq });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outlets, selectedOutlet, homeOutlet]);
+
   if (!canFilter || outlets.length === 0) return null;
 
   const filtered = search
