@@ -6,6 +6,7 @@ import { RecurrenceEditor, generateRecurrencePattern } from '@/components/invent
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingredientLineForSubmit, recipeLineCost, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
 import { convertQuantity, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
+import { EtimsCodeSelect } from '@/components/inventory/EtimsCodeSelect';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
@@ -148,6 +149,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [targetMargin, setTargetMargin] = useState(item?.target_margin_percent != null ? String(item.target_margin_percent) : '');
   const [taxCode, setTaxCode] = useState(item?.tax_code_id ?? '');
   const [taxInclusive, setTaxInclusive] = useState(item?.tax_inclusive ?? false);
+  const [etimsClsCd, setEtimsClsCd] = useState(item?.etims_item_cls_cd ?? '');
+  const [etimsPkgUnit, setEtimsPkgUnit] = useState(item?.etims_pkg_unit_cd ?? '');
+  const [etimsQtyUnit, setEtimsQtyUnit] = useState(item?.etims_qty_unit_cd ?? '');
   const [requiresAge, setRequiresAge] = useState(item?.requires_age_verification ?? false);
   const [isControlledSubstance, setIsControlledSubstance] = useState(item?.is_controlled_substance ?? false);
   const [isPerishable, setIsPerishable] = useState(item?.is_perishable ?? false);
@@ -259,6 +263,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setTargetMargin(item.target_margin_percent != null ? String(item.target_margin_percent) : '');
       setTaxCode(item.tax_code_id ?? '');
       setTaxInclusive(item.tax_inclusive ?? false);
+      setEtimsClsCd(item.etims_item_cls_cd ?? '');
+      setEtimsPkgUnit(item.etims_pkg_unit_cd ?? '');
+      setEtimsQtyUnit(item.etims_qty_unit_cd ?? '');
       setRequiresAge(item.requires_age_verification);
       setIsControlledSubstance(item.is_controlled_substance ?? false);
       setIsPerishable(item.is_perishable);
@@ -518,6 +525,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       target_margin_percent: targetMargin !== '' ? parseDecimal(targetMargin) : undefined,
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
+      etims_item_cls_cd: etimsClsCd.trim() || undefined,
+      etims_pkg_unit_cd: etimsPkgUnit.trim() || undefined,
+      etims_qty_unit_cd: etimsQtyUnit.trim() || undefined,
       barcode_type: barcodeType || undefined,
       requires_age_verification: requiresAge,
       is_controlled_substance: isControlledSubstance,
@@ -850,6 +860,23 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     <input type="checkbox" checked={taxInclusive} onChange={(e) => setTaxInclusive(e.target.checked)} className="rounded mt-0.5" />
                     <span>Price is inclusive of tax (VAT)<br /><span className="text-xs text-muted-foreground font-normal">Tax is computed backwards from the price.</span></span>
                   </label>
+                  {/* KRA eTIMS classification — inventory is the item source of truth; these
+                      drive treasury's eTIMS item registration (saveItem) instead of defaults. */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">eTIMS Classification <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <EtimsCodeSelect orgSlug={orgSlug} codeType="ITEM_CLS" value={etimsClsCd} onChange={setEtimsClsCd} placeholder="Default: general goods (1000000000)" />
+                    <p className="text-xs text-muted-foreground">KRA UNSPSC item class for eTIMS registration.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">eTIMS Package Unit</label>
+                      <EtimsCodeSelect orgSlug={orgSlug} codeType="PKG_UNIT" value={etimsPkgUnit} onChange={setEtimsPkgUnit} placeholder="Default: NT" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">eTIMS Quantity Unit</label>
+                      <EtimsCodeSelect orgSlug={orgSlug} codeType="QTY_UNIT" value={etimsQtyUnit} onChange={setEtimsQtyUnit} placeholder="Default: unit's KRA mapping" />
+                    </div>
+                  </div>
                 </div>
               )}
 

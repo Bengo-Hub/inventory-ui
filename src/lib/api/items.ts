@@ -65,6 +65,10 @@ export interface Item {
   // Tax / compliance (treasury-api is the rate source of truth)
   tax_code_id?: string;
   tax_inclusive?: boolean;
+  // KRA eTIMS catalog classification (drives treasury's eTIMS item registration)
+  etims_item_cls_cd?: string;
+  etims_pkg_unit_cd?: string;
+  etims_qty_unit_cd?: string;
   // Read-only effective price + tax split enriched by inventory-api for POS/ordering
   selling_price?: number | null;
   net_price?: number | null;
@@ -168,6 +172,9 @@ export interface CreateItemInput {
   target_margin_percent?: number;
   tax_code_id?: string;
   tax_inclusive?: boolean;
+  etims_item_cls_cd?: string;
+  etims_pkg_unit_cd?: string;
+  etims_qty_unit_cd?: string;
   is_active?: boolean;
   requires_age_verification?: boolean;
   is_controlled_substance?: boolean;
