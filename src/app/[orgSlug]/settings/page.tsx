@@ -38,6 +38,18 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { parseDecimal } from '@/lib/utils';
+import { FeatureLock } from '@bengo-hub/shared-ui-lib/subscription';
+
+/** Wraps a plan-gated settings toggle row: unlocked plans render children as-is; locked
+ *  plans dim the row and clicking opens the shared UpgradeDialog (show-don't-hide). */
+function GatedRow({ feature, children }: { feature?: string; children: React.ReactNode }) {
+  if (!feature) return <>{children}</>;
+  return (
+    <FeatureLock feature={feature} mode="overlay">
+      {children}
+    </FeatureLock>
+  );
+}
 
 type Tab = 'general' | 'stock' | 'modules' | 'tax' | 'documents' | 'integrations' | 'platform';
 
@@ -151,20 +163,24 @@ function GeneralTab({ orgSlug }: { orgSlug: string }) {
           </div>
 
           {[
-            { key: 'enableLowStockNotifications' as const, label: 'Low Stock Alerts', desc: 'Send alerts when stock drops below the threshold.' },
-            { key: 'enableExpiryNotifications' as const, label: 'Expiry Alerts', desc: 'Send alerts when items are approaching their expiry date.' },
+            // Alert toggles are plan-gated per the use-case PowerSuite specs (inventory-api
+            // enforces the same codes on PUT /inventory/settings).
+            { key: 'enableLowStockNotifications' as const, label: 'Low Stock Alerts', desc: 'Send alerts when stock drops below the threshold.', feature: 'stock_alerts' },
+            { key: 'enableExpiryNotifications' as const, label: 'Expiry Alerts', desc: 'Send alerts when items are approaching their expiry date.', feature: 'expiry_alerts' },
           ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
-              <div>
-                <h4 className="text-sm font-bold">{item.label}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+            <GatedRow key={item.key} feature={item.feature}>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
+                <div>
+                  <h4 className="text-sm font-bold">{item.label}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                </div>
+                <Toggle
+                  checked={form[item.key]}
+                  onChange={(v) => setForm((f) => ({ ...f, [item.key]: v }))}
+                  disabled={!canEdit}
+                />
               </div>
-              <Toggle
-                checked={form[item.key]}
-                onChange={(v) => setForm((f) => ({ ...f, [item.key]: v }))}
-                disabled={!canEdit}
-              />
-            </div>
+            </GatedRow>
           ))}
 
           <div className="flex items-center justify-end gap-3">
@@ -409,24 +425,28 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
           </div>
 
           {[
-            { key: 'enableLotTracking' as const, label: 'Lot / Batch Tracking', desc: 'Track inventory by lot/batch numbers for traceability.' },
-            { key: 'enableExpiryTracking' as const, label: 'Expiry Date Tracking', desc: 'Track expiry dates and enforce FEFO (First Expired, First Out).' },
+            // Lot/expiry tracking are plan-gated per the use-case PowerSuite specs
+            // (inventory-api enforces the same codes on PUT /inventory/settings).
+            { key: 'enableLotTracking' as const, label: 'Lot / Batch Tracking', desc: 'Track inventory by lot/batch numbers for traceability.', feature: 'lots_batches' },
+            { key: 'enableExpiryTracking' as const, label: 'Expiry Date Tracking', desc: 'Track expiry dates and enforce FEFO (First Expired, First Out).', feature: 'batch_expiry_tracking' },
             { key: 'purchaseOrderApprovalRequired' as const, label: 'Purchase Order Approval Required', desc: 'Require manager approval before a PO can be issued.' },
             { key: 'autoAdjustOnTransfer' as const, label: 'Auto-Adjust Stock on Transfer', desc: 'Automatically deduct source and credit destination on transfer completion.' },
             { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.' },
             { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).' },
           ].map((item) => (
-            <div key={item.key} className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
-              <div>
-                <h4 className="text-sm font-bold">{item.label}</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+            <GatedRow key={item.key} feature={'feature' in item ? item.feature : undefined}>
+              <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
+                <div>
+                  <h4 className="text-sm font-bold">{item.label}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+                </div>
+                <Toggle
+                  checked={form[item.key]}
+                  onChange={(v) => setForm((f) => ({ ...f, [item.key]: v }))}
+                  disabled={!canEdit}
+                />
               </div>
-              <Toggle
-                checked={form[item.key]}
-                onChange={(v) => setForm((f) => ({ ...f, [item.key]: v }))}
-                disabled={!canEdit}
-              />
-            </div>
+            </GatedRow>
           ))}
 
           <div className="flex items-center justify-end gap-3">

@@ -118,8 +118,8 @@ export default function IngredientUtilizationPage() {
   const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
   function printReport() {
     openPreview(() => reportsApi.ingredientUtilizationDoc(orgSlug, { ...baseParams, format: 'pdf' }), {
-      fileName: `ingredient-utilization-${itemId}-${from}_${to}.pdf`,
-      title: 'Ingredient Utilization',
+      fileName: `stock-reconciliation-${itemId}-${from}_${to}.pdf`,
+      title: 'Stock Reconciliation',
     });
   }
 
@@ -127,7 +127,8 @@ export default function IngredientUtilizationPage() {
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold">Ingredient Utilization</h1>
+          {/* Renamed from "Ingredient Utilization" per the use-case PowerSuite specs (route unchanged). */}
+          <h1 className="text-2xl font-bold">Stock Reconciliation</h1>
           <p className="text-sm text-muted-foreground mt-1">
             How much of an ingredient was consumed, by which recipe, relative to its reorder level
           </p>

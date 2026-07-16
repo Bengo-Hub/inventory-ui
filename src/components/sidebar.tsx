@@ -60,6 +60,9 @@ interface NavItem {
   href: string;
   /** Module key used for use_case filtering. Omit to always show. */
   moduleKey?: string;
+  /** Subscription feature code for this item — overrides MODULE_FEATURE[moduleKey] so
+   *  items sharing a moduleKey (e.g. the report pages) can carry distinct plan gates. */
+  feature?: string;
   /** True when the tenant's plan lacks this module's feature — shown with an upgrade
    *  badge but still navigable; the page renders the upgrade blocker. */
   locked?: boolean;
@@ -78,7 +81,7 @@ interface NavGroup {
 const USE_CASE_MODULES: Record<string, string[]> = {
   hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'stock_take', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'warranties', 'settings'],
   pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
   services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'events', 'assets', 'requisitions', 'approvals','settings'],
   warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
@@ -88,21 +91,37 @@ const USE_CASE_MODULES: Record<string, string[]> = {
 
 // Maps a sidebar module key to the subscription feature the backend enforces for it.
 // Only modules whose endpoints are feature-gated server-side are listed, so the UI and
-// API stay consistent. Modules without an entry are always shown (subject to use_case).
+// API stay consistent (inventory-api route gates in internal/http/handlers). Modules
+// without an entry are always shown (subject to use_case).
 const MODULE_FEATURE: Record<string, string> = {
   stock: 'stock_tracking',
   adjustments: 'stock_tracking',
-  stock_take: 'stock_tracking',
+  stock_take: 'stock_take',
+  transfers: 'stock_transfers',
+  lots: 'lots_batches',
   purchase_orders: 'purchase_orders',
+  rfqs: 'rfqs',
+  requisitions: 'requisitions',
+  contracts: 'procurement_contracts',
+  production_batches: 'manufacturing',
+  events: 'events_module',
+  assets: 'fixed_assets',
+  warranties: 'warranties',
+  erp: 'hr_management',
 };
 
 // Procurement is a universal capability, not a use_case-specific one: any business — even a
 // pure-services or mixed goods+services tenant — can buy from suppliers and raise LPOs/RFQs.
 // These keys are therefore never hidden by use_case (they remain subject to subscription gating
-// via MODULE_FEATURE, e.g. purchase_orders).
+// via MODULE_FEATURE, e.g. purchase_orders). The ERP cross-service link is likewise available
+// to every use case (subscription-locked below tier 2 instead).
 const UNIVERSAL_MODULES = new Set<string>([
-  'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers',
+  'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'erp',
 ]);
+
+// Cross-service ERP UI (linked, never duplicated). Code fallback is the safety net since
+// NEXT_PUBLIC URLs are baked at build time.
+const ERP_UI_URL = process.env.NEXT_PUBLIC_ERP_UI_URL || 'https://erp.codevertexitsolutions.com';
 
 // Gating is driven by the SELECTED outlet's use_case for everyone (admins included).
 // When no specific outlet is selected — the HQ "All Outlets" view, where useCase is
@@ -122,12 +141,12 @@ function hasModule(key: string | undefined, useCase: string | undefined): boolea
 function NavLink({ item, orgSlug, onClose }: { item: NavItem; orgSlug: string; onClose?: () => void }) {
   const pathname = usePathname();
   const href = `/${orgSlug}${item.href}`;
-  const active = item.href === '' ? pathname === `/${orgSlug}` : pathname.startsWith(href);
+  const active = item.href === '' ? pathname === `/${orgSlug}` : !item.href.startsWith('http') && pathname.startsWith(href);
   const Icon = item.icon;
 
   const link = (
     <Link
-      href={href}
+      href={item.href.startsWith('http') ? item.href : href}
       onClick={onClose}
       className={cn(
         'group flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-sm',
@@ -143,7 +162,7 @@ function NavLink({ item, orgSlug, onClose }: { item: NavItem; orgSlug: string; o
 
   // Locked (plan lacks the feature): keep the item visible with the shared "🔒 <tier>" badge;
   // clicking opens the shared UpgradeDialog (capture-phase, so the Link never navigates).
-  const feature = item.moduleKey ? MODULE_FEATURE[item.moduleKey] : undefined;
+  const feature = item.feature ?? (item.moduleKey ? MODULE_FEATURE[item.moduleKey] : undefined);
   if (item.locked && feature) {
     return (
       <FeatureLock feature={feature} mode="badge" className="pr-2">
@@ -219,9 +238,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // Tenant admins/owners (and platform owners) get every in-scope module — they administer the
   // tenant, so subscription-feature gating must not hide navigation from them.
   const { isSuperuser } = usePermissions();
-  function hasFeatureAccess(key: string | undefined): boolean {
-    if (!key) return true;
-    const feature = MODULE_FEATURE[key];
+  function hasFeatureAccess(item: { moduleKey?: string; feature?: string }): boolean {
+    const feature = item.feature ?? (item.moduleKey ? MODULE_FEATURE[item.moduleKey] : undefined);
     if (!feature) return true;
     if (isSuperuser) return true;
     if (subLoading || subPlatform || isDemo || isServiceCharge || !info?.planCode) return true;
@@ -293,9 +311,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Stock Valuation', icon: BarChart3, href: '/reports/stock-valuation', moduleKey: 'stock' },
         { label: 'Deadstock', icon: Boxes, href: '/reports/deadstock', moduleKey: 'stock' },
-        { label: 'Ingredient Utilization', icon: Gauge, href: '/reports/ingredient-utilization', moduleKey: 'stock' },
-        { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes' },
-        { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes' },
+        // Renamed from "Ingredient Utilization" per the use-case PowerSuite specs (route unchanged).
+        { label: 'Stock Reconciliation', icon: Gauge, href: '/reports/ingredient-utilization', moduleKey: 'stock', feature: 'report_stock_reconciliation' },
+        { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes', feature: 'report_food_cost_variance' },
+        { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes', feature: 'report_menu_engineering' },
       ],
     },
     {
@@ -313,6 +332,24 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Fixed Assets', icon: Boxes, href: '/assets', moduleKey: 'assets' },
         { label: 'Asset Categories', icon: FolderTree, href: '/asset-categories', moduleKey: 'assets' },
+      ],
+    },
+    {
+      label: 'After-Sales',
+      defaultCollapsed: true,
+      items: [
+        // Warranty tracking for serialized items — retail use case only per the
+        // use-case PowerSuite specs (tier 2+, `warranties` feature).
+        { label: 'Warranties', icon: ShieldCheck, href: '/warranties', moduleKey: 'warranties' },
+      ],
+    },
+    {
+      label: 'ERP',
+      defaultCollapsed: true,
+      items: [
+        // Cross-service link (never duplicated here) — locked below tier 2 per the
+        // use-case PowerSuite matrix (no ERP access at Basic; hr_management unlocks at Pro).
+        { label: 'ERP', icon: Users, href: `${ERP_UI_URL}/${orgSlug}`, moduleKey: 'erp' },
       ],
     },
     {
@@ -338,7 +375,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       ...group,
       items: group.items
         .filter((item) => hasModule(item.moduleKey, useCase))
-        .map((item) => ({ ...item, locked: !hasFeatureAccess(item.moduleKey) })),
+        .map((item) => ({ ...item, locked: !hasFeatureAccess(item) })),
     }))
     .filter((group) => group.items.length > 0);
 
