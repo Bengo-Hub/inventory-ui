@@ -37,6 +37,8 @@ export interface Item {
   track_lots: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** RECIPE items only: may be picked as an ingredient in other recipes (reusable menu component). */
+  usable_in_recipes?: boolean;
   track_serial_numbers: boolean;
   shelf_life_days?: number | null;
   weight_kg?: number;
@@ -182,6 +184,8 @@ export interface CreateItemInput {
   track_lots?: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** RECIPE items only: may be picked as an ingredient in other recipes. */
+  usable_in_recipes?: boolean;
   track_serial_numbers?: boolean;
   shelf_life_days?: number;
   barcode_type?: string;
@@ -442,6 +446,12 @@ export interface MenuItemCompositeRequest {
   is_perishable?: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** Reusable menu component: may be picked as an ingredient in other recipes. */
+  usable_in_recipes?: boolean;
+  /** Content per portion (300 + 'ml' for a pot of tea) — required for other recipes
+   *  to reference this item in ml/g lines (deduction + costing bridge through it). */
+  unit_content_qty?: number;
+  unit_content_uom?: string;
   image_url?:    string;
   servings?:     number;
   target_margin_percent?: number;

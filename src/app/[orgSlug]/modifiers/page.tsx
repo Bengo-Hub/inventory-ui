@@ -201,10 +201,7 @@ export default function ModifiersPage() {
                                                     </button>
                                                 </td>
                                                 <td className="px-6 py-4">
-                                                    <div className="font-medium">{group.display_name || group.name}</div>
-                                                    {group.display_name && group.display_name !== group.name && (
-                                                        <div className="text-xs text-muted-foreground">{group.name}</div>
-                                                    )}
+                                                    <div className="font-medium">{group.name}</div>
                                                 </td>
                                                 <td className="px-6 py-4 hidden md:table-cell">
                                                     {group.item_name ? (
@@ -256,6 +253,7 @@ export default function ModifiersPage() {
                                                             <thead>
                                                                 <tr className="text-muted-foreground">
                                                                     <th className="text-left pb-2 font-medium">Option</th>
+                                                                    <th className="text-left pb-2 font-medium">Deducts (SKU)</th>
                                                                     <th className="text-right pb-2 font-medium">Price Adj.</th>
                                                                     <th className="text-center pb-2 font-medium">Default</th>
                                                                     <th className="text-center pb-2 font-medium">Active</th>
@@ -264,7 +262,8 @@ export default function ModifiersPage() {
                                                             <tbody className="divide-y divide-border/50">
                                                                 {group.options.map((opt, idx) => (
                                                                     <tr key={opt.id ?? idx}>
-                                                                        <td className="py-2">{opt.display_name || opt.name}</td>
+                                                                        <td className="py-2">{opt.name}</td>
+                                                                        <td className="py-2 font-mono text-muted-foreground">{opt.sku || '-'}</td>
                                                                         <td className="py-2 text-right tabular-nums">
                                                                             {opt.price_adjustment !== 0 ? formatCurrency(opt.price_adjustment) : '-'}
                                                                         </td>
@@ -301,7 +300,7 @@ export default function ModifiersPage() {
 
             {pendingDelete && (
                 <ConfirmDeleteDialog
-                    groupName={pendingDelete.display_name || pendingDelete.name}
+                    groupName={pendingDelete.name}
                     onConfirm={executeDelete}
                     onCancel={() => setPendingDelete(null)}
                     isPending={deleteMutation.isPending}

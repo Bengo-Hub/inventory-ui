@@ -5,6 +5,7 @@ import {
   stockCountsApi,
   type CreateStockCountInput,
   type StockCountStatus,
+  type StockCountTemplatePayload,
   type UpsertLineInput,
 } from '@/lib/api/stock-counts';
 
@@ -68,5 +69,42 @@ export function useCancelStockCount(orgSlug: string) {
   return useMutation({
     mutationFn: (id: string) => stockCountsApi.cancel(orgSlug, id),
     onSuccess: () => qc.invalidateQueries({ queryKey: [KEY, orgSlug] }),
+  });
+}
+
+const TPL_KEY = 'stock-count-templates';
+
+export function useStockCountTemplates(orgSlug: string) {
+  return useQuery({
+    queryKey: [TPL_KEY, orgSlug],
+    queryFn: () => stockCountsApi.listTemplates(orgSlug),
+    enabled: !!orgSlug,
+    placeholderData: [],
+    staleTime: 30_000,
+  });
+}
+
+export function useCreateStockCountTemplate(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: StockCountTemplatePayload) => stockCountsApi.createTemplate(orgSlug, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [TPL_KEY, orgSlug] }),
+  });
+}
+
+export function useUpdateStockCountTemplate(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: StockCountTemplatePayload }) =>
+      stockCountsApi.updateTemplate(orgSlug, id, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [TPL_KEY, orgSlug] }),
+  });
+}
+
+export function useDeleteStockCountTemplate(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => stockCountsApi.deleteTemplate(orgSlug, id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [TPL_KEY, orgSlug] }),
   });
 }

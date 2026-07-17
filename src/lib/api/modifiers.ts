@@ -1,15 +1,21 @@
 import { apiClient } from './client';
 
-/* ── Types ─────────────────────────────────────────────────────────── */
+/* ── Types (aligned to inventory-api modifiers module) ─────────────── */
 
 export interface ModifierOption {
     id?: string;
+    group_id?: string;
     name: string;
-    display_name: string;
+    /** Inventory item SKU deducted when this option is sold (a linked accompaniment /
+     *  add-on). A linked RECIPE item deducts its own BOM ingredients. */
+    sku?: string;
     price_adjustment: number;
-    sort_order: number;
+    /** How much of `sku` ONE selection consumes (default 1 natural unit). */
+    deduction_qty?: number;
+    deduction_unit?: string;
     is_default: boolean;
     is_active: boolean;
+    display_order?: number;
 }
 
 export interface ModifierGroup {
@@ -18,23 +24,34 @@ export interface ModifierGroup {
     item_name?: string;
     item_sku?: string;
     name: string;
-    display_name: string;
     min_selections: number;
     max_selections: number;
     is_required: boolean;
+    display_order?: number;
     options: ModifierOption[];
-    createdAt?: string;
-    updatedAt?: string;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface ModifierOptionPayload {
+    name: string;
+    sku?: string;
+    price_adjustment: number;
+    deduction_qty?: number;
+    deduction_unit?: string;
+    is_default: boolean;
+    is_active: boolean;
+    display_order?: number;
 }
 
 export interface ModifierGroupPayload {
     item_id: string;
     name: string;
-    display_name: string;
     min_selections: number;
     max_selections: number;
     is_required: boolean;
-    options: Omit<ModifierOption, 'id'>[];
+    /** Full option set — replaces existing options on update. */
+    options: ModifierOptionPayload[];
 }
 
 export interface ModifierGroupListParams {

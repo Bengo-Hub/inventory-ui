@@ -1,7 +1,8 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { InfoHint } from '@/components/ui/info-hint';
+import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
@@ -9,15 +10,17 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 interface OptionRow {
     name: string;
-    display_name: string;
+    /** Deduction SKU of a linked inventory item (accompaniment / add-on). */
+    sku: string;
+    /** Display helper for the linked item's name — never sent to the API. */
+    linked_name: string;
     price_adjustment: string;
-    sort_order: string;
     is_default: boolean;
     is_active: boolean;
 }
 
-function emptyOption(sort_order: number): OptionRow {
-    return { name: '', display_name: '', price_adjustment: '0', sort_order: String(sort_order), is_default: false, is_active: true };
+function emptyOption(): OptionRow {
+    return { name: '', sku: '', linked_name: '', price_adjustment: '0', is_default: false, is_active: true };
 }
 
 interface Props {
@@ -33,23 +36,22 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
     const [itemName, setItemName] = useState(editing?.item_name ?? '');
     const [itemSku, setItemSku] = useState(editing?.item_sku ?? '');
     const [formName, setFormName] = useState(editing?.name ?? '');
-    const [formDisplayName, setFormDisplayName] = useState(editing?.display_name ?? '');
     const [formMinSelections, setFormMinSelections] = useState(String(editing?.min_selections ?? 0));
     const [formMaxSelections, setFormMaxSelections] = useState(String(editing?.max_selections ?? 1));
     const [formIsRequired, setFormIsRequired] = useState(editing?.is_required ?? false);
     const [options, setOptions] = useState<OptionRow[]>(
         editing?.options?.map((o) => ({
             name: o.name,
-            display_name: o.display_name,
+            sku: o.sku ?? '',
+            linked_name: '',
             price_adjustment: String(o.price_adjustment),
-            sort_order: String(o.sort_order),
             is_default: o.is_default,
             is_active: o.is_active,
         })) ?? []
     );
 
     function addOption() {
-        setOptions((prev) => [...prev, emptyOption(prev.length + 1)]);
+        setOptions((prev) => [...prev, emptyOption()]);
     }
 
     function removeOption(idx: number) {
@@ -64,6 +66,24 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
         });
     }
 
+    // Linking an existing item (e.g. the Ugali accompaniment) fills the option in one go:
+    // name, deduction SKU and price adjustment — 0 when the item is a free (non-billable)
+    // accompaniment, else its menu selling price. Everything stays editable afterwards.
+    function linkOptionItem(idx: number, item: ItemResult) {
+        setOptions((prev) => {
+            const updated = [...prev];
+            const o = updated[idx];
+            updated[idx] = {
+                ...o,
+                name: o.name.trim() || item.name,
+                sku: item.sku,
+                linked_name: item.name,
+                price_adjustment: String(item.non_billable ? 0 : (item.selling_price ?? 0)),
+            };
+            return updated;
+        });
+    }
+
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
         if (!formName.trim() || !itemId) return;
@@ -71,7 +91,6 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
         const payload: ModifierGroupPayload = {
             item_id: itemId,
             name: formName.trim(),
-            display_name: formDisplayName.trim() || formName.trim(),
             min_selections: Number(formMinSelections) || 0,
             max_selections: Number(formMaxSelections) || 1,
             is_required: formIsRequired,
@@ -79,11 +98,11 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                 .filter((o) => o.name.trim())
                 .map((o, idx) => ({
                     name: o.name.trim(),
-                    display_name: o.display_name.trim() || o.name.trim(),
+                    sku: o.sku.trim() || undefined,
                     price_adjustment: parseDecimal(o.price_adjustment),
-                    sort_order: Number(o.sort_order) || idx + 1,
                     is_default: o.is_default,
                     is_active: o.is_active,
+                    display_order: idx + 1,
                 })),
         };
 
@@ -93,7 +112,7 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative z-50 w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -142,24 +161,15 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                                     )}
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Internal Name *</label>
-                                        <Input
-                                            placeholder="e.g. pizza_size"
-                                            value={formName}
-                                            onChange={(e) => setFormName(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Display Name</label>
-                                        <Input
-                                            placeholder="e.g. Choose Your Size"
-                                            value={formDisplayName}
-                                            onChange={(e) => setFormDisplayName(e.target.value)}
-                                        />
-                                    </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Group Name *</label>
+                                    <Input
+                                        placeholder="e.g. Choose your accompaniment"
+                                        value={formName}
+                                        onChange={(e) => setFormName(e.target.value)}
+                                        required
+                                    />
+                                    <p className="text-xs text-muted-foreground">The question shown at the till.</p>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
@@ -179,7 +189,15 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
 
                             <div className="border-t border-border pt-4">
                                 <div className="flex items-center justify-between mb-3">
-                                    <p className="text-sm font-medium">Options</p>
+                                    <p className="text-sm font-medium inline-flex items-center gap-1">Options
+                                        <InfoHint title="Modifier options">
+                                            Each option can link an existing inventory item (e.g. the Ugali accompaniment) —
+                                            the name, deduction SKU and price adjustment prefill automatically: KES&nbsp;0 for
+                                            free (non-billable) accompaniments, else the item&apos;s menu price. Selling the
+                                            option deducts the linked item&apos;s stock (a linked recipe deducts its own
+                                            ingredients). Options without a linked item are price-only choices.
+                                        </InfoHint>
+                                    </p>
                                     <Button type="button" variant="ghost" size="sm" onClick={addOption}>
                                         <Plus className="h-3 w-3 mr-1" />
                                         Add Option
@@ -190,37 +208,43 @@ export function ModifierGroupDialog({ orgSlug, editing, isPending, onSubmit, onC
                                 )}
                                 <div className="space-y-2">
                                     {options.map((opt, idx) => (
-                                        <div key={idx} className="grid grid-cols-[1fr_1fr_80px_auto] gap-2 items-end p-2 rounded-lg border border-border/50">
+                                        <div key={idx} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_96px_auto] gap-2 items-start p-2 rounded-lg border border-border/50">
+                                            <div className="space-y-1">
+                                                <label className="text-xs text-muted-foreground">Link item (optional)</label>
+                                                <ItemSearchInput
+                                                    orgSlug={orgSlug}
+                                                    value={opt.linked_name || opt.sku}
+                                                    placeholder="Search item…"
+                                                    fixedDropdown
+                                                    allowCreate={false}
+                                                    enableScan={false}
+                                                    onSelect={(item) => linkOptionItem(idx, item)}
+                                                />
+                                                {opt.sku && (
+                                                    <p className="text-[10px] text-muted-foreground">Deducts <span className="font-mono">{opt.sku}</span></p>
+                                                )}
+                                            </div>
                                             <div className="space-y-1">
                                                 <label className="text-xs text-muted-foreground">Name *</label>
                                                 <Input
-                                                    placeholder="e.g. Large"
+                                                    placeholder="e.g. Ugali White"
                                                     value={opt.name}
                                                     onChange={(e) => updateOption(idx, 'name', e.target.value)}
-                                                    className="h-8 text-xs"
+                                                    className="h-9 text-sm"
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground">Display Name</label>
-                                                <Input
-                                                    placeholder="e.g. Large (30cm)"
-                                                    value={opt.display_name}
-                                                    onChange={(e) => updateOption(idx, 'display_name', e.target.value)}
-                                                    className="h-8 text-xs"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-xs text-muted-foreground">Price Adj. (KES)</label>
+                                                <label className="text-xs text-muted-foreground">Price Adj.</label>
                                                 <Input
                                                     type="number"
                                                     step={DECIMAL_STEP}
                                                     placeholder="0"
                                                     value={opt.price_adjustment}
                                                     onChange={(e) => updateOption(idx, 'price_adjustment', e.target.value)}
-                                                    className="h-8 text-xs"
+                                                    className="h-9 text-sm"
                                                 />
                                             </div>
-                                            <div className="flex items-center gap-2 pb-0.5">
+                                            <div className="flex items-center gap-2 pt-6">
                                                 <label className="flex items-center gap-1 cursor-pointer">
                                                     <input type="checkbox" checked={opt.is_default} onChange={(e) => updateOption(idx, 'is_default', e.target.checked)} className="rounded" />
                                                     <span className="text-xs text-muted-foreground">Default</span>

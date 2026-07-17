@@ -6,6 +6,7 @@ import { CategoryCombobox } from '@/components/inventory/CategoryCombobox';
 import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { FoodCostBudgetBar } from '@/components/inventory/FoodCostBudgetBar';
 import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingredientLineForSubmit, recipeLineCost, type IngredientRowValue } from '@/components/inventory/RecipeIngredientRow';
+import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
 import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import { apiClient } from '@/lib/api/client';
 import { itemsApi, type Item, type MenuItemCompositeRequest } from '@/lib/api/items';
@@ -49,10 +50,15 @@ interface Step1Data {
   sellingPrice: string;
   servings:     string;
   targetMargin: string;
+  /** Reusable menu component: other recipes may consume this item (sub-recipe). */
+  usableInRecipes: boolean;
+  /** Content of one portion (e.g. 300 ml pot of tea) — lets other recipes use ml/g lines. */
+  contentQty:  string;
+  contentUom:  string;
 }
 
 function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; onChange: (d: Step1Data) => void }) {
-  function set(key: keyof Step1Data, val: string) {
+  function set(key: keyof Step1Data, val: string | boolean) {
     onChange({ ...data, [key]: val });
   }
 
@@ -130,6 +136,60 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
           value={data.description}
           onChange={(e) => set('description', e.target.value)}
         />
+      </div>
+
+      {/* Reusable menu component — other recipes may pour/measure this item as an
+          ingredient (Black Tea 30 ml inside an Iced Passion Tea). */}
+      <div className="space-y-3 rounded-lg border border-border p-3">
+        <label className="flex items-start gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={data.usableInRecipes}
+            onChange={(e) => set('usableInRecipes', e.target.checked)}
+            className="rounded mt-0.5"
+          />
+          <span>
+            Usable as an ingredient in other recipes
+            <br />
+            <span className="text-xs text-muted-foreground font-normal">
+              Makes this item pickable in the recipe builder (e.g. Black Tea poured into an Iced Passion Tea).
+            </span>
+          </span>
+        </label>
+        {data.usableInRecipes && (
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium inline-flex items-center gap-1">Content per portion
+              <InfoHint title="Content per portion">
+                How much ONE portion contains — e.g. a pot of tea holds 300&nbsp;ml. Other recipes can then
+                use ml/g lines (30&nbsp;ml = 0.1 portion) and costing/stock deduction stay exact. Leave blank
+                if other recipes will reference whole portions.
+              </InfoHint>
+            </label>
+            <div className="flex items-center gap-2">
+              <Input
+                type="number"
+                min={0}
+                step="any"
+                placeholder="e.g. 300"
+                value={data.contentQty}
+                onChange={(e) => set('contentQty', e.target.value)}
+                className="max-w-35"
+              />
+              <select
+                value={data.contentUom}
+                onChange={(e) => set('contentUom', e.target.value)}
+                className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                disabled={data.contentQty === ''}
+              >
+                <option value="ml">ml</option>
+                <option value="l">L</option>
+                <option value="g">g</option>
+                <option value="kg">kg</option>
+              </select>
+              <span className="text-xs text-muted-foreground">per portion</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -227,10 +287,10 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
 
 // ── Step 3 (Modifiers — optional) ─────────────────────────────────────────────
 
-interface ModOption { name: string; price_adjustment: number; stock_sku: string; }
+interface ModOption { name: string; price_adjustment: number; stock_sku: string; linked_name?: string; }
 interface ModGroup  { group_name: string; is_required: boolean; max_selections: number; options: ModOption[]; }
 
-function Step3({ modifiers, setModifiers }: { modifiers: ModGroup[]; setModifiers: (m: ModGroup[]) => void }) {
+function Step3({ orgSlug, modifiers, setModifiers }: { orgSlug: string; modifiers: ModGroup[]; setModifiers: (m: ModGroup[]) => void }) {
   function addGroup() {
     setModifiers([...modifiers, { group_name: '', is_required: false, max_selections: 5, options: [] }]);
   }
@@ -248,6 +308,22 @@ function Step3({ modifiers, setModifiers }: { modifiers: ModGroup[]; setModifier
   function setOptionField(gi: number, oi: number, key: keyof ModOption, val: string | number) {
     setModifiers(modifiers.map((g, i) =>
       i === gi ? { ...g, options: g.options.map((o, j) => j === oi ? { ...o, [key]: val } : o) } : g
+    ));
+  }
+  // Linking an existing item (an accompaniment like Ugali, or a goods add-on) fills the
+  // option in one go: name, the deduction SKU, and the price adjustment — 0 when the item
+  // is a free (non-billable) accompaniment, else its menu selling price.
+  function linkOptionItem(gi: number, oi: number, item: ItemResult) {
+    const prefillPrice = item.non_billable ? 0 : (item.selling_price ?? 0);
+    setModifiers(modifiers.map((g, i) =>
+      i === gi
+        ? {
+            ...g,
+            options: g.options.map((o, j) => j === oi
+              ? { ...o, name: o.name.trim() || item.name, stock_sku: item.sku, linked_name: item.name, price_adjustment: prefillPrice }
+              : o),
+          }
+        : g
     ));
   }
 
@@ -286,20 +362,33 @@ function Step3({ modifiers, setModifiers }: { modifiers: ModGroup[]; setModifier
             <button type="button" onClick={() => removeGroup(gi)} className="text-muted-foreground hover:text-destructive text-xs">Remove</button>
           </div>
 
-          <div className="hidden sm:grid grid-cols-[1fr_120px_140px] gap-2 text-xs font-medium text-muted-foreground">
+          <div className="hidden sm:grid grid-cols-[1fr_1fr_120px] gap-2 text-xs font-medium text-muted-foreground">
+            <span className="inline-flex items-center gap-1">Link menu/stock item
+              <InfoHint title="Link an existing item (optional)">Pick an existing menu item (e.g. the Ugali accompaniment) or goods item — the option name, deduction SKU and price adjustment are filled automatically: KES&nbsp;0 for free (non-billable) accompaniments, else the item&apos;s menu price. Selling the option deducts the linked item&apos;s stock (recipes deduct their ingredients). Leave blank for a price-only choice.</InfoHint>
+            </span>
             <span>Option name</span>
             <span className="inline-flex items-center gap-1">Price adj.
-              <InfoHint title="Price adjustment">Amount added to (or, if negative, subtracted from) the selling price when this option is chosen. Use 0 for a free choice.</InfoHint>
-            </span>
-            <span className="inline-flex items-center gap-1">Stock SKU
-              <InfoHint title="Link to an ingredient (optional)">Enter an inventory item&apos;s SKU to auto-deduct its stock whenever this option is sold — e.g. &ldquo;Add Bacon&rdquo; → the bacon SKU. Leave blank if nothing should be deducted.</InfoHint>
+              <InfoHint title="Price adjustment">Amount added to (or, if negative, subtracted from) the selling price when this option is chosen. Prefilled from the linked item (0 for free accompaniments) — edit to override.</InfoHint>
             </span>
           </div>
           {g.options.map((opt, oi) => (
-            <div key={oi} className="grid grid-cols-1 sm:grid-cols-[1fr_120px_140px] gap-2">
+            <div key={oi} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_120px] gap-2 items-start">
+              <div>
+                <ItemSearchInput
+                  orgSlug={orgSlug}
+                  value={opt.linked_name || opt.stock_sku}
+                  placeholder="Search item to link…"
+                  fixedDropdown
+                  allowCreate={false}
+                  enableScan={false}
+                  onSelect={(item) => linkOptionItem(gi, oi, item)}
+                />
+                {opt.stock_sku && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Deducts <span className="font-mono">{opt.stock_sku}</span> per selection</p>
+                )}
+              </div>
               <Input placeholder="Option name" value={opt.name} onChange={(e) => setOptionField(gi, oi, 'name', e.target.value)} />
               <Input type="number" step={DECIMAL_STEP} placeholder="Adj (KES)" value={opt.price_adjustment || ''} onChange={(e) => setOptionField(gi, oi, 'price_adjustment', parseDecimal(e.target.value))} />
-              <Input placeholder="Stock SKU" value={opt.stock_sku} onChange={(e) => setOptionField(gi, oi, 'stock_sku', e.target.value)} />
             </div>
           ))}
           <button type="button" onClick={() => addOption(gi)} className="text-xs text-primary hover:underline flex items-center gap-1">
@@ -327,6 +416,7 @@ export default function NewMenuItemPage() {
   const [step1, setStep1] = useState<Step1Data>({
     name: '', sku: '', categoryName: '', description: '',
     sellingPrice: '', servings: '1', targetMargin: '',
+    usableInRecipes: false, contentQty: '', contentUom: 'ml',
   });
   const [ingredients, setIngredients] = useState<IngredientRowValue[]>([]);
   const [modifiers, setModifiers] = useState<ModGroup[]>([]);
@@ -382,8 +472,15 @@ export default function NewMenuItemPage() {
     }
     const cleanModifiers = modifiers
       .filter((g) => g.group_name.trim() !== '')
-      .map((g) => ({ ...g, options: g.options.filter((o) => o.name.trim() !== '') }));
+      .map((g) => ({
+        ...g,
+        // linked_name is a display-only helper — never sent to the API.
+        options: g.options
+          .filter((o) => o.name.trim() !== '')
+          .map(({ linked_name: _linked, ...o }) => o),
+      }));
 
+    const contentQtyNum = step1.contentQty !== '' ? parseFloat(step1.contentQty) || 0 : 0;
     compositeMenu.mutate({
       name:          step1.name.trim(),
       sku:           step1.sku.trim() || undefined,
@@ -391,6 +488,9 @@ export default function NewMenuItemPage() {
       description:   step1.description.trim() || undefined,
       selling_price: sellingPrice,
       servings,
+      usable_in_recipes: step1.usableInRecipes,
+      unit_content_qty:  step1.usableInRecipes && contentQtyNum > 0 ? contentQtyNum : undefined,
+      unit_content_uom:  step1.usableInRecipes && contentQtyNum > 0 ? step1.contentUom : undefined,
       target_margin_percent: step1.targetMargin ? parseDecimal(step1.targetMargin) : undefined,
       // Convert each line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it stores
       // and costs correctly against the ingredient's per-base-unit cost.
@@ -436,7 +536,7 @@ export default function NewMenuItemPage() {
               servings={servings}
             />
           )}
-          {step === 2 && <Step3 modifiers={modifiers} setModifiers={setModifiers} />}
+          {step === 2 && <Step3 orgSlug={orgSlug} modifiers={modifiers} setModifiers={setModifiers} />}
 
           <div className="flex items-center justify-between pt-2">
             <Button variant="outline" onClick={() => step > 0 ? setStep(step - 1) : router.back()}>

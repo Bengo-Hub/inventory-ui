@@ -13,6 +13,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BoxIcon,
+  ClipboardCheck,
   Clock,
   FileText,
   Package,
@@ -107,6 +108,7 @@ export default function DashboardPage() {
   ];
 
   const quickActions = [
+    { label: 'Stock Take', icon: ClipboardCheck, href: `/${orgSlug}/stock-take` },
     { label: 'Adjust Stock', icon: Plus, href: `/${orgSlug}/adjustments` },
     { label: 'Purchase Order', icon: FileText, href: `/${orgSlug}/purchase-orders` },
     { label: 'Transfer', icon: Warehouse, href: `/${orgSlug}/transfers` },

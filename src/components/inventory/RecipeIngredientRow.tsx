@@ -221,9 +221,10 @@ export function RecipeIngredientRow({ orgSlug, row, index, onChange, onRemove, u
           orgSlug={orgSlug}
           value={row.ingredient_name}
           placeholder="Search ingredient…"
-          // A recipe's ingredients are raw stock (goods/ingredients), never other menu
-          // items — same reasoning as the purchase-order line picker.
-          type="GOODS,INGREDIENT"
+          // Raw stock (goods/ingredients) plus RECIPE items flagged "usable in recipes"
+          // — reusable menu components like a Black Tea poured into an Iced Passion Tea.
+          // The API auto-links those as sub-recipes so deduction backflushes their BOM.
+          forRecipe
           fixedDropdown
           onSelect={(item) => {
             // The ingredient's own base/stock unit — cost is expressed per this unit and the

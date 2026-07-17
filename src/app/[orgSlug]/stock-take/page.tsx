@@ -2,27 +2,26 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import {
-    useApproveStockCount,
-    useCancelStockCount,
     useCreateStockCount,
-    useStockCount,
+    useCreateStockCountTemplate,
+    useDeleteStockCountTemplate,
     useStockCounts,
-    useSubmitStockCount,
-    useUpsertCountLine,
+    useStockCountTemplates,
+    useUpdateStockCountTemplate,
 } from '@/hooks/useStockCounts';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import type { StockCount, StockCountLine, StockCountStatus } from '@/lib/api/stock-counts';
+import { apiClient } from '@/lib/api/client';
+import type { StockCount, StockCountStatus, StockCountTemplate } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
-import { CheckCircle2, ClipboardCheck, ClipboardList, Plus, Send, X } from 'lucide-react';
-import { useParams } from 'next/navigation';
+import { ClipboardCheck, ClipboardList, LayoutTemplate, Play, Plus, Trash2, X } from 'lucide-react';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 const STATUS_VARIANT: Record<StockCountStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
@@ -41,24 +40,36 @@ const STATUS_LABEL: Record<StockCountStatus, string> = {
     cancelled: 'Cancelled',
 };
 
+interface Category { id: string; name: string }
+
 // ── Create dialog ───────────────────────────────────────────────────────────────
 
-function CreateCountDialog({ orgSlug, onClose, onCreated }: {
+function CreateCountDialog({ orgSlug, templates, onClose, onCreated }: {
     orgSlug: string;
+    templates: StockCountTemplate[];
     onClose: () => void;
     onCreated: (id: string) => void;
 }) {
     const { data: warehouses } = useWarehouses(orgSlug);
     const create = useCreateStockCount(orgSlug);
+    const [templateId, setTemplateId] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
     const [reference, setReference] = useState('');
     const [snapshot, setSnapshot] = useState(true);
 
+    const tpl = templates.find((t) => t.id === templateId);
+
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        if (!warehouseId) { toast.error('Pick a warehouse to count'); return; }
+        const whEff = warehouseId || tpl?.warehouse_id || '';
+        if (!whEff) { toast.error('Pick a warehouse to count'); return; }
         create.mutate(
-            { warehouse_id: warehouseId, reference: reference.trim() || undefined, snapshot },
+            {
+                warehouse_id: whEff,
+                reference: reference.trim() || undefined,
+                snapshot: templateId ? false : snapshot,
+                template_id: templateId || undefined,
+            },
             {
                 onSuccess: (c) => { toast.success('Stock take started'); onCreated(c.id); },
                 onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to start stock take')),
@@ -79,14 +90,33 @@ function CreateCountDialog({ orgSlug, onClose, onCreated }: {
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-4">
+                            {templates.length > 0 && (
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Count sheet <span className="text-muted-foreground font-normal">(optional)</span></label>
+                                    <select
+                                        value={templateId}
+                                        onChange={(e) => setTemplateId(e.target.value)}
+                                        className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                    >
+                                        <option value="">Full count (all stocked items)</option>
+                                        {templates.filter((t) => t.is_active).map((t) => (
+                                            <option key={t.id} value={t.id}>{t.name}</option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-muted-foreground">
+                                        A sheet pre-loads only its department&apos;s items (e.g. the kitchen daily sheet) at their
+                                        current expected stock.
+                                    </p>
+                                </div>
+                            )}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Warehouse / Outlet *</label>
+                                <label className="text-sm font-medium">Warehouse / Outlet {tpl?.warehouse_id ? <span className="text-muted-foreground font-normal">(from sheet)</span> : '*'}</label>
                                 <select
                                     value={warehouseId}
                                     onChange={(e) => setWarehouseId(e.target.value)}
                                     className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                                 >
-                                    <option value="">Select location…</option>
+                                    <option value="">{tpl?.warehouse_id ? 'Use the sheet’s location' : 'Select location…'}</option>
                                     {(warehouses ?? []).map((w) => (
                                         <option key={w.id} value={w.id}>{w.name}</option>
                                     ))}
@@ -94,19 +124,21 @@ function CreateCountDialog({ orgSlug, onClose, onCreated }: {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Reference <span className="text-muted-foreground font-normal">(optional)</span></label>
-                                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. July month-end count" />
+                                <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={tpl ? `${tpl.name} · today` : 'e.g. July month-end count'} />
                             </div>
-                            <label className="flex items-start gap-2 text-sm">
-                                <input type="checkbox" checked={snapshot} onChange={(e) => setSnapshot(e.target.checked)} className="mt-0.5" />
-                                <span>
-                                    Pre-load every item at its current system quantity
-                                    <InfoHint title="Snapshot">
-                                        Fills the count sheet with each item and the quantity the system thinks you have right now.
-                                        Your team then types what they physically counted; the difference becomes the variance. Turn
-                                        off to start from a blank sheet and add items as you go.
-                                    </InfoHint>
-                                </span>
-                            </label>
+                            {!templateId && (
+                                <label className="flex items-start gap-2 text-sm">
+                                    <input type="checkbox" checked={snapshot} onChange={(e) => setSnapshot(e.target.checked)} className="mt-0.5" />
+                                    <span>
+                                        Pre-load every item at its current system quantity
+                                        <InfoHint title="Snapshot">
+                                            Fills the count sheet with each item and the quantity the system thinks you have right now.
+                                            Your team then types what they physically counted; the difference becomes the variance. Turn
+                                            off to start from a blank sheet and add items as you go.
+                                        </InfoHint>
+                                    </span>
+                                </label>
+                            )}
                             <div className="flex gap-3 pt-1">
                                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
                                 <Button type="submit" className="flex-1" disabled={create.isPending}>
@@ -121,196 +153,175 @@ function CreateCountDialog({ orgSlug, onClose, onCreated }: {
     );
 }
 
-// ── Line row (editable counted qty) ─────────────────────────────────────────────
+// ── Count-sheet (template) editor dialog ────────────────────────────────────────
 
-function CountLineRow({ orgSlug, countId, line, editable }: {
+function TemplateDialog({ orgSlug, editing, onClose }: {
     orgSlug: string;
-    countId: string;
-    line: StockCountLine;
-    editable: boolean;
-}) {
-    const upsert = useUpsertCountLine(orgSlug, countId);
-    const [value, setValue] = useState(line.counted_qty != null ? String(line.counted_qty) : '');
-
-    const variance = value === '' ? null : parseFloat(value) - line.system_qty;
-
-    function save() {
-        if (value === '' || parseFloat(value) === line.counted_qty) return;
-        upsert.mutate(
-            { item_id: line.item_id, sku: line.sku, counted_qty: parseDecimal(value) },
-            { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save line')) },
-        );
-    }
-
-    return (
-        <tr className="border-b border-border last:border-0">
-            <td className="px-3 py-2 font-mono text-xs">{line.sku}</td>
-            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{line.system_qty}</td>
-            <td className="px-3 py-2 text-right">
-                {editable ? (
-                    <Input
-                        type="number"
-                        step={DECIMAL_STEP}
-                        value={value}
-                        onChange={(e) => setValue(e.target.value)}
-                        onBlur={save}
-                        className="h-8 w-24 text-right text-sm ml-auto"
-                        placeholder="—"
-                    />
-                ) : (
-                    <span className="tabular-nums">{line.counted_qty ?? '—'}</span>
-                )}
-            </td>
-            <td className="px-3 py-2 text-right tabular-nums">
-                {(variance ?? line.variance) == null ? (
-                    <span className="text-muted-foreground">—</span>
-                ) : (
-                    <span className={(variance ?? line.variance)! === 0 ? 'text-muted-foreground' : (variance ?? line.variance)! > 0 ? 'text-emerald-600' : 'text-destructive'}>
-                        {(variance ?? line.variance)! > 0 ? '+' : ''}{(variance ?? line.variance)}
-                    </span>
-                )}
-            </td>
-            <td className="px-3 py-2 text-right">
-                {line.posted && <Badge variant="success">Posted</Badge>}
-            </td>
-        </tr>
-    );
-}
-
-// ── Detail sheet ────────────────────────────────────────────────────────────────
-
-function CountDetailSheet({ orgSlug, countId, onClose, canChange, canApprove }: {
-    orgSlug: string;
-    countId: string;
+    editing: StockCountTemplate | null;
     onClose: () => void;
-    canChange: boolean;
-    canApprove: boolean;
 }) {
-    const { data: count, isLoading } = useStockCount(orgSlug, countId);
-    const submit = useSubmitStockCount(orgSlug);
-    const approve = useApproveStockCount(orgSlug);
-    const cancel = useCancelStockCount(orgSlug);
-    const addLine = useUpsertCountLine(orgSlug, countId);
+    const { data: warehouses } = useWarehouses(orgSlug);
+    const createTpl = useCreateStockCountTemplate(orgSlug);
+    const updateTpl = useUpdateStockCountTemplate(orgSlug);
 
-    const status = count?.status;
-    const editable = canChange && status === 'counting';
+    const [name, setName] = useState(editing?.name ?? '');
+    const [description, setDescription] = useState(editing?.description ?? '');
+    const [warehouseId, setWarehouseId] = useState(editing?.warehouse_id ?? '');
+    const [categoryIds, setCategoryIds] = useState<string[]>(editing?.category_ids ?? []);
+    const [items, setItems] = useState<{ id: string; name: string; sku: string }[]>([]);
+    const [itemIdsFromEdit] = useState<string[]>(editing?.item_ids ?? []);
 
-    function addItem(sku: string, itemId: string, systemQty: number) {
-        addLine.mutate(
-            { item_id: itemId, sku, system_qty: systemQty, counted_qty: 0 },
-            { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to add item')) },
-        );
+    const { data: categories } = useQuery<Category[]>({
+        queryKey: ['categories', orgSlug],
+        queryFn: async () => {
+            const res = await apiClient.get<{ data: Category[] } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`);
+            return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
+        },
+        placeholderData: [],
+    });
+
+    // Resolve names for pre-existing explicit items when editing (best effort — the
+    // sheet still works even if a name lookup fails; ids are what the API stores).
+    useQuery({
+        queryKey: ['tpl-item-names', orgSlug, itemIdsFromEdit],
+        queryFn: async () => {
+            const resolved: { id: string; name: string; sku: string }[] = [];
+            for (const id of itemIdsFromEdit) {
+                try {
+                    const res = await apiClient.get<{ data: { id: string; name: string; sku: string }[] }>(
+                        `/api/v1/${orgSlug}/inventory/items`, { id },
+                    );
+                    const it = (res.data ?? [])[0];
+                    if (it) resolved.push({ id: it.id, name: it.name, sku: it.sku });
+                } catch { /* keep going */ }
+            }
+            setItems((prev) => {
+                const have = new Set(prev.map((p) => p.id));
+                return [...prev, ...resolved.filter((r) => !have.has(r.id))];
+            });
+            return resolved;
+        },
+        enabled: itemIdsFromEdit.length > 0,
+        staleTime: Infinity,
+    });
+
+    function toggleCategory(id: string) {
+        setCategoryIds((prev) => prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]);
+    }
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!name.trim()) { toast.error('Name the count sheet'); return; }
+        const itemIds = items.map((i) => i.id);
+        if (itemIds.length === 0 && categoryIds.length === 0) {
+            toast.error('Pick at least one item or category for the sheet');
+            return;
+        }
+        const payload = {
+            name: name.trim(),
+            description: description.trim() || undefined,
+            warehouse_id: warehouseId || null,
+            item_ids: itemIds,
+            category_ids: categoryIds,
+        };
+        const opts = {
+            onSuccess: () => { toast.success(editing ? 'Count sheet updated' : 'Count sheet created'); onClose(); },
+            onError: async (err: Error) => toast.error(await apiErrorMessage(err, 'Failed to save count sheet')),
+        };
+        if (editing) updateTpl.mutate({ id: editing.id, data: payload }, opts);
+        else createTpl.mutate(payload, opts);
     }
 
     return (
-        <Sheet open onClose={onClose} width="lg">
-            <SheetHeader>
-                <SheetTitle>Stock Take {count?.reference ? `· ${count.reference}` : ''}</SheetTitle>
-            </SheetHeader>
-            <SheetContent>
-                {isLoading || !count ? (
-                    <p className="text-sm text-muted-foreground py-8 text-center">Loading count…</p>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="flex flex-wrap items-center gap-3">
-                            <Badge variant={STATUS_VARIANT[count.status]}>{STATUS_LABEL[count.status]}</Badge>
-                            <span className="text-xs text-muted-foreground">Started {new Date(count.created_at).toLocaleDateString()}</span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative z-50 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold">{editing ? 'Edit Count Sheet' : 'New Count Sheet'}</h2>
+                            <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent"><X className="h-5 w-5 text-muted-foreground" /></button>
                         </div>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submit} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Sheet name *</label>
+                                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kitchen Daily Stock Sheet" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+                                <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Filled by chefs at shift open/close" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Default location <span className="text-muted-foreground font-normal">(optional)</span></label>
+                                <select
+                                    value={warehouseId ?? ''}
+                                    onChange={(e) => setWarehouseId(e.target.value)}
+                                    className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                >
+                                    <option value="">Chosen when starting the count</option>
+                                    {(warehouses ?? []).map((w) => (
+                                        <option key={w.id} value={w.id}>{w.name}</option>
+                                    ))}
+                                </select>
+                            </div>
 
-                        <div className="rounded-lg border border-border bg-accent/20 p-3 text-xs text-muted-foreground">
-                            <strong className="text-foreground">How a stock take works: </strong>
-                            enter the physically counted quantity for each item while status is <em>Counting</em>, then
-                            <em> Submit for review</em>. A supervisor <em>Approves</em>, which posts the variance for every
-                            line as a stock adjustment (reason <em>count variance</em>) so your on-hand matches reality.
-                        </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Whole categories</label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {(categories ?? []).map((c) => (
+                                        <button
+                                            key={c.id}
+                                            type="button"
+                                            onClick={() => toggleCategory(c.id)}
+                                            className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${categoryIds.includes(c.id)
+                                                ? 'bg-primary text-primary-foreground border-primary'
+                                                : 'border-border text-muted-foreground hover:bg-accent'}`}
+                                        >
+                                            {c.name}
+                                        </button>
+                                    ))}
+                                </div>
+                                <p className="text-xs text-muted-foreground">Every active item in a selected category joins the sheet automatically.</p>
+                            </div>
 
-                        {editable && (
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-medium text-muted-foreground">Add an item to this count</label>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Specific items</label>
                                 <ItemSearchInput
                                     orgSlug={orgSlug}
                                     value=""
-                                    placeholder="Search item to add…"
-                                    onSelect={(item) => addItem(item.sku, item.id, item.available ?? 0)}
+                                    placeholder="Add an item to the sheet…"
+                                    enableScan={false}
+                                    allowCreate={false}
+                                    fixedDropdown
+                                    onSelect={(item) => setItems((prev) => prev.some((p) => p.id === item.id) ? prev : [...prev, { id: item.id, name: item.name, sku: item.sku }])}
                                 />
+                                {items.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {items.map((it) => (
+                                            <span key={it.id} className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-accent text-xs">
+                                                {it.name}
+                                                <button type="button" onClick={() => setItems((prev) => prev.filter((p) => p.id !== it.id))} className="text-muted-foreground hover:text-destructive">
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
-                        )}
 
-                        <div className="overflow-x-auto rounded-lg border border-border">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30 text-xs text-muted-foreground">
-                                        <th className="px-3 py-2 text-left font-medium">SKU</th>
-                                        <th className="px-3 py-2 text-right font-medium">
-                                            <span className="inline-flex items-center gap-1">System
-                                                <InfoHint title="System quantity">What the system currently believes is on hand — the snapshot to count against.</InfoHint>
-                                            </span>
-                                        </th>
-                                        <th className="px-3 py-2 text-right font-medium">Counted</th>
-                                        <th className="px-3 py-2 text-right font-medium">
-                                            <span className="inline-flex items-center gap-1">Variance
-                                                <InfoHint title="Variance">Counted − System. Positive = surplus found, negative = shortage. Posted as an adjustment on approval.</InfoHint>
-                                            </span>
-                                        </th>
-                                        <th className="px-3 py-2" />
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {count.lines.length === 0 ? (
-                                        <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">No items yet. {editable ? 'Add items above.' : ''}</td></tr>
-                                    ) : (
-                                        count.lines.map((ln) => (
-                                            <CountLineRow key={ln.id} orgSlug={orgSlug} countId={countId} line={ln} editable={editable} />
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2 pt-2">
-                            {canChange && status === 'counting' && (
-                                <Button
-                                    onClick={() => submit.mutate(countId, {
-                                        onSuccess: () => toast.success('Submitted for review'),
-                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to submit')),
-                                    })}
-                                    disabled={submit.isPending}
-                                >
-                                    <Send className="h-4 w-4 mr-1.5" /> Submit for review
+                            <div className="flex gap-3 pt-1">
+                                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+                                <Button type="submit" className="flex-1" disabled={createTpl.isPending || updateTpl.isPending}>
+                                    {createTpl.isPending || updateTpl.isPending ? 'Saving…' : editing ? 'Update Sheet' : 'Create Sheet'}
                                 </Button>
-                            )}
-                            {canApprove && (status === 'review' || status === 'counting') && (
-                                <Button
-                                    onClick={() => approve.mutate(countId, {
-                                        onSuccess: (res) => {
-                                            if (res.status === 'partial') toast.warning(res.message ?? 'Some lines could not post');
-                                            else toast.success(`Approved · ${res.posted_lines ?? 0} variance line(s) posted`);
-                                        },
-                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to approve')),
-                                    })}
-                                    disabled={approve.isPending}
-                                >
-                                    <CheckCircle2 className="h-4 w-4 mr-1.5" /> Approve &amp; post variances
-                                </Button>
-                            )}
-                            {canChange && (status === 'counting' || status === 'review') && (
-                                <Button
-                                    variant="outline"
-                                    className="text-destructive"
-                                    onClick={() => cancel.mutate(countId, {
-                                        onSuccess: () => { toast.success('Count cancelled'); onClose(); },
-                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to cancel')),
-                                    })}
-                                    disabled={cancel.isPending}
-                                >
-                                    Cancel count
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                )}
-            </SheetContent>
-        </Sheet>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 }
 
@@ -318,23 +329,40 @@ function CountDetailSheet({ orgSlug, countId, onClose, canChange, canApprove }: 
 
 export default function StockTakePage() {
     const params = useParams();
+    const router = useRouter();
     const orgSlug = params?.orgSlug as string;
     const { data: counts, isLoading } = useStockCounts(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
+    const { data: templates } = useStockCountTemplates(orgSlug);
+    const create = useCreateStockCount(orgSlug);
+    const deleteTpl = useDeleteStockCountTemplate(orgSlug);
     const { canAny } = usePermissions();
 
     const canAdd = canAny([P.STOCK_COUNT_ADD, P.STOCK_MANAGE]);
     const canChange = canAny([P.STOCK_COUNT_CHANGE, P.STOCK_MANAGE]);
-    const canApprove = canAny([P.STOCK_COUNT_APPROVE, P.STOCK_MANAGE]);
 
     const [createOpen, setCreateOpen] = useState(false);
     useCreateFromQuery(() => setCreateOpen(true)); // mobile quick-add → open New Stock Take
-    const [openId, setOpenId] = useState<string | null>(null);
+    const [tplDialog, setTplDialog] = useState<{ open: boolean; editing: StockCountTemplate | null }>({ open: false, editing: null });
 
     const whName = useMemo(() => {
         const map = new Map((warehouses ?? []).map((w) => [w.id, w.name]));
-        return (id: string) => map.get(id) ?? '—';
+        return (id?: string | null) => (id ? map.get(id) ?? '—' : '—');
     }, [warehouses]);
+
+    function openCount(id: string) {
+        router.push(`/${orgSlug}/stock-take/${id}`);
+    }
+
+    function startFromSheet(tpl: StockCountTemplate) {
+        create.mutate(
+            { template_id: tpl.id, warehouse_id: tpl.warehouse_id ?? undefined },
+            {
+                onSuccess: (c) => { toast.success(`${tpl.name} started`); openCount(c.id); },
+                onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to start count — the sheet may need a location')),
+            },
+        );
+    }
 
     return (
         <SubscriptionGate feature="stock_tracking">
@@ -346,15 +374,86 @@ export default function StockTakePage() {
                             <InfoHint title="Stock take (physical count)" side="bottom">
                                 Count physical stock against the system, then post the differences in one approved batch —
                                 cleaner than editing items one by one. Use Adjustments for quick one-off corrections; use a
-                                Stock Take for periodic full or cycle counts.
+                                Stock Take for periodic full or cycle counts, or department shift sheets.
                             </InfoHint>
                         </h1>
-                        <p className="text-muted-foreground mt-1">Physical counts with variance posting and supervisor sign-off</p>
+                        <p className="text-muted-foreground mt-1">Physical counts with variance classification, review and supervisor sign-off</p>
                     </div>
                     {canAdd && (
                         <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" /> New Stock Take</Button>
                     )}
                 </div>
+
+                {/* Department count sheets */}
+                <Card>
+                    <CardHeader>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                                <h2 className="text-sm font-semibold flex items-center gap-1.5">
+                                    <LayoutTemplate className="h-4 w-4" /> Count Sheets
+                                    <InfoHint title="Department count sheets">
+                                        Reusable per-department sheets — e.g. the kitchen daily stock sheet chefs fill at shift
+                                        open/close, or the barista counter list. Starting a count from a sheet pre-loads exactly
+                                        its items with the system&apos;s expected stock; staff record the physical count and the
+                                        variance is classified (wastage, pilferage…) and approved.
+                                    </InfoHint>
+                                </h2>
+                                <p className="text-xs text-muted-foreground mt-0.5">One-tap shift counts for kitchen, bar, and other sections</p>
+                            </div>
+                            {canChange && (
+                                <Button variant="outline" size="sm" onClick={() => setTplDialog({ open: true, editing: null })}>
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> New Sheet
+                                </Button>
+                            )}
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {(templates ?? []).length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No count sheets yet — create one per department (kitchen, bar, stores) to make shift counts one tap.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {(templates ?? []).map((tpl) => (
+                                    <div key={tpl.id} className="rounded-lg border border-border p-3 flex flex-col gap-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="min-w-0">
+                                                <p className="font-medium text-sm truncate">{tpl.name}</p>
+                                                <p className="text-xs text-muted-foreground truncate">
+                                                    {tpl.warehouse_id ? whName(tpl.warehouse_id) : 'Location chosen at start'}
+                                                    {' · '}
+                                                    {(tpl.item_ids?.length ?? 0) > 0 ? `${tpl.item_ids?.length} item(s)` : ''}
+                                                    {(tpl.item_ids?.length ?? 0) > 0 && (tpl.category_ids?.length ?? 0) > 0 ? ' + ' : ''}
+                                                    {(tpl.category_ids?.length ?? 0) > 0 ? `${tpl.category_ids?.length} categor${(tpl.category_ids?.length ?? 0) === 1 ? 'y' : 'ies'}` : ''}
+                                                </p>
+                                            </div>
+                                            {canChange && (
+                                                <button
+                                                    onClick={() => deleteTpl.mutate(tpl.id, {
+                                                        onSuccess: () => toast.success('Count sheet deleted'),
+                                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete sheet')),
+                                                    })}
+                                                    className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive shrink-0"
+                                                    title="Delete sheet"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex gap-2 mt-auto">
+                                            {canAdd && (
+                                                <Button size="sm" className="flex-1" onClick={() => startFromSheet(tpl)} disabled={create.isPending}>
+                                                    <Play className="h-3.5 w-3.5 mr-1" /> Start count
+                                                </Button>
+                                            )}
+                                            {canChange && (
+                                                <Button size="sm" variant="outline" onClick={() => setTplDialog({ open: true, editing: tpl })}>Edit</Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card>
                     <CardContent className="p-0">
@@ -381,7 +480,7 @@ export default function StockTakePage() {
                                         </tr>
                                     ) : (
                                         (counts as StockCount[]).map((c) => (
-                                            <tr key={c.id} className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => setOpenId(c.id)}>
+                                            <tr key={c.id} className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => openCount(c.id)}>
                                                 <td className="px-6 py-4 font-medium">{c.reference || <span className="text-muted-foreground">Untitled count</span>}</td>
                                                 <td className="px-6 py-4">{whName(c.warehouse_id)}</td>
                                                 <td className="px-6 py-4"><Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
@@ -400,17 +499,16 @@ export default function StockTakePage() {
             {createOpen && (
                 <CreateCountDialog
                     orgSlug={orgSlug}
+                    templates={templates ?? []}
                     onClose={() => setCreateOpen(false)}
-                    onCreated={(id) => { setCreateOpen(false); setOpenId(id); }}
+                    onCreated={(id) => { setCreateOpen(false); openCount(id); }}
                 />
             )}
-            {openId && (
-                <CountDetailSheet
+            {tplDialog.open && (
+                <TemplateDialog
                     orgSlug={orgSlug}
-                    countId={openId}
-                    onClose={() => setOpenId(null)}
-                    canChange={canChange}
-                    canApprove={canApprove}
+                    editing={tplDialog.editing}
+                    onClose={() => setTplDialog({ open: false, editing: null })}
                 />
             )}
         </SubscriptionGate>

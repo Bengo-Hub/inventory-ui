@@ -159,6 +159,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Never charged at the POS even if a selling price exists (free accompaniments,
   // supplies like tissue/packaging); stock still deducts on sale.
   const [nonBillable, setNonBillable] = useState(item?.non_billable ?? false);
+  // Reusable menu component: this RECIPE may be picked as an ingredient in OTHER
+  // recipes (Black Tea inside an Iced Passion Tea). Needs a content-per-portion
+  // declaration for ml/g lines to cost + deduct fractions of a portion.
+  const [usableInRecipes, setUsableInRecipes] = useState(item?.usable_in_recipes ?? false);
   const [trackSerial, setTrackSerial] = useState(item?.track_serial_numbers ?? false);
   const [shelfLifeDays, setShelfLifeDays] = useState(item?.shelf_life_days != null ? String(item.shelf_life_days) : '');
   const [barcodeType, setBarcodeType] = useState(item?.barcode_type ?? '');
@@ -271,6 +275,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
       setNonBillable(item.non_billable ?? false);
+      setUsableInRecipes(item.usable_in_recipes ?? false);
       setTrackSerial(item.track_serial_numbers ?? false);
       setShelfLifeDays(item.shelf_life_days != null ? String(item.shelf_life_days) : '');
       setBarcodeType(item.barcode_type ?? '');
@@ -451,6 +456,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         category_name: categories?.find((c) => c.id === categoryId)?.name,
         selling_price: sellingPrice !== '' ? parseDecimal(sellingPrice) : 0,
         non_billable: nonBillable,
+        usable_in_recipes: usableInRecipes,
+        // Content per portion — how much one portion contains (300 ml pot of tea);
+        // lets OTHER recipes reference this item in ml/g lines.
+        unit_content_qty: usableInRecipes && unitContentQty !== '' ? parseFloat(unitContentQty) || 0 : undefined,
+        unit_content_uom: usableInRecipes && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
         servings: parseDecimal(servings, 1),
         tags: [],
         is_perishable: isPerishable,
@@ -515,10 +525,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         ? (packIsUnitCost ? packUnitEff : `${packQtyNum} ${packUnitEff}`)
         : undefined,
       // Content-per-unit: on edit, an emptied qty sends 0 to explicitly clear the bridge.
-      unit_content_qty: isStockable && unitContentQty !== ''
+      // Applies to stockables AND reusable recipes (content per portion).
+      unit_content_qty: (isStockable || isRecipe) && unitContentQty !== ''
         ? parseFloat(unitContentQty) || 0
-        : (item && isStockable && item.unit_content_qty != null ? 0 : undefined),
-      unit_content_uom: isStockable && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
+        : (item && (isStockable || isRecipe) && item.unit_content_qty != null ? 0 : undefined),
+      unit_content_uom: (isStockable || isRecipe) && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
+      usable_in_recipes: isRecipe ? usableInRecipes : undefined,
       stock_tracking_mode: stockTrackingMode !== 'default' || item ? stockTrackingMode : undefined,
       min_selling_price: minSellingPrice !== '' ? parseDecimal(minSellingPrice) : undefined,
       max_selling_price: maxSellingPrice !== '' ? parseDecimal(maxSellingPrice) : undefined,
@@ -895,6 +907,60 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     </span>
                   </span>
                 </label>
+              )}
+
+              {/* Reusable menu component — RECIPE items that other recipes may consume
+                  (Black Tea 30 ml inside an Iced Passion Tea). The content-per-portion
+                  declaration lets ml/g lines cost + deduct fractions of one portion. */}
+              {isRecipe && (
+                <div className="space-y-3 rounded-lg border border-border p-3">
+                  <label className="flex items-start gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={usableInRecipes} onChange={(e) => setUsableInRecipes(e.target.checked)} className="rounded mt-0.5" />
+                    <span>
+                      Usable as an ingredient in other recipes
+                      <br />
+                      <span className="text-xs text-muted-foreground font-normal">
+                        Makes this item pickable in the recipe builder (e.g. Black Tea poured into an Iced Passion Tea).
+                        Selling it inside another recipe consumes this recipe&apos;s own ingredients automatically.
+                      </span>
+                    </span>
+                  </label>
+                  {usableInRecipes && (
+                    <div className="space-y-1.5">
+                      <label className="text-sm font-medium inline-flex items-center gap-1">
+                        Content per portion
+                        <InfoHint title="Content per portion">
+                          How much ONE portion of this recipe contains — e.g. a pot of tea holds 300&nbsp;ml.
+                          Other recipes can then use ml/g lines (30&nbsp;ml of Black Tea = 0.1 portion) and
+                          costing/stock deduction stay exact. Leave blank if other recipes will reference whole portions.
+                        </InfoHint>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="e.g. 300"
+                          value={unitContentQty}
+                          onChange={(e) => setUnitContentQty(e.target.value)}
+                          className="max-w-35"
+                        />
+                        <select
+                          value={unitContentUom}
+                          onChange={(e) => setUnitContentUom(e.target.value)}
+                          className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                          disabled={unitContentQty === ''}
+                        >
+                          <option value="ml">ml</option>
+                          <option value="l">L</option>
+                          <option value="g">g</option>
+                          <option value="kg">kg</option>
+                        </select>
+                        <span className="text-xs text-muted-foreground">per portion</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Stock-only fields — irrelevant for services/events/vouchers/recipes */}

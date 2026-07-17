@@ -19,6 +19,11 @@ export interface ItemResult {
   available?: number;
   cost_price?: number | null;
   suggested_price?: number | null;
+  /** Effective customer price (recipe selling price → default tier → guardrail),
+   *  enriched by the items list. Feeds modifier price-adjustment prefill. */
+  selling_price?: number | null;
+  /** Free at the POS (accompaniments like ugali) — a linked modifier option prefills 0. */
+  non_billable?: boolean;
   unit_id?: string;
   type?: string;
   // Purchase pack fields — how the item is actually bought (e.g. 52.50 per 500 ml
@@ -56,6 +61,12 @@ interface Props {
    * (e.g. ModifierGroupDialog deliberately searches both RECIPE and GOODS items).
    */
   type?: string;
+  /**
+   * Recipe-ingredient scope (?for_recipe=1): GOODS + INGREDIENT plus RECIPE items
+   * flagged "usable in recipes" (reusable menu components like Black Tea inside an
+   * Iced Passion Tea). Overrides `type`.
+   */
+  forRecipe?: boolean;
 }
 
 function itemToResult(i: Item): ItemResult {
@@ -65,6 +76,8 @@ function itemToResult(i: Item): ItemResult {
     name: i.name,
     cost_price: i.cost_price ?? null,
     suggested_price: i.suggested_price ?? null,
+    selling_price: i.selling_price ?? null,
+    non_billable: i.non_billable ?? false,
     unit_id: i.unit_id ?? undefined,
     type: i.type,
     purchase_price: i.purchase_price ?? null,
@@ -78,7 +91,7 @@ function itemToResult(i: Item): ItemResult {
   };
 }
 
-export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type }: Props) {
+export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type, forRecipe }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -88,11 +101,14 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
   const createItem = useCreateItem(orgSlug);
 
   const { data: results } = useQuery<ItemResult[]>({
-    queryKey: ['item-search', orgSlug, query, type],
+    queryKey: ['item-search', orgSlug, query, type, forRecipe ?? false],
     queryFn: async () => {
+      const params: Record<string, string> = { search: query };
+      if (forRecipe) params.for_recipe = '1';
+      else if (type) params.type = type;
       const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
         `/api/v1/${orgSlug}/inventory/items`,
-        type ? { search: query, type } : { search: query }
+        params
       );
       return Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
     },
