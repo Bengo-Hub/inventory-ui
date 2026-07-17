@@ -62,6 +62,14 @@ function itemToUpdateInput(item: Item): UpdateItemInput {
     target_margin_percent: item.target_margin_percent ?? undefined,
     tax_code_id: item.tax_code_id || undefined,
     tax_inclusive: item.tax_inclusive ?? false,
+    // eTIMS/KRA classification + customs fields — MUST be resent on every full-object PUT
+    // (Set semantics), otherwise an inline price/field quick-edit clobbers a previously-set
+    // eTIMS classification and breaks the treasury eTIMS item sync for this SKU.
+    etims_item_cls_cd: item.etims_item_cls_cd ?? undefined,
+    etims_pkg_unit_cd: item.etims_pkg_unit_cd ?? undefined,
+    etims_qty_unit_cd: item.etims_qty_unit_cd ?? undefined,
+    country_of_origin: item.country_of_origin ?? undefined,
+    hs_code: item.hs_code ?? undefined,
     is_active: item.is_active,
     requires_age_verification: item.requires_age_verification,
     is_controlled_substance: item.is_controlled_substance ?? false,
