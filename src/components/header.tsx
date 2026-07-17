@@ -2,10 +2,12 @@
 
 import { useAuthStore } from '@/store/auth';
 import { useRef, useState } from 'react';
-import { Bell, BookOpen, ChevronDown, ExternalLink, Globe, LogOut, Menu, Search, Settings, ShoppingCart, Tag, User } from 'lucide-react';
+import { Bell, BookOpen, ChevronDown, ExternalLink, Globe, LogOut, Menu, Search, Settings, ShoppingCart, Tag, Truck, User, UserSquare, Users } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { useBranding } from '@/providers/branding-provider';
 import { OutletFilter } from './outlet-filter';
+import { usePermissions } from '@/hooks/usePermissions';
+import { P } from '@/lib/rbac/permissions';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
@@ -14,13 +16,22 @@ const TREASURY_URL = process.env.NEXT_PUBLIC_TREASURY_UI_URL ?? 'https://books.c
 const PRICING_URL = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL ?? 'https://pricing.codevertexitsolutions.com';
 const ORDERING_URL = process.env.NEXT_PUBLIC_ORDERING_UI_URL ?? 'https://ordersapp.codevertexitsolutions.com';
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_UI_URL ?? 'https://accounts.codevertexitsolutions.com';
+const LOGISTICS_URL = process.env.NEXT_PUBLIC_LOGISTICS_UI_URL ?? 'https://logistics.codevertexitsolutions.com';
+const MARKETFLOW_URL = process.env.NEXT_PUBLIC_MARKETFLOW_UI_URL ?? 'https://marketflow.codevertexitsolutions.com';
+const ERP_URL = process.env.NEXT_PUBLIC_ERP_UI_URL ?? 'https://erp.codevertexitsolutions.com';
 
+// Cross-service LINKS (never duplicated pages — each target enforces its own RBAC +
+// subscription gating on arrival). `manageOnly` additionally hides the link here from
+// non-manager principals (warehouse clerks don't need ERP/Logistics/CRM shortcuts).
 const SERVICES = [
-  { label: 'POS',            href: (slug: string) => `${POS_URL}/${slug}`,      Icon: ShoppingCart },
-  { label: 'Treasury',       href: (slug: string) => `${TREASURY_URL}/${slug}`,  Icon: BookOpen },
-  { label: 'Online Store',   href: (slug: string) => `${ORDERING_URL}/${slug}`,  Icon: Globe },
-  { label: 'Subscriptions',  href: (slug: string) => `${PRICING_URL}/${slug}`,   Icon: Tag },
-  { label: 'Account Portal', href: (slug: string) => `${AUTH_URL}/${slug}`,      Icon: Globe },
+  { label: 'POS',            href: (slug: string) => `${POS_URL}/${slug}`,        Icon: ShoppingCart, manageOnly: false },
+  { label: 'Treasury',       href: (slug: string) => `${TREASURY_URL}/${slug}`,   Icon: BookOpen,     manageOnly: false },
+  { label: 'Logistics',      href: (slug: string) => `${LOGISTICS_URL}/${slug}`,  Icon: Truck,        manageOnly: true },
+  { label: 'CRM (MarketFlow)', href: (slug: string) => `${MARKETFLOW_URL}/${slug}`, Icon: UserSquare, manageOnly: true },
+  { label: 'ERP',            href: (slug: string) => `${ERP_URL}/${slug}`,        Icon: Users,        manageOnly: true },
+  { label: 'Online Store',   href: (slug: string) => `${ORDERING_URL}/${slug}`,   Icon: Globe,        manageOnly: false },
+  { label: 'Subscriptions',  href: (slug: string) => `${PRICING_URL}/${slug}`,    Icon: Tag,          manageOnly: true },
+  { label: 'Account Portal', href: (slug: string) => `${AUTH_URL}/${slug}`,       Icon: Globe,        manageOnly: false },
 ] as const;
 
 function displayName(user: { fullName?: string; name?: string; email?: string } | null): string {
@@ -39,6 +50,9 @@ export function Header({ onMenuClick }: HeaderProps) {
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
   const { getServiceTitle } = useBranding();
+  const { canAny } = usePermissions();
+  const canManageLinks = canAny([P.SETTINGS_MANAGE, P.CONFIG_MANAGE, P.CATALOG_MANAGE]);
+  const services = SERVICES.filter((s) => !s.manageOnly || canManageLinks);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = !!user && !!session;
@@ -130,8 +144,8 @@ export function Header({ onMenuClick }: HeaderProps) {
                   <div className="h-px bg-border my-2 mx-1" />
 
                   <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-3 mb-1.5">Services</p>
-                  <div className="grid gap-1">
-                    {SERVICES.map(({ label, href, Icon }) => (
+                  <div className="grid gap-1 max-h-72 overflow-y-auto">
+                    {services.map(({ label, href, Icon }) => (
                       <a
                         key={label}
                         href={href(orgSlug)}

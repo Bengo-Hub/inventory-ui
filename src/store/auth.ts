@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api/client';
 import { buildAuthorizeUrl, buildLogoutUrl, exchangeCodeForTokens, fetchInventoryProfile, fetchProfile, revokeServerSession } from '@/lib/auth/api';
+import { useOutletStore } from '@/store/outlet';
 import {
     consumeVerifier,
     generateCodeChallenge,
@@ -237,11 +238,17 @@ export const useAuthStore = create<AuthState>()(
                 set({ status: 'idle', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
+                // Drop the outlet context too — a retained outlet (store + X-Outlet-ID +
+                // 'inventory-selected-outlet-id') leaks into the NEXT tenant's session when
+                // the user logs into a different org slug, sending the old tenant's outlet
+                // header on early requests. Mirrors erp-ui's logout.
+                try { useOutletStore.getState().clearOutlet(); } catch { /* no-op */ }
                 if (typeof window !== 'undefined') {
                     try { slug = slug || (localStorage.getItem('tenantSlug') ?? ''); } catch { /* no-op */ }
                     try { localStorage.removeItem('tenantId'); } catch { /* no-op */ }
                     // Keep `tenantSlug` as the last-used hint so the bare-root landing routes back here.
                     try { localStorage.removeItem('inventory-auth-storage'); } catch { /* no-op */ }
+                    try { localStorage.removeItem('inventory-outlet-storage'); } catch { /* no-op */ }
                     try { sessionStorage.clear(); } catch { /* no-op */ }
                     // Land on the tenant app root: arriving there unauthenticated re-triggers
                     // SSO with tenant=<slug>, so the login screen shows the RIGHT organisation.
