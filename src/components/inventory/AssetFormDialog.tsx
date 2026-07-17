@@ -17,6 +17,17 @@ interface Props {
 
 const DEPRECIATION_METHODS = ['straight_line', 'declining_balance', 'none'];
 const CONDITIONS = ['new', 'good', 'fair', 'poor'];
+// KRA capital-allowance (wear-and-tear) classes — carried to Treasury so it computes the
+// allowance without a manual reclassify. Stable statutory classes (Income Tax Act 2nd Schedule).
+const KRA_CA_CLASSES = [
+    { value: '', label: 'Unclassified (set later in Treasury)' },
+    { value: 'CA_CLASS_1', label: 'Class I — Heavy machinery / earthmoving (37.5%)' },
+    { value: 'CA_CLASS_2', label: 'Class II — Computers & peripherals (30%)' },
+    { value: 'CA_CLASS_3', label: 'Class III — Vehicles & general plant (25%)' },
+    { value: 'CA_CLASS_4', label: 'Class IV — Furniture, fittings & other (12.5%)' },
+    { value: 'CA_IBA', label: 'Industrial Building Allowance (2.5%)' },
+    { value: 'CA_COMMERCIAL_BLDG', label: 'Commercial Building (10%)' },
+];
 
 export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Props) {
     const { data: categories = [] } = useAssetCategories(org);
@@ -31,6 +42,7 @@ export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Pr
     const [salvageValue, setSalvageValue] = useState(asset?.salvage_value != null ? String(asset.salvage_value) : '');
     const [depreciationRate, setDepreciationRate] = useState(asset?.depreciation_rate != null ? String(asset.depreciation_rate) : '');
     const [depreciationMethod, setDepreciationMethod] = useState(asset?.depreciation_method ?? 'straight_line');
+    const [kraCaClass, setKraCaClass] = useState(asset?.kra_ca_class ?? '');
     const [location, setLocation] = useState(asset?.location ?? '');
     const [condition, setCondition] = useState(asset?.condition ?? 'good');
     const [notes, setNotes] = useState(asset?.notes ?? '');
@@ -50,6 +62,7 @@ export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Pr
             salvage_value: salvageValue ? parseDecimal(salvageValue) : undefined,
             depreciation_rate: depreciationRate ? parseDecimal(depreciationRate) : undefined,
             depreciation_method: depreciationMethod || undefined,
+            kra_ca_class: kraCaClass || undefined,
             location: location.trim() || undefined,
             condition: condition || undefined,
             notes: notes.trim() || undefined,
@@ -118,6 +131,14 @@ export function AssetFormDialog({ org, asset, isPending, onSubmit, onClose }: Pr
                                     value={depreciationMethod} onChange={(e) => setDepreciationMethod(e.target.value)}>
                                     {DEPRECIATION_METHODS.map((m) => <option key={m} value={m}>{m.replace(/_/g, ' ')}</option>)}
                                 </select>
+                            </label>
+                            <label className="space-y-1 block">
+                                <span className="text-sm font-medium">KRA Capital-Allowance Class</span>
+                                <select className="w-full border border-border rounded-md px-3 py-2 text-sm bg-background"
+                                    value={kraCaClass} onChange={(e) => setKraCaClass(e.target.value)}>
+                                    {KRA_CA_CLASSES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+                                </select>
+                                <span className="text-xs text-muted-foreground">Sets how KRA capital allowances are computed in Treasury. Leave blank to classify later.</span>
                             </label>
                             <label className="space-y-1 block">
                                 <span className="text-sm font-medium">Condition</span>

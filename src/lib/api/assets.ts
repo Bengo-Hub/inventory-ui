@@ -27,6 +27,7 @@ export interface Asset {
   salvage_value: number;
   depreciation_rate: number;
   depreciation_method?: string;
+  kra_ca_class?: string;
   current_value?: number;
   accumulated_depreciation?: number;
   location?: string;
@@ -52,6 +53,7 @@ export interface CreateAssetInput {
   salvage_value?: number;
   depreciation_rate?: number;
   depreciation_method?: string;
+  kra_ca_class?: string;
   location?: string;
   condition?: string;
   notes?: string;
