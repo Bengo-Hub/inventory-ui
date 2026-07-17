@@ -97,6 +97,30 @@ function PinLoginContent() {
   function clear() { setError(false); setPinDigits([]); }
   function submitCurrent() { if (pinDigits.length > 0) void submitPin(pinDigits.join('')); }
 
+  // ── Physical-keyboard support ── non-touch devices type the PIN/passcode directly:
+  // digits keep the auto-submit-at-4 while the entry is all-numeric; once a letter is
+  // present it's a passcode (no auto-submit). Backspace deletes, Enter submits, Escape
+  // clears. Focused real inputs keep their own typing.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'Enter') { e.preventDefault(); submitCurrent(); return; }
+      if (e.key === 'Backspace') { e.preventDefault(); backspace(); return; }
+      if (e.key === 'Escape') { clear(); return; }
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        const numericSoFar = pinDigits.every((c) => /^[0-9]$/.test(c));
+        if (numericSoFar) handleDigit(e.key); else handleKey(e.key);
+        return;
+      }
+      if (e.key.length === 1) { e.preventDefault(); handleKey(e.key); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
+
   const goSSO = () => redirectToSSO(orgSlug, returnTo ? `${window.location.origin}${returnTo}` : `${window.location.origin}/${orgSlug}`);
 
   return (
