@@ -197,6 +197,51 @@ export const ITEM_USE_CASE_LABEL: Record<ItemUseCase, string> = {
   PROFESSIONAL_SERVICE: 'Professional Services',
 };
 
+// ── Report nomenclature (Stock Reconciliation & consumption reports) ────────────
+//
+// The consumption/reconciliation reports were written in hospitality language
+// ("Ingredient", "Consumption by recipe") and shown verbatim to retail/pharmacy/services
+// outlets where those words make no sense. Recipe-based wording applies only where the
+// use case actually has recipes (catalogScopeFor(...).showRecipe); everywhere else the
+// same data reads as generic product consumption ("Consumption by source", with recipe-less
+// rows as "Direct sale").
+
+export interface ReportNomenclature {
+  /** The consumed thing: "Ingredient" (recipe use cases) else the catalog noun (Product/Drug/…). */
+  subject: string;
+  subjectLower: string;
+  /** Section/chart title: "Consumption by recipe" vs "Consumption by source". */
+  bySource: string;
+  /** Breakdown table column header: "Recipe" vs "Source". */
+  sourceCol: string;
+  /** Label for consumption not attributed to a recipe. */
+  directLabel: string;
+  /** Whether this use case has recipes at all (drives recipe-only UI). */
+  hasRecipes: boolean;
+}
+
+export function reportNomenclatureFor(useCase?: string | null): ReportNomenclature {
+  const scope = catalogScopeFor(useCase);
+  if (scope.showRecipe) {
+    return {
+      subject: 'Ingredient', subjectLower: 'ingredient',
+      bySource: 'Consumption by recipe', sourceCol: 'Recipe',
+      directLabel: 'Direct sale', hasRecipes: true,
+    };
+  }
+  const n = nomenclatureFor(useCase);
+  return {
+    subject: n.item, subjectLower: n.item.toLowerCase(),
+    bySource: 'Consumption by source', sourceCol: 'Source',
+    directLabel: 'Direct sale / usage', hasRecipes: false,
+  };
+}
+
+export function useReportNomenclature(): ReportNomenclature {
+  const outlet = useOutletStore((s) => s.outlet);
+  return reportNomenclatureFor(outlet?.use_case);
+}
+
 // ── Hooks (read the active outlet from the store) ───────────────────────────────
 
 export function useNomenclature(): CatalogNomenclature {

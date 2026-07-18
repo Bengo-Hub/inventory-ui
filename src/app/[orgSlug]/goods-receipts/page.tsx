@@ -150,7 +150,14 @@ export default function GoodsReceiptsPage() {
                                 <tbody className="divide-y divide-border">
                                     {viewGRN.lines?.map((l, i) => (
                                         <tr key={l.id ?? i}>
-                                            <td className="px-3 py-2 font-mono text-xs">{l.item_id.slice(0, 8)}</td>
+                                            <td className="px-3 py-2">
+                                                <span className="block font-medium" title={l.item_id}>{l.item_name || l.item_id.slice(0, 8)}</span>
+                                                {(l.sku || l.barcode || (l.serials?.length ?? 0) > 0) && (
+                                                    <span className="block text-[11px] text-muted-foreground font-mono">
+                                                        {[l.sku, l.barcode, l.serials?.join(', ')].filter(Boolean).join(' · ')}
+                                                    </span>
+                                                )}
+                                            </td>
                                             <td className="px-3 py-2 text-right tabular-nums">{l.quantity_received}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{l.quantity_accepted}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{l.quantity_rejected}</td>

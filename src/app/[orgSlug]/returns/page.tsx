@@ -23,8 +23,8 @@ const STATUS_VARIANT: Record<ReturnPaymentStatus, 'default' | 'success' | 'warni
     pending: 'warning', due: 'warning', partial: 'default', paid: 'success',
 };
 
-interface Line { itemId: string; itemName: string; quantity: string; subTotal: string }
-const emptyLine = (): Line => ({ itemId: '', itemName: '', quantity: '1', subTotal: '' });
+interface Line { itemId: string; itemName: string; quantity: string; unitCost: string; subTotal: string }
+const emptyLine = (): Line => ({ itemId: '', itemName: '', quantity: '1', unitCost: '', subTotal: '' });
 
 export default function PurchaseReturnsPage() {
     const params = useParams();
@@ -54,6 +54,15 @@ export default function PurchaseReturnsPage() {
 
     const nameOf = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? '—';
     const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+    // Sub-total follows qty × unit cost while the user hasn't overridden it directly.
+    const setLineRecalc = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, idx) => {
+        if (idx !== i) return l;
+        const next = { ...l, ...patch };
+        const qty = parseDecimal(next.quantity, 1);
+        const cost = parseDecimal(next.unitCost);
+        if (cost > 0) next.subTotal = String(Math.round(qty * cost * 100) / 100);
+        return next;
+    }));
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -169,10 +178,22 @@ export default function PurchaseReturnsPage() {
                                         </div>
                                         {lines.map((l, i) => (
                                             <div key={i} className="space-y-2 p-3 rounded-lg border border-border">
-                                                <ItemSearchInput orgSlug={org} value={l.itemName} onSelect={(item) => setLine(i, { itemId: item.id, itemName: item.name })} placeholder="Search item…" />
+                                                {/* Selecting an item prefills its unit cost (cost_price → purchase_price) and
+                                                    the sub-total — previously both were discarded and left blank. */}
+                                                <ItemSearchInput
+                                                    orgSlug={org}
+                                                    value={l.itemName}
+                                                    onSelect={(item) => setLineRecalc(i, {
+                                                        itemId: item.id,
+                                                        itemName: item.name,
+                                                        unitCost: String(item.cost_price ?? item.purchase_price ?? ''),
+                                                    })}
+                                                    placeholder="Search item…"
+                                                />
                                                 <div className="grid grid-cols-12 gap-2 items-center">
-                                                    <Input className="col-span-5" type="number" min="1" step={DECIMAL_STEP} placeholder="Qty" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value })} />
-                                                    <Input className="col-span-6" type="number" min="0" step={DECIMAL_STEP} placeholder="Sub-total" value={l.subTotal} onChange={(e) => setLine(i, { subTotal: e.target.value })} />
+                                                    <Input className="col-span-3" type="number" min="1" step={DECIMAL_STEP} placeholder="Qty" value={l.quantity} onChange={(e) => setLineRecalc(i, { quantity: e.target.value })} />
+                                                    <Input className="col-span-4" type="number" min="0" step={DECIMAL_STEP} placeholder="Unit cost" value={l.unitCost} onChange={(e) => setLineRecalc(i, { unitCost: e.target.value })} />
+                                                    <Input className="col-span-4" type="number" min="0" step={DECIMAL_STEP} placeholder="Sub-total" value={l.subTotal} onChange={(e) => setLine(i, { subTotal: e.target.value })} />
                                                     {lines.length > 1 && <button type="button" onClick={() => setLines((ls) => ls.filter((_, idx) => idx !== i))} className="col-span-1 text-muted-foreground hover:text-red-500"><Minus className="h-4 w-4" /></button>}
                                                 </div>
                                             </div>

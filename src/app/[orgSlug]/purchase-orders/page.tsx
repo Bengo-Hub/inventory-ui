@@ -28,6 +28,7 @@ import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
 import { AlertTriangle, BarChart3, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -559,10 +560,14 @@ export default function PurchaseOrdersPage() {
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Unit</label>
-                                                    <select
+                                                    <SearchableCombobox
+                                                        options={(units ?? []).map((u) => ({
+                                                            value: u.id,
+                                                            label: u.abbreviation || u.name,
+                                                            hint: u.abbreviation ? u.name : undefined,
+                                                        }))}
                                                         value={line.unitId}
-                                                        onChange={(e) => {
-                                                            const newUnitId = e.target.value;
+                                                        onChange={(newUnitId) => {
                                                             const updated = [...poLines];
                                                             updated[idx] = {
                                                                 ...updated[idx],
@@ -573,14 +578,9 @@ export default function PurchaseOrdersPage() {
                                                             };
                                                             setPoLines(updated);
                                                         }}
-                                                        className="w-full rounded-lg border border-input bg-transparent px-2 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                                        aria-label="Unit"
-                                                    >
-                                                        <option value="">Unit</option>
-                                                        {(units ?? []).map((u) => (
-                                                            <option key={u.id} value={u.id}>{u.abbreviation || u.name}</option>
-                                                        ))}
-                                                    </select>
+                                                        placeholder="Unit"
+                                                        searchPlaceholder="Search units…"
+                                                    />
                                                 </div>
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Unit Cost</label>

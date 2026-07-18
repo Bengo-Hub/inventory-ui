@@ -10,6 +10,7 @@ import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { Download, Printer, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 
 type SelectionMode = 'category' | 'supplier' | 'purchase_order' | 'item_ids';
 
@@ -154,16 +155,13 @@ export function PrintLabelsDialog({
                 By category
               </label>
               {mode === 'category' && (
-                <select
+                <SearchableCombobox
+                  options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
                   value={categoryId}
-                  onChange={(e) => setCategoryId(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                >
-                  <option value="">Select a category…</option>
-                  {(categories ?? []).map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(id) => setCategoryId(id)}
+                  placeholder="Select a category…"
+                  searchPlaceholder="Search categories…"
+                />
               )}
               <label className="flex items-center gap-2 text-sm">
                 <input type="radio" checked={mode === 'supplier'} onChange={() => setMode('supplier')} />

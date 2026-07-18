@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* shared-ui-lib ships raw Tailwind classNames resolved by THIS app's build —
+   its dist must be scanned or those classes silently won't exist. */
+@source "../../node_modules/@bengo-hub/shared-ui-lib/dist";
 
 @theme {
   --color-background: hsl(var(--background));

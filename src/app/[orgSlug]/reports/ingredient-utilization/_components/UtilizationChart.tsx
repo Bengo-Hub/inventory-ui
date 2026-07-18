@@ -64,14 +64,18 @@ interface UtilizationChartProps {
   rangeEnd: string;
   unit?: string;
   loading: boolean;
+  /** Series label for consumption not attributed to a recipe (use-case-aware wording). */
+  directLabel?: string;
+  /** The consumed thing in empty-state copy: "ingredient" / "product" / "drug". */
+  subjectLabel?: string;
 }
 
-export function UtilizationChart({ points, events, granularity, rangeStart, rangeEnd, unit, loading }: UtilizationChartProps) {
+export function UtilizationChart({ points, events, granularity, rangeStart, rangeEnd, unit, loading, directLabel = 'Direct sale', subjectLabel = 'ingredient' }: UtilizationChartProps) {
   if (loading) return <div className="h-72 skeleton rounded-xl" />;
   if (points.length === 0) {
     return (
       <div className="h-72 flex items-center justify-center text-sm text-muted-foreground">
-        No consumption recorded for this ingredient in the selected period.
+        No consumption recorded for this {subjectLabel} in the selected period.
       </div>
     );
   }
@@ -81,7 +85,7 @@ export function UtilizationChart({ points, events, granularity, rangeStart, rang
   const totals = new Map<string, number>();
   for (const point of points) {
     for (const slice of point.by_recipe) {
-      const name = slice.recipe_name || 'Direct sale';
+      const name = slice.recipe_name || directLabel;
       totals.set(name, (totals.get(name) ?? 0) + slice.quantity);
     }
   }
@@ -94,7 +98,7 @@ export function UtilizationChart({ points, events, granularity, rangeStart, rang
     for (const name of topSeries) row[name] = 0;
     if (hasOther) row.Other = 0;
     for (const slice of point.by_recipe) {
-      const name = slice.recipe_name || 'Direct sale';
+      const name = slice.recipe_name || directLabel;
       const key = topSeries.includes(name) ? name : 'Other';
       row[key] = (Number(row[key]) || 0) + slice.quantity;
     }

@@ -13,6 +13,7 @@ import {
   useIngredientUtilizationTimeseries,
 } from '@/hooks/useReports';
 import { itemsApi } from '@/lib/api/items';
+import { useCatalogScope, useReportNomenclature } from '@/lib/use-case-nomenclature';
 import { reportsApi, type UtilizationGranularity } from '@/lib/api/reports';
 import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
@@ -45,10 +46,11 @@ const RANGE_PRESETS = [
   { label: '90d', days: 90 },
 ];
 
-// Ingredients live under item type GOODS (retail/inventory raw stock) or the dedicated
+// Consumable stock lives under item type GOODS (retail/inventory raw stock) or the dedicated
 // INGREDIENT type — both are fetched and merged rather than adding a new backend filter
-// value, since itemsApi.list already supports type-scoped search.
-function useIngredientOptions(orgSlug: string, search: string) {
+// value, since itemsApi.list already supports type-scoped search. INGREDIENT is only queried
+// for use cases that actually have recipes (retail/pharmacy/services never see it).
+function useConsumableOptions(orgSlug: string, search: string, includeIngredients: boolean) {
   const goods = useQuery({
     queryKey: ['ingredient-picker', orgSlug, 'GOODS', search],
     queryFn: () => itemsApi.list(orgSlug, { type: 'GOODS', search: search || undefined, limit: 50 }),
@@ -58,7 +60,7 @@ function useIngredientOptions(orgSlug: string, search: string) {
   const ingredients = useQuery({
     queryKey: ['ingredient-picker', orgSlug, 'INGREDIENT', search],
     queryFn: () => itemsApi.list(orgSlug, { type: 'INGREDIENT', search: search || undefined, limit: 50 }),
-    enabled: !!orgSlug,
+    enabled: !!orgSlug && includeIngredients,
     staleTime: 60_000,
   });
   const options = useMemo(() => {
@@ -69,13 +71,17 @@ function useIngredientOptions(orgSlug: string, search: string) {
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((it) => ({ id: it.id, name: `${it.name} (${it.sku})` }));
   }, [goods.data, ingredients.data]);
-  return { options, isLoading: goods.isLoading || ingredients.isLoading };
+  return { options, isLoading: goods.isLoading || (includeIngredients && ingredients.isLoading) };
 }
 
 export default function IngredientUtilizationPage() {
   const params = useParams();
   const orgSlug = params?.orgSlug as string;
   const active = useActiveWarehouse(orgSlug);
+  // Wording follows the selected outlet's use case: hospitality keeps Ingredient/recipe
+  // language; retail/pharmacy/services read as Product/Drug/Service consumption.
+  const rn = useReportNomenclature();
+  const scope = useCatalogScope();
 
   const [itemSearch, setItemSearch] = useState('');
   const [itemId, setItemId] = useState('');
@@ -83,7 +89,9 @@ export default function IngredientUtilizationPage() {
   const [granularity, setGranularity] = useState<UtilizationGranularity>('day');
   const [excludedRecipes, setExcludedRecipes] = useState<Set<string>>(new Set());
 
-  const { options: itemOptions, isLoading: itemsLoading } = useIngredientOptions(orgSlug, itemSearch);
+  const { options: itemOptions, isLoading: itemsLoading } = useConsumableOptions(
+    orgSlug, itemSearch, rn.hasRecipes && scope.itemTypes.includes('INGREDIENT'),
+  );
 
   const now = new Date();
   const from = toISO(new Date(now.getTime() - rangeDays * 24 * 60 * 60 * 1000));
@@ -111,9 +119,9 @@ export default function IngredientUtilizationPage() {
     if (!timeseries.data || excludedRecipes.size === 0) return timeseries.data?.points ?? [];
     return timeseries.data.points.map((p) => ({
       ...p,
-      by_recipe: p.by_recipe.filter((r) => !excludedRecipes.has(r.recipe_name || 'Direct sale')),
+      by_recipe: p.by_recipe.filter((r) => !excludedRecipes.has(r.recipe_name || rn.directLabel)),
     }));
-  }, [timeseries.data, excludedRecipes]);
+  }, [timeseries.data, excludedRecipes, rn.directLabel]);
 
   const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
   function printReport() {
@@ -130,7 +138,9 @@ export default function IngredientUtilizationPage() {
           {/* Renamed from "Ingredient Utilization" per the use-case PowerSuite specs (route unchanged). */}
           <h1 className="text-2xl font-bold">Stock Reconciliation</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            How much of an ingredient was consumed, by which recipe, relative to its reorder level
+            {rn.hasRecipes
+              ? `How much of an ${rn.subjectLower} was consumed, by which recipe, relative to its reorder level`
+              : `How much of a ${rn.subjectLower} was consumed or sold, relative to its reorder level`}
           </p>
         </div>
         {ready && (
@@ -145,19 +155,19 @@ export default function IngredientUtilizationPage() {
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Ingredient</label>
+              <label className="text-sm font-medium">{rn.subject}</label>
               <input
                 type="text"
                 value={itemSearch}
                 onChange={(e) => setItemSearch(e.target.value)}
-                placeholder="Search ingredient by name…"
+                placeholder={`Search ${rn.subjectLower} by name…`}
                 className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm mb-2 focus:ring-1 focus:ring-ring focus:outline-none"
               />
               <CreatableSelect
                 value={itemId}
                 onChange={setItemId}
                 options={itemOptions}
-                placeholder={itemsLoading ? 'Loading…' : 'Select an ingredient…'}
+                placeholder={itemsLoading ? 'Loading…' : `Select a ${rn.subjectLower}…`}
                 disabled={itemsLoading}
               />
             </div>
@@ -199,7 +209,7 @@ export default function IngredientUtilizationPage() {
 
       {!ready ? (
         <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-          Pick an ingredient and warehouse to see its utilization.
+          Pick a {rn.subjectLower} and warehouse to see its consumption.
         </div>
       ) : (
         <>
@@ -237,11 +247,11 @@ export default function IngredientUtilizationPage() {
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h2 className="text-base font-semibold">Consumption by recipe</h2>
+                <h2 className="text-base font-semibold">{rn.bySource}</h2>
                 {byRecipe.data && byRecipe.data.length > 1 && (
                   <div className="flex flex-wrap gap-1.5">
                     {byRecipe.data.map((r) => {
-                      const name = r.recipe_name || 'Direct sale';
+                      const name = r.recipe_name || rn.directLabel;
                       const excluded = excludedRecipes.has(name);
                       return (
                         <button
@@ -270,6 +280,8 @@ export default function IngredientUtilizationPage() {
                 rangeEnd={to}
                 unit={s?.unit}
                 loading={timeseries.isLoading}
+                directLabel={rn.directLabel}
+                subjectLabel={rn.subjectLower}
               />
             </CardContent>
           </Card>
@@ -278,7 +290,9 @@ export default function IngredientUtilizationPage() {
           <Card>
             <CardHeader>
               <span className="text-sm text-muted-foreground">
-                {byRecipe.data?.length ?? 0} recipe{(byRecipe.data?.length ?? 0) !== 1 ? 's' : ''}
+                {byRecipe.data?.length ?? 0} {rn.hasRecipes
+                  ? `recipe${(byRecipe.data?.length ?? 0) !== 1 ? 's' : ''}`
+                  : `source${(byRecipe.data?.length ?? 0) !== 1 ? 's' : ''}`}
               </span>
             </CardHeader>
             <CardContent className="p-0">
@@ -286,13 +300,15 @@ export default function IngredientUtilizationPage() {
                 <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
               ) : !byRecipe.data || byRecipe.data.length === 0 ? (
                 <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-                  No recipes consumed this ingredient in the selected period.
+                  {rn.hasRecipes
+                    ? `No recipes consumed this ${rn.subjectLower} in the selected period.`
+                    : `No consumption recorded for this ${rn.subjectLower} in the selected period.`}
                 </div>
               ) : (
                 <Table>
                   <thead>
                     <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <th className="px-6 py-3">Recipe</th>
+                      <th className="px-6 py-3">{rn.sourceCol}</th>
                       <th className="px-6 py-3 text-right">Quantity</th>
                       <th className="px-6 py-3 text-right">Cost</th>
                       <th className="px-6 py-3 text-right">Share</th>
@@ -302,7 +318,7 @@ export default function IngredientUtilizationPage() {
                     {byRecipe.data.map((row) => (
                       <tr key={row.recipe_id ?? row.recipe_name} className="hover:bg-muted/30 transition-colors">
                         <td className="px-6 py-4">
-                          <div className="font-medium">{row.recipe_name || 'Direct sale'}</div>
+                          <div className="font-medium">{row.recipe_name || rn.directLabel}</div>
                           {row.recipe_sku && <div className="text-xs text-muted-foreground">{row.recipe_sku}</div>}
                         </td>
                         <td className="px-6 py-4 text-right text-sm tabular-nums">

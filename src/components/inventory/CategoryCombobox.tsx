@@ -6,10 +6,11 @@ import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { categoriesApi, type Category } from '@/lib/api/categories';
 import { useOutletStore } from '@/store/outlet';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Plus, X } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 
 interface Props {
   orgSlug:      string;
@@ -19,128 +20,49 @@ interface Props {
 }
 
 /**
- * Rich category picker: searchable dropdown over existing categories with an
- * inline "+" action that opens the standard create-category form. Emits the
- * selected category name (the menu-item composite endpoint resolves/creates by name).
+ * Rich category picker: the shared SearchableCombobox over existing categories
+ * with a "+ New category" footer opening the standard create-category form.
+ * Emits the selected category NAME (the menu-item composite endpoint
+ * resolves/creates by name; names are unique per tenant).
  */
 export function CategoryCombobox({ orgSlug, value, onChange, placeholder = 'Select a category…' }: Props) {
   const { data: categories } = useCategories(orgSlug);
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState('');
   const [addOpen, setAddOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function onDoc(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, []);
-
-  const filtered = useMemo(() => {
-    const list = categories ?? [];
-    const q = query.trim().toLowerCase();
-    if (!q) return list;
-    return list.filter(
-      (c) => c.name.toLowerCase().includes(q) || (c.code ?? '').toLowerCase().includes(q),
-    );
-  }, [categories, query]);
-
-  function select(name: string) {
-    onChange(name);
-    setOpen(false);
-    setQuery('');
-  }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="relative flex-1 min-w-0" ref={ref}>
-        <button
-          type="button"
-          onClick={() => setOpen((o) => !o)}
-          className="flex w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
-        >
-          <span className={`truncate ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
-            {value || placeholder}
-          </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-        </button>
-
-        {open && (
-          <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-xl">
-            <div className="relative border-b border-border p-2">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                autoFocus
-                placeholder="Search categories…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="h-9 pl-9"
-              />
-            </div>
-            <div className="max-h-56 overflow-y-auto py-1">
-              {value && (
-                <button
-                  type="button"
-                  onClick={() => select('')}
-                  className="w-full px-4 py-2 text-left text-xs text-muted-foreground hover:bg-accent"
-                >
-                  Clear selection
-                </button>
-              )}
-              {filtered.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-muted-foreground">No matching categories.</div>
-              ) : (
-                filtered.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => select(c.name)}
-                    className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm hover:bg-accent"
-                  >
-                    <span className="truncate">
-                      {c.parent_name ? <span className="text-muted-foreground">{c.parent_name} › </span> : null}
-                      {c.name}
-                    </span>
-                    {value === c.name && <Check className="h-4 w-4 shrink-0 text-primary" />}
-                  </button>
-                ))
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => { setOpen(false); setAddOpen(true); }}
-              className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2.5 text-sm text-primary hover:bg-accent"
-            >
-              <Plus className="h-4 w-4" />
-              {query.trim() ? `Create "${query.trim()}"` : 'New category'}
-            </button>
-          </div>
-        )}
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        size="icon"
-        className="shrink-0"
-        aria-label="Add category"
-        onClick={() => setAddOpen(true)}
-      >
-        <Plus className="h-4 w-4" />
-      </Button>
-
+    <>
+      <SearchableCombobox
+        options={(categories ?? []).map((c) => ({
+          value: c.name,
+          label: c.name,
+          hint: c.code || undefined,
+          description: c.parent_name ? `${c.parent_name} ›` : undefined,
+        }))}
+        value={value}
+        onChange={(name) => onChange(name)}
+        placeholder={placeholder}
+        searchPlaceholder="Search categories…"
+        emptyText="No matching categories."
+        footer={
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted/60"
+          >
+            <Plus className="h-4 w-4" /> New category
+          </button>
+        }
+      />
       {addOpen && (
         <AddCategoryDialog
           orgSlug={orgSlug}
-          initialName={query.trim()}
+          initialName=""
           categories={categories ?? []}
           onClose={() => setAddOpen(false)}
-          onCreated={(cat) => { setAddOpen(false); select(cat.name); }}
+          onCreated={(cat) => { setAddOpen(false); onChange(cat.name); }}
         />
       )}
-    </div>
+    </>
   );
 }
 
@@ -231,16 +153,13 @@ export function AddCategoryDialog({
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Parent Category</label>
-                <select
+                <SearchableCombobox
+                  options={categories.map((c) => ({ value: c.id, label: c.name }))}
                   value={parentId}
-                  onChange={(e) => setParentId(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                >
-                  <option value="">None (root category)</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                  onChange={(id) => setParentId(id)}
+                  placeholder="None (root category)"
+                  searchPlaceholder="Search categories…"
+                />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Description</label>

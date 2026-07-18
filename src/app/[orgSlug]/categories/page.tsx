@@ -12,6 +12,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -344,16 +345,13 @@ export default function CategoriesPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Parent Category</label>
-                                        <select
+                                        <SearchableCombobox
+                                            options={parentOptions.map((c) => ({ value: c.id, label: c.name }))}
                                             value={formParentId}
-                                            onChange={(e) => setFormParentId(e.target.value)}
-                                            className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                        >
-                                            <option value="">None (root category)</option>
-                                            {parentOptions.map((c) => (
-                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                            ))}
-                                        </select>
+                                            onChange={(id) => setFormParentId(id)}
+                                            placeholder="None (root category)"
+                                            searchPlaceholder="Search categories…"
+                                        />
                                         <p className="text-xs text-muted-foreground">Optional. Assign a parent to create a subcategory.</p>
                                     </div>
                                     <div className="space-y-2">

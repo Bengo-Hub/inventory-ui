@@ -6,11 +6,17 @@ export interface GRNLine {
   id?: string;
   purchase_order_line_id?: string | null;
   item_id: string;
+  /** Human identifiers (enriched by the API) — render these in tables, never the raw item UUID. */
+  item_name?: string;
+  sku?: string;
+  barcode?: string;
   quantity_received: number;
   quantity_accepted: number;
   quantity_rejected: number;
   unit_cost: number;
   rejection_reason?: string;
+  serials?: string[];
+  lot_number?: string;
 }
 
 export interface GoodsReceipt {
