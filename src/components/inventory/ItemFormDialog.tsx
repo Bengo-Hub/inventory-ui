@@ -705,7 +705,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   <CreatableSelect
                     value={unitId}
                     onChange={setUnitId}
-                    options={(units ?? []).map((u) => ({ id: u.id, name: `${u.name}${u.abbreviation ? ` (${u.abbreviation})` : ''}` }))}
+                    options={(units ?? []).map((u) => ({ id: u.id, name: u.name, hint: u.abbreviation || undefined }))}
                     placeholder="No unit"
                     disabled={lockToEvent}
                     onAddClick={lockToEvent ? undefined : () => setAddUnitOpen(true)}
