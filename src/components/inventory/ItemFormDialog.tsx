@@ -53,6 +53,33 @@ function isEventCategory(c: Category): boolean {
   );
 }
 
+// Goods vs service category filtering — mirrors treasury-ui CreateItemModal (categoryKind /
+// itemTypeKind) so both services offer the SAME categories for a given item type. Classification
+// is deliberately conservative: a category only resolves to "service" when its code or name
+// clearly says so; every freeform category (Beverages, Pizza, Stationery…) stays "both" and is
+// visible for either kind. Selecting a GOODS type therefore hides clearly-service categories,
+// and a SERVICE/VOUCHER type keeps service + freeform categories — without ever over-hiding a
+// freeform grouping the user might legitimately want.
+const SERVICE_CATEGORY_CODES = new Set(['CON', 'SRV', 'SVC']);
+const SERVICE_NAME_RE = /service|consult|training|installation|maintenance|\bdesign\b|feasib|software|supervis|subscription|professional/;
+
+function itemTypeKind(itemType?: string): 'goods' | 'service' {
+  const t = (itemType ?? '').toUpperCase();
+  return t === 'SERVICE' || t === 'VOUCHER' ? 'service' : 'goods';
+}
+
+function categoryKind(c: Category): 'goods' | 'service' | 'both' {
+  if (SERVICE_CATEGORY_CODES.has((c.code ?? '').toUpperCase())) return 'service';
+  if (SERVICE_NAME_RE.test((c.name ?? '').toLowerCase())) return 'service';
+  return 'both';
+}
+
+/** True when a category is appropriate for the given item type (goods/service). */
+function categoryMatchesType(c: Category, itemType?: string): boolean {
+  const kind = categoryKind(c);
+  return kind === 'both' || kind === itemTypeKind(itemType);
+}
+
 interface Unit {
   id: string;
   name: string;
@@ -411,10 +438,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const dupMatches = useDuplicateNameWarning(dupCandidates, name, { excludeId: item?.id });
 
   // In event mode show only event categories; fall back to all if the tenant has none seeded.
+  // Otherwise filter to the selected item type's kind (goods/service) so the dropdown only offers
+  // categories that apply to that type — matching treasury-ui. Freeform categories are "both" and
+  // stay visible for either kind, so this never empties the list for a normal catalogue.
   const eventCategories = categories?.filter(isEventCategory) ?? [];
   const visibleCategories = isEventMode
     ? (eventCategories.length > 0 ? eventCategories : categories)
-    : categories;
+    : (categories ?? []).filter((c) => categoryMatchesType(c, type));
 
   // Preset the "Events & Experiences" category for a new event once categories have loaded.
   useEffect(() => {
@@ -422,6 +452,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     const evt = categories?.find(isEventCategory);
     if (evt) setCategoryId(evt.id);
   }, [isEventMode, item, categories, categoryId]);
+
+  // When the item type flips goods↔service, drop a now-incompatible category selection so the
+  // form can't submit a service category on a goods item (or vice-versa). Freeform ("both")
+  // categories always match, so an ordinary selection is never cleared.
+  useEffect(() => {
+    if (isEventMode || !categoryId) return;
+    const chosen = categories?.find((c) => c.id === categoryId);
+    if (chosen && !categoryMatchesType(chosen, type)) setCategoryId('');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [type, isEventMode]);
 
   function addTier() {
     setTiers((prev) => [...prev, { name: '', price: 0, capacity: 0 }]);
