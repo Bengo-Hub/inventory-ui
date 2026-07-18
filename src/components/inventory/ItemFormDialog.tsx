@@ -305,18 +305,26 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     }
   }, [item]);
 
+  // Categories + units are scoped to the outlet's use_case (untagged rows are
+  // universal) so a pharmacy outlet never sees food categories or culinary units.
   const { data: categories } = useQuery<Category[]>({
-    queryKey: ['categories', orgSlug],
+    queryKey: ['categories', orgSlug, outletUseCase ?? 'all'],
     queryFn: async () => {
-      const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`);
+      const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(
+        `/api/v1/${orgSlug}/inventory/categories`,
+        outletUseCase ? { use_case: outletUseCase } : undefined,
+      );
       return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
     },
     placeholderData: [],
   });
 
   const { data: units } = useQuery<Unit[]>({
-    queryKey: ['units', orgSlug],
-    queryFn: () => apiClient.get<Unit[]>(`/api/v1/${orgSlug}/inventory/units`),
+    queryKey: ['units', orgSlug, outletUseCase ?? 'all'],
+    queryFn: () => apiClient.get<Unit[]>(
+      `/api/v1/${orgSlug}/inventory/units`,
+      outletUseCase ? { use_case: outletUseCase } : undefined,
+    ),
     placeholderData: [],
   });
 

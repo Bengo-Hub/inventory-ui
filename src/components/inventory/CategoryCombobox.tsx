@@ -4,6 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { useCategories } from '@/hooks/useCategories';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { categoriesApi, type Category } from '@/lib/api/categories';
+import { useOutletStore } from '@/store/outlet';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Plus, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -161,6 +162,9 @@ export function AddCategoryDialog({
   const [code, setCode] = useState('');
   const [parentId, setParentId] = useState('');
   const [description, setDescription] = useState('');
+  // Stamp the creating outlet's use_case so a hospitality category never pollutes
+  // a pharmacy outlet's pickers. HQ (no outlet) creates universal categories.
+  const outletUseCase = useOutletStore((st) => st.outlet?.use_case);
 
   // Real duplicate prevention (not just a soft warning) — case-insensitive, no
   // network round-trip since the category list is already loaded by the parent.
@@ -174,6 +178,7 @@ export function AddCategoryDialog({
         code: code.trim() || undefined,
         description: description.trim() || undefined,
         parent_id: parentId || null,
+        use_cases: outletUseCase ? [outletUseCase] : undefined,
       }),
     onSuccess: (cat) => {
       toast.success('Category created');

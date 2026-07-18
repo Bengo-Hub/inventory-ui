@@ -16,6 +16,7 @@ import {
 } from '@/hooks/useStockCounts';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
+import { useOutletStore } from '@/store/outlet';
 import type { StockCount, StockCountStatus, StockCountTemplate } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ClipboardCheck, ClipboardList, LayoutTemplate, Play, Plus, Trash2, X } from 'lucide-react';
@@ -171,10 +172,16 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
     const [items, setItems] = useState<{ id: string; name: string; sku: string }[]>([]);
     const [itemIdsFromEdit] = useState<string[]>(editing?.item_ids ?? []);
 
+    // Scoped to the outlet's use_case so a kitchen sheet builder never wades
+    // through another vertical's categories.
+    const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
     const { data: categories } = useQuery<Category[]>({
-        queryKey: ['categories', orgSlug],
+        queryKey: ['categories', orgSlug, outletUseCase ?? 'all'],
         queryFn: async () => {
-            const res = await apiClient.get<{ data: Category[] } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`);
+            const res = await apiClient.get<{ data: Category[] } | Category[]>(
+                `/api/v1/${orgSlug}/inventory/categories`,
+                outletUseCase ? { use_case: outletUseCase } : undefined,
+            );
             return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
         },
         placeholderData: [],
@@ -292,6 +299,7 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
                                     orgSlug={orgSlug}
                                     value=""
                                     placeholder="Add an item to the sheet…"
+                                    type="GOODS,INGREDIENT,EQUIPMENT"
                                     enableScan={false}
                                     allowCreate={false}
                                     fixedDropdown

@@ -4,6 +4,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { useCreateUnit, useUnits } from '@/hooks/useUnits';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
+import { useOutletStore } from '@/store/outlet';
 import type { Unit } from '@/lib/api/units';
 import { X } from 'lucide-react';
 import { useState } from 'react';
@@ -22,6 +23,9 @@ export function UnitQuickCreateDialog({ orgSlug, initialName = '', onClose, onCr
   const [abbreviation, setAbbreviation] = useState('');
   const create = useCreateUnit(orgSlug);
   const { data: units } = useUnits(orgSlug);
+  // Stamp the creating outlet's use_case so a vertical-specific unit (tot, pot)
+  // never pollutes other verticals' pickers. HQ (no outlet) creates universal units.
+  const outletUseCase = useOutletStore((st) => st.outlet?.use_case);
 
   // Real duplicate prevention (not just a soft warning) — case-insensitive, matching
   // what the backend enforces (units are a global table; see inventory-api's
@@ -42,7 +46,11 @@ export function UnitQuickCreateDialog({ orgSlug, initialName = '', onClose, onCr
     if (!name.trim()) { toast.error('Name is required'); return; }
     if (duplicateError) { toast.error(duplicateError); return; }
     create.mutate(
-      { name: name.trim(), abbreviation: effectiveAbbr.toLowerCase() },
+      {
+        name: name.trim(),
+        abbreviation: effectiveAbbr.toLowerCase(),
+        use_cases: outletUseCase ? [outletUseCase] : undefined,
+      },
       {
         onSuccess: (u) => { toast.success('Unit created'); onCreated(u); },
         onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create unit')),

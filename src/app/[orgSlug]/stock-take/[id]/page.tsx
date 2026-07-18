@@ -248,11 +248,12 @@ export default function StockTakeDetailPage() {
             );
             return;
         }
-        // Not on the sheet — look the code up in the catalog and add it.
+        // Not on the sheet — look the code up in the catalog (stock-tracked types
+        // only: recipes/services hold no stock and can't be counted) and add it.
         try {
             const res = await apiClient.get<{ data: { id: string; sku: string; name: string }[] } | { id: string; sku: string; name: string }[]>(
                 `/api/v1/${orgSlug}/inventory/items`,
-                { search: code },
+                { search: code, type: 'GOODS,INGREDIENT,EQUIPMENT' },
             );
             const items = Array.isArray(res) ? res : (res as { data: { id: string; sku: string; name: string }[] }).data ?? [];
             const exact = items.find((i) => i.sku.toLowerCase() === lower) ?? items[0];
@@ -339,12 +340,14 @@ export default function StockTakeDetailPage() {
                             </div>
                         )}
 
-                        {/* Add item manually */}
+                        {/* Add item manually — stock-tracked types only: RECIPE/SERVICE
+                            items hold no stock of their own (their ingredients are counted). */}
                         {editable && (
                             <ItemSearchInput
                                 orgSlug={orgSlug}
                                 value=""
                                 placeholder="Add an item to this count…"
+                                type="GOODS,INGREDIENT,EQUIPMENT"
                                 enableScan={false}
                                 onSelect={(item) =>
                                     addLine.mutate(
