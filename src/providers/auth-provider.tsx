@@ -56,16 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Default landing for unauthenticated users = the PIN login page (the warehouse/desk
     // default, like pos-ui and library-ui), which itself offers "Sign in with your account
-    // (SSO)". Never bounce straight to SSO — that hangs on the callback for many users. The
-    // PIN page lives under /auth/ and renders with the bare layout, so this never loops.
+    // (SSO)". Before parking the user there, try ONE silent SSO probe (prompt=none) per
+    // browser session: users already signed in via pos/treasury carry an SSO session cookie,
+    // and the probe logs them straight in with no clicks (auth-api answers login_required
+    // when there is no session, and the callback quietly falls back to PIN login). Only
+    // probe while online — offline the accounts domain is unreachable and the redirect
+    // would strand the user on a browser error page.
     useEffect(() => {
         if (status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
-            const returnTo = encodeURIComponent(
-                typeof window !== 'undefined'
-                    ? window.location.pathname + window.location.search
-                    : `/${orgSlug}`,
-            );
-            router.replace(`/${orgSlug}/auth/pin-login?returnTo=${returnTo}`);
+            const path = typeof window !== 'undefined'
+                ? window.location.pathname + window.location.search
+                : `/${orgSlug}`;
+            const probed = typeof window !== 'undefined'
+                && sessionStorage.getItem('sso_silent_done') === '1';
+            const online = typeof navigator === 'undefined' || navigator.onLine;
+            if (!probed && online) {
+                useAuthStore.getState().redirectToSSO(orgSlug, `${window.location.origin}${path}`, { silent: true });
+                return;
+            }
+            router.replace(`/${orgSlug}/auth/pin-login?returnTo=${encodeURIComponent(path)}`);
         }
     }, [status, pathname, orgSlug, router]);
 

@@ -63,6 +63,8 @@ export interface AuthorizeParams {
     scope?: string;
     /** Pass explicitly so token is minted for this tenant (e.g. orgSlug from route). */
     tenant?: string;
+    /** OIDC prompt. "none" = silent probe: auth-api answers login_required instead of showing the login UI. */
+    prompt?: 'none';
 }
 
 export interface TokenExchangeParams {
@@ -71,7 +73,7 @@ export interface TokenExchangeParams {
     redirectUri: string;
 }
 
-export function buildAuthorizeUrl({ codeChallenge, state, redirectUri, scope, tenant: tenantParam }: AuthorizeParams): string {
+export function buildAuthorizeUrl({ codeChallenge, state, redirectUri, scope, tenant: tenantParam, prompt }: AuthorizeParams): string {
     const url = new URL('/api/v1/authorize', SSO_BASE_URL);
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('client_id', SSO_CLIENT_ID);
@@ -80,6 +82,7 @@ export function buildAuthorizeUrl({ codeChallenge, state, redirectUri, scope, te
     url.searchParams.set('state', state);
     url.searchParams.set('code_challenge', codeChallenge);
     url.searchParams.set('code_challenge_method', 'S256');
+    if (prompt) url.searchParams.set('prompt', prompt);
 
     const tenant = tenantParam ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') : null);
     if (tenant) {

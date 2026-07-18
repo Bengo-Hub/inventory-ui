@@ -112,6 +112,33 @@ function AuthCallbackContent() {
         }
     }, [status, orgSlug, router]);
 
+    // Silent-probe fallback: when the provider fired a background prompt=none authorize
+    // (user may already hold an SSO session from pos/treasury), a login_required answer —
+    // or any other error — just means "no usable session". Mark the probe done so it never
+    // loops this browser session and land on the PIN page with zero error UI.
+    const wasSilentProbe = typeof window !== 'undefined'
+        && sessionStorage.getItem('sso_silent_probe') === '1';
+    useEffect(() => {
+        if (!error || !wasSilentProbe) return;
+        sessionStorage.removeItem('sso_silent_probe');
+        sessionStorage.setItem('sso_silent_done', '1');
+        const returnTo = sanitizedReturnTo(sessionStorage.getItem('sso_return_to'), orgSlug);
+        sessionStorage.removeItem('sso_return_to');
+        router.replace(`/${orgSlug}/auth/pin-login${returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`);
+    }, [error, wasSilentProbe, orgSlug, router]);
+    // A code arriving from the probe means the session was live — clear the probe marker.
+    useEffect(() => {
+        if (code && typeof window !== 'undefined') sessionStorage.removeItem('sso_silent_probe');
+    }, [code]);
+
+    if (error && wasSilentProbe) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
     if (error || authError) {
         // Shared error card: renders wrong-organisation copy for access_denied /
         // membership errors and offers a "Continue to {lastTenant}" rescue when a

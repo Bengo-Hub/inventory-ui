@@ -44,7 +44,7 @@ interface AuthState {
     setSubscriptionInfo: (info: Record<string, unknown> | null) => void;
 
     initialize: () => Promise<void>;
-    redirectToSSO: (orgSlug: string, returnTo?: string) => Promise<void>;
+    redirectToSSO: (orgSlug: string, returnTo?: string, opts?: { silent?: boolean }) => Promise<void>;
     handleSSOCallback: (orgSlug: string, code: string, callbackUrl: string) => Promise<void>;
     hydrateFromWebAuthn: (tokens: { accessToken: string; refreshToken: string; expiresIn: number }, tenantSlug?: string) => Promise<void>;
     logout: () => Promise<void>;
@@ -99,7 +99,7 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            redirectToSSO: async (orgSlug: string, returnTo?: string) => {
+            redirectToSSO: async (orgSlug: string, returnTo?: string, opts?: { silent?: boolean }) => {
                 set({ status: 'loading', error: null });
                 try {
                     const verifier = generateCodeVerifier();
@@ -116,6 +116,10 @@ export const useAuthStore = create<AuthState>()(
                         sessionStorage.setItem('sso_org_slug', orgSlug);
                         localStorage.setItem('tenantSlug', orgSlug);
                         sessionStorage.setItem('sso_return_to', returnTo || `/${orgSlug}`);
+                        // Silent probe (prompt=none): mark it so the callback knows a
+                        // login_required answer means "fall back to PIN login quietly",
+                        // and so the provider never retries the probe this session.
+                        if (opts?.silent) sessionStorage.setItem('sso_silent_probe', '1');
                     }
 
                     const callbackUrl = `${window.location.origin}/${orgSlug}/auth/callback`;
@@ -124,6 +128,7 @@ export const useAuthStore = create<AuthState>()(
                         state,
                         redirectUri: callbackUrl,
                         tenant: orgSlug,
+                        prompt: opts?.silent ? 'none' : undefined,
                     });
 
                     window.location.href = authorizeUrl;
