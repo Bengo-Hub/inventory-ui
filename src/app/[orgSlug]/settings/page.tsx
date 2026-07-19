@@ -724,35 +724,60 @@ function IntegrationsTab() {
 // Documents tab — per-doc-type numbering (prefix / date / padding)
 // ══════════════════════════════════════════════════════════════════════════════
 
+// Suggested prefixes pre-filled ONLY when a tenant switches a doc type to the "Prefixed" format.
+// The platform default is pure numeric (no prefix, no date) — hints, not defaults.
+const SEQ_SUGGESTED_PREFIX: Record<string, string> = {
+  purchase_order: 'PO', grn: 'GRN', rfq: 'RFQ', requisition: 'REQ',
+  purchase_return: 'PRET', stock_transfer: 'TRF', stock_adjustment: 'ADJ', event_ticket: 'TKT',
+};
+
 function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentSequence }) {
   const update = useUpdateDocumentSequence(orgSlug);
+  const suggested = SEQ_SUGGESTED_PREFIX[seq.doc_type] ?? '';
+  // 'numeric' → pure sequential number (000001); 'prefixed' → prefix/date/separator style.
+  const [format, setFormat] = useState<'numeric' | 'prefixed'>(seq.prefix || seq.date_format ? 'prefixed' : 'numeric');
   const [prefix, setPrefix] = useState(seq.prefix);
   const [separator, setSeparator] = useState(seq.separator || '-');
   const [dateFormat, setDateFormat] = useState(seq.date_format ?? '');
   const [padding, setPadding] = useState(String(seq.padding));
 
+  const selectNumeric = () => { setFormat('numeric'); setPrefix(''); setDateFormat(''); };
+  const selectPrefixed = () => {
+    setFormat('prefixed');
+    setPrefix((p) => p || suggested);
+    setDateFormat((d) => d || 'YYMMDD');
+  };
+
   // Live local preview mirrors the backend formatter.
   const preview = (() => {
     const parts: string[] = [];
-    if (prefix.trim()) parts.push(prefix.trim());
+    if (format === 'prefixed' && prefix.trim()) parts.push(prefix.trim());
     const now = new Date();
     const yy = String(now.getFullYear()).slice(2);
     const yyyy = String(now.getFullYear());
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const dateMap: Record<string, string> = { YYMMDD: `${yy}${mm}${dd}`, YYYYMMDD: `${yyyy}${mm}${dd}`, MMYY: `${mm}${yy}`, YYYY: yyyy };
-    if (dateFormat && dateMap[dateFormat]) parts.push(dateMap[dateFormat]);
+    if (format === 'prefixed' && dateFormat && dateMap[dateFormat]) parts.push(dateMap[dateFormat]);
     const n = (seq.current_val + 1).toString().padStart(Math.max(1, parseInt(padding, 10) || 1), '0');
     parts.push(n);
     return parts.join(separator || '-');
   })();
 
   function save() {
+    const numeric = format === 'numeric';
     update.mutate(
-      { docType: seq.doc_type, data: { prefix: prefix.trim(), separator: separator || '-', date_format: dateFormat, padding: parseInt(padding, 10) || 6, reset_freq: seq.reset_freq } },
+      { docType: seq.doc_type, data: { prefix: numeric ? '' : prefix.trim(), separator: separator || '-', date_format: numeric ? '' : dateFormat, padding: parseInt(padding, 10) || 6, reset_freq: seq.reset_freq } },
       { onSuccess: () => toast.success(`${DOC_TYPE_LABELS[seq.doc_type] ?? seq.doc_type} numbering updated`), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update numbering')) },
     );
   }
+
+  const toggleBtn = (mode: 'numeric' | 'prefixed', label: string, onClick: () => void) => (
+    <button type="button" onClick={onClick}
+      className={`px-3 py-1 rounded text-sm ${format === mode ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+      {label}
+    </button>
+  );
 
   return (
     <div className="rounded-lg border border-border p-4 space-y-3">
@@ -760,21 +785,29 @@ function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentS
         <span className="font-bold text-sm">{DOC_TYPE_LABELS[seq.doc_type] ?? seq.doc_type}</span>
         <span className="text-xs font-mono text-muted-foreground">Next: <span className="font-bold text-foreground">{preview}</span></span>
       </div>
+      <div className="inline-flex rounded-md border border-border bg-background p-0.5">
+        {toggleBtn('numeric', 'Numeric', selectNumeric)}
+        {toggleBtn('prefixed', 'Prefixed', selectPrefixed)}
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div>
-          <label className={labelClass}>Prefix</label>
-          <input className={inputClass} value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} placeholder="PO" />
-        </div>
-        <div>
-          <label className={labelClass}>Separator</label>
-          <input className={inputClass} value={separator} maxLength={3} onChange={(e) => setSeparator(e.target.value)} placeholder="-" />
-        </div>
-        <div>
-          <label className={labelClass}>Date format</label>
-          <select className={inputClass} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
-            {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-          </select>
-        </div>
+        {format === 'prefixed' && (
+          <>
+            <div>
+              <label className={labelClass}>Prefix</label>
+              <input className={inputClass} value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} placeholder={suggested || 'PO'} />
+            </div>
+            <div>
+              <label className={labelClass}>Separator</label>
+              <input className={inputClass} value={separator} maxLength={3} onChange={(e) => setSeparator(e.target.value)} placeholder="-" />
+            </div>
+            <div>
+              <label className={labelClass}>Date format</label>
+              <select className={inputClass} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+                {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+              </select>
+            </div>
+          </>
+        )}
         <div>
           <label className={labelClass}>Padding</label>
           <input className={inputClass} type="number" min={1} max={12} value={padding} onChange={(e) => setPadding(e.target.value)} />
@@ -798,7 +831,7 @@ function DocumentsTab({ orgSlug }: { orgSlug: string }) {
           <FileText className="h-4 w-4 text-primary" />
           <span className="font-bold text-sm">Document Numbering</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">Configure the number format for each document type (e.g. PO-260625-000001). Changes apply to newly created documents.</p>
+        <p className="text-xs text-muted-foreground mt-1">Choose pure numeric numbering (the default, e.g. 000001) or a prefixed/dated format (e.g. PO-260625-000001) per document type. Changes apply to newly created documents.</p>
       </CardHeader>
       <CardContent className="space-y-3">
         {isLoading ? (
