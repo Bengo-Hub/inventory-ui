@@ -5,12 +5,14 @@ import { Pagination } from '@/components/ui/pagination';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
+import { useItems, useMarkItemEOL, useRestoreItemEOL } from '@/hooks/useItems';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, Minus, Plus, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { AlertTriangle, BookOpen, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -465,6 +467,33 @@ export default function StockPage() {
 
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.STOCK_CHANGE, P.STOCK_MANAGE]);
+    // Marking / restoring End-of-Life mirrors the backend guard (inventory.items.delete).
+    const canManageEOL = canAny([P.CATALOG_DELETE, P.CATALOG_MANAGE]);
+
+    // Top-level view: live stock levels vs the End-of-Life tab (items awaiting purge/restore).
+    const [tab, setTab] = useState<'levels' | 'eol'>('levels');
+
+    // End-of-Life listing — reuses the items endpoint with status=eol (only EOL items).
+    const { data: eolItems, isLoading: eolLoading } = useItems(orgSlug, { status: 'eol', limit: 200 });
+    const eolCount = eolItems?.total ?? eolItems?.data.length ?? 0;
+
+    const markEOL = useMarkItemEOL(orgSlug);
+    const restoreEOL = useRestoreItemEOL(orgSlug);
+    // Pending confirm target: mark hides the item everywhere; restore un-marks it.
+    const [eolConfirm, setEolConfirm] = useState<{ sku: string; name: string; action: 'mark' | 'restore' } | null>(null);
+
+    function runEOLConfirm() {
+        if (!eolConfirm) return;
+        const { sku, name, action } = eolConfirm;
+        const mut = action === 'mark' ? markEOL : restoreEOL;
+        mut.mutate(sku, {
+            onSuccess: () => {
+                toast.success(action === 'mark' ? `${name} marked End-of-Life` : `${name} restored`);
+                setEolConfirm(null);
+            },
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Action failed')),
+        });
+    }
 
     const { data: categories } = useCategories(orgSlug);
 
@@ -503,6 +532,22 @@ export default function StockPage() {
                 <p className="text-muted-foreground mt-1">Real-time stock availability across all warehouses</p>
             </div>
 
+            {/* View tabs (capsule) — live stock vs the End-of-Life holding area. */}
+            <div className="flex items-center gap-1 rounded-lg border border-border p-0.5 bg-muted/30 w-fit">
+                {([['levels', 'Stock Levels'], ['eol', 'End of Life']] as const).map(([key, label]) => (
+                    <button
+                        key={key}
+                        onClick={() => setTab(key)}
+                        className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                            tab === key ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        {label}{key === 'eol' && eolCount > 0 ? ` (${eolCount})` : ''}
+                    </button>
+                ))}
+            </div>
+
+            {tab === 'levels' && (<>
             {(lowStockCount > 0 || outOfStockCount > 0) && (
                 <div className="flex flex-wrap gap-3">
                     {outOfStockCount > 0 && (
@@ -639,26 +684,42 @@ export default function StockPage() {
                                                     <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
                                                 </td>
                                                 <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    {canAdjust && (
+                                                    {(canAdjust || canManageEOL) && (
                                                         <div className="flex items-center justify-end gap-1">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                title="Record Adjustment"
-                                                                aria-label="Record adjustment"
-                                                                onClick={() => openItem(item, 'adjust')}
-                                                            >
-                                                                <SlidersHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                title="Break Down Stock"
-                                                                aria-label="Break down stock"
-                                                                onClick={() => openItem(item, 'breakdown')}
-                                                            >
-                                                                <Split className="h-4 w-4" />
-                                                            </Button>
+                                                            {canAdjust && (
+                                                                <>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        title="Record Adjustment"
+                                                                        aria-label="Record adjustment"
+                                                                        onClick={() => openItem(item, 'adjust')}
+                                                                    >
+                                                                        <SlidersHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="sm"
+                                                                        title="Break Down Stock"
+                                                                        aria-label="Break down stock"
+                                                                        onClick={() => openItem(item, 'breakdown')}
+                                                                    >
+                                                                        <Split className="h-4 w-4" />
+                                                                    </Button>
+                                                                </>
+                                                            )}
+                                                            {canManageEOL && (
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    title="Mark End-of-Life"
+                                                                    aria-label="Mark End-of-Life"
+                                                                    className="text-destructive hover:text-destructive"
+                                                                    onClick={() => setEolConfirm({ sku: item.sku, name: item.item_name, action: 'mark' })}
+                                                                >
+                                                                    <PackageX className="h-4 w-4" />
+                                                                </Button>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </td>
@@ -674,6 +735,84 @@ export default function StockPage() {
                     )}
                 </CardContent>
             </Card>
+            </>)}
+
+            {tab === 'eol' && (
+                <Card>
+                    <CardHeader>
+                        <div>
+                            <h2 className="text-sm font-semibold">End of Life</h2>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                Items marked End-of-Life are hidden from the POS, catalog, and ordering. They are
+                                permanently deleted after the retention window — restore one here to bring it back.
+                            </p>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b border-border bg-muted/30">
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">SKU</th>
+                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Marked EOL</th>
+                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border">
+                                    {eolLoading ? (
+                                        <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading…</td></tr>
+                                    ) : (eolItems?.data.length ?? 0) === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                                <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                                <p className="text-muted-foreground">No End-of-Life items</p>
+                                                <p className="text-xs text-muted-foreground/70 mt-1">Mark an out-of-stock item End-of-Life to move it here</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        eolItems?.data.map((it) => (
+                                            <tr key={it.id} className="hover:bg-accent/30 transition-colors">
+                                                <td className="px-6 py-4 font-medium">{it.name}</td>
+                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{it.sku}</td>
+                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
+                                                    {it.end_of_life_at ? new Date(it.end_of_life_at).toLocaleDateString() : '—'}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {canManageEOL && (
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            title="Restore"
+                                                            onClick={() => setEolConfirm({ sku: it.sku, name: it.name, action: 'restore' })}
+                                                        >
+                                                            <RotateCcw className="h-4 w-4 mr-1" /> Restore
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            <ConfirmDialog
+                open={!!eolConfirm}
+                variant={eolConfirm?.action === 'mark' ? 'danger' : 'info'}
+                title={eolConfirm?.action === 'mark' ? 'Mark End-of-Life?' : 'Restore item?'}
+                description={
+                    eolConfirm?.action === 'mark'
+                        ? `"${eolConfirm?.name}" will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore it before then from the End of Life tab.`
+                        : `"${eolConfirm?.name}" will be re-activated and reappear in the catalog and POS.`
+                }
+                confirmLabel={eolConfirm?.action === 'mark' ? 'Mark End-of-Life' : 'Restore'}
+                onConfirm={runEOLConfirm}
+                onCancel={() => setEolConfirm(null)}
+            />
 
             {selectedItem && (
                 <StockDrawer

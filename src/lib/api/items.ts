@@ -25,6 +25,8 @@ export interface Item {
   preferred_supplier_name?: string;
   unit_id?: string;
   is_active: boolean;
+  // End-of-Life: non-null = the item is marked EOL (hidden everywhere) and awaiting auto-purge.
+  end_of_life_at?: string | null;
   image_url?: string;
   // Multi-image gallery (ItemAsset). image_url above stays the PRIMARY image for
   // backward compatibility; images[] is the full ordered set (primary first).
@@ -327,6 +329,15 @@ export const itemsApi = {
 
   delete: (orgSlug: string, sku: string) =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${sku}`),
+
+  // End-of-Life: mark hides the item everywhere (POS, lists, ordering) and schedules it for
+  // auto hard-delete after the retention window; restore un-marks it. The EOL listing itself is
+  // itemsApi.list(orgSlug, { status: 'eol' }).
+  markEOL: (orgSlug: string, sku: string) =>
+    apiClient.post<Item>(`${itemsBase(orgSlug)}/${sku}/eol`, {}),
+
+  restoreEOL: (orgSlug: string, sku: string) =>
+    apiClient.post<Item>(`${itemsBase(orgSlug)}/${sku}/eol/restore`, {}),
 
   listEvents: (orgSlug: string, params?: { page?: number; limit?: number }): Promise<PaginatedItems> =>
     apiClient.get<PaginatedItems>(`/api/v1/${orgSlug}/inventory/events`, params as Record<string, string | number | undefined>),

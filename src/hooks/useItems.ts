@@ -55,3 +55,26 @@ export function useDeleteItem(orgSlug: string) {
     },
   });
 }
+
+// invalidateItemViews refreshes every surface an EOL transition affects: item lists
+// (including the End-of-Life tab) and the stock-levels view the item vanishes from.
+function invalidateItemViews(queryClient: ReturnType<typeof useQueryClient>, orgSlug: string) {
+  queryClient.invalidateQueries({ queryKey: [ITEMS_KEY, orgSlug] });
+  queryClient.invalidateQueries({ queryKey: ['stock', orgSlug] });
+}
+
+export function useMarkItemEOL(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sku: string) => itemsApi.markEOL(orgSlug, sku),
+    onSuccess: () => invalidateItemViews(queryClient, orgSlug),
+  });
+}
+
+export function useRestoreItemEOL(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (sku: string) => itemsApi.restoreEOL(orgSlug, sku),
+    onSuccess: () => invalidateItemViews(queryClient, orgSlug),
+  });
+}
