@@ -109,4 +109,69 @@ export const stockApi = {
 
   bulkAvailability: (orgSlug: string, skus: string[]) =>
     apiClient.post<Record<string, { available: number; reserved: number }>>(`/api/v1/${orgSlug}/inventory/availability`, { skus }),
+
+  // Product stock history — the Go-Digital-style per-item ledger (summary cards +
+  // unified movement rows from adjustments/purchases/sales/returns/transfers).
+  itemHistory: (orgSlug: string, sku: string, params?: StockHistoryParams) =>
+    apiClient.get<StockHistoryResponse>(
+      `/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(sku)}/stock-history`,
+      params as Record<string, string | number | undefined>,
+    ),
 };
+
+// ── Product stock history ─────────────────────────────────────────────────────
+
+export interface StockHistoryParams {
+  warehouse_id?: string;
+  /** RFC3339 or YYYY-MM-DD. */
+  date_from?: string;
+  date_to?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface StockMovementRow {
+  type:
+    | 'opening_stock'
+    | 'purchase'
+    | 'sale'
+    | 'sell_return'
+    | 'purchase_return'
+    | 'transfer_in'
+    | 'transfer_out'
+    | 'adjustment';
+  label: string;
+  quantity_change: number;
+  /** Stock level after the movement — present for adjustment-ledger rows only. */
+  quantity_after?: number;
+  occurred_at: string;
+  reference?: string;
+  warehouse_id?: string;
+  warehouse_name?: string;
+  actor_id?: string;
+  /** Supplier name (purchases) or order reference (sales). */
+  counterparty?: string;
+}
+
+export interface StockHistorySummary {
+  opening_stock: number;
+  total_purchased: number;
+  total_sell_returns: number;
+  transfers_in: number;
+  total_sold: number;
+  total_purchase_returns: number;
+  transfers_out: number;
+  /** Net of miscellaneous adjustments (damage, shrinkage, corrections…). */
+  total_adjusted: number;
+  current_stock: number;
+}
+
+export interface StockHistoryResponse {
+  item: { id: string; sku: string; name: string; unit_abbreviation?: string };
+  summary: StockHistorySummary;
+  data: StockMovementRow[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+}

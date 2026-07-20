@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams } from '@/lib/api/stock';
+import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams } from '@/lib/api/stock';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
@@ -68,5 +68,15 @@ export function useBulkAvailability(orgSlug: string, skus: string[]) {
     queryFn: () => stockApi.bulkAvailability(orgSlug, skus),
     enabled: !!orgSlug && skus.length > 0,
     staleTime: 15_000,
+  });
+}
+
+// Product stock history — the per-item ledger modal (summary cards + movements).
+export function useItemStockHistory(orgSlug: string, sku: string, params?: StockHistoryParams) {
+  return useQuery({
+    queryKey: ['stock-history', orgSlug, sku, params],
+    queryFn: () => stockApi.itemHistory(orgSlug, sku, params),
+    enabled: !!orgSlug && !!sku,
+    staleTime: 30_000,
   });
 }

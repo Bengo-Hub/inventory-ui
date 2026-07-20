@@ -193,6 +193,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Never charged at the POS even if a selling price exists (free accompaniments,
   // supplies like tissue/packaging); stock still deducts on sale.
   const [nonBillable, setNonBillable] = useState(item?.non_billable ?? false);
+  // Not for sale: stocked/purchased/counted like any item but hidden from EVERY
+  // sales surface (POS terminal, back-office sales, ordering storefront) —
+  // ingredients bought pre-portioned, cleaning supplies, internal consumables.
+  const [notForSale, setNotForSale] = useState(item?.not_for_sale ?? false);
   // Reusable menu component: this RECIPE may be picked as an ingredient in OTHER
   // recipes (Black Tea inside an Iced Passion Tea). Needs a content-per-portion
   // declaration for ml/g lines to cost + deduct fractions of a portion.
@@ -312,6 +316,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setIsPerishable(item.is_perishable);
       setTrackLots(item.track_lots);
       setNonBillable(item.non_billable ?? false);
+      setNotForSale(item.not_for_sale ?? false);
       setUsableInRecipes(item.usable_in_recipes ?? false);
       setTrackSerial(item.track_serial_numbers ?? false);
       setShelfLifeDays(item.shelf_life_days != null ? String(item.shelf_life_days) : '');
@@ -514,6 +519,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         category_name: categories?.find((c) => c.id === categoryId)?.name,
         selling_price: sellingPrice !== '' ? parseDecimal(sellingPrice) : 0,
         non_billable: nonBillable,
+        not_for_sale: notForSale,
         usable_in_recipes: usableInRecipes,
         // Content per portion — how much one portion contains (300 ml pot of tea);
         // lets OTHER recipes reference this item in ml/g lines.
@@ -595,6 +601,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         : (item && (isStockable || isRecipe) && item.unit_content_qty != null ? 0 : undefined),
       unit_content_uom: (isStockable || isRecipe) && unitContentQty !== '' && parseFloat(unitContentQty) > 0 ? unitContentUom : undefined,
       usable_in_recipes: isRecipe ? usableInRecipes : undefined,
+      not_for_sale: notForSale,
       stock_tracking_mode: stockTrackingMode !== 'default' || item ? stockTrackingMode : undefined,
       min_selling_price: minSellingPrice !== '' ? parseDecimal(minSellingPrice) : undefined,
       max_selling_price: maxSellingPrice !== '' ? parseDecimal(maxSellingPrice) : undefined,
@@ -1004,6 +1011,21 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   </span>
                 </label>
               )}
+
+              {/* Not for sale — hidden from EVERY sales surface (POS, ordering) while still
+                  stocked/purchased/counted. For raw ingredients bought pre-portioned,
+                  cleaning supplies, internal consumables. Distinct from non-billable
+                  (which still reaches the till at KES 0). */}
+              <label className="flex items-start gap-2 text-sm cursor-pointer rounded-lg border border-border p-3" title="Excluded from all sales interfaces (POS, ordering) — the item stays fully stockable and purchasable.">
+                <input type="checkbox" checked={notForSale} onChange={(e) => setNotForSale(e.target.checked)} className="rounded mt-0.5" />
+                <span>
+                  Not for sale
+                  <br />
+                  <span className="text-xs text-muted-foreground font-normal">
+                    Never appears on any sales interface (POS, ordering). For ingredients, cleaning supplies and internal consumables that are still stocked, purchased and counted.
+                  </span>
+                </span>
+              </label>
 
               {/* Reusable menu component — RECIPE items that other recipes may consume
                   (Black Tea 30 ml inside an Iced Passion Tea). The content-per-portion

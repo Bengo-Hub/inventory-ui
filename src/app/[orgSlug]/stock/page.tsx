@@ -12,7 +12,8 @@ import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { AlertTriangle, BookOpen, History, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -58,12 +59,14 @@ function StockDrawer({
     onClose,
     canAdjust,
     initialAction,
+    onViewHistory,
 }: {
     item: StockLevel;
     orgSlug: string;
     onClose: () => void;
     canAdjust: boolean;
     initialAction?: 'adjust' | 'breakdown';
+    onViewHistory?: () => void;
 }) {
     const [adjType, setAdjType] = useState<'add' | 'remove'>('add');
     const [adjItemSku, setAdjItemSku] = useState(item.sku);
@@ -428,6 +431,14 @@ function StockDrawer({
                 )}
 
                 {/* Recent adjustments */}
+                {onViewHistory && (
+                    <div className="border-t border-border pt-4">
+                        <Button variant="outline" size="sm" className="w-full" onClick={onViewHistory}>
+                            <History className="h-4 w-4 mr-1.5" />Product stock history
+                        </Button>
+                    </div>
+                )}
+
                 {(itemAdj?.length ?? 0) > 0 && (
                     <div className="border-t border-border pt-4">
                         <h3 className="text-sm font-semibold mb-2">Recent Adjustments</h3>
@@ -459,6 +470,8 @@ export default function StockPage() {
     const [page, setPage] = useState(1);
     const [selectedItem, setSelectedItem] = useState<StockLevel | null>(null);
     const [drawerAction, setDrawerAction] = useState<'adjust' | 'breakdown' | undefined>(undefined);
+    // Centralized per-item stock ledger modal (Go-Digital "Product stock history").
+    const [historySku, setHistorySku] = useState<string | null>(null);
 
     function openItem(item: StockLevel, action?: 'adjust' | 'breakdown') {
         setSelectedItem(item);
@@ -684,8 +697,16 @@ export default function StockPage() {
                                                     <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
                                                 </td>
                                                 <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                    {(canAdjust || canManageEOL) && (
                                                         <div className="flex items-center justify-end gap-1">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                title="Product stock history"
+                                                                aria-label="Product stock history"
+                                                                onClick={() => setHistorySku(item.sku)}
+                                                            >
+                                                                <History className="h-4 w-4" />
+                                                            </Button>
                                                             {canAdjust && (
                                                                 <>
                                                                     <Button
@@ -721,7 +742,6 @@ export default function StockPage() {
                                                                 </Button>
                                                             )}
                                                         </div>
-                                                    )}
                                                 </td>
                                             </tr>
                                         );
@@ -822,7 +842,13 @@ export default function StockPage() {
                     onClose={() => { setSelectedItem(null); setDrawerAction(undefined); }}
                     canAdjust={canAdjust}
                     initialAction={drawerAction}
+                    onViewHistory={() => setHistorySku(selectedItem.sku)}
                 />
+            )}
+
+            {/* Centralized Product stock history ledger (per-row button + drawer link) */}
+            {historySku && (
+                <ProductStockHistoryModal orgSlug={orgSlug} sku={historySku} onClose={() => setHistorySku(null)} />
             )}
         </div>
     );

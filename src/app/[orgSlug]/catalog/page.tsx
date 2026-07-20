@@ -7,7 +7,9 @@ import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
-import { useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
+import { useBulkDeleteItems, useBulkItemStatus, useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
+import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
@@ -15,8 +17,8 @@ import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
-import { Pagination } from '@/components/ui/pagination';
-import { AlertTriangle, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, Loader2, Package, Pencil, Plus, Printer, Search, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Ban, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
+import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -28,7 +30,6 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
 
 const KES = (n?: number | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
@@ -391,18 +392,30 @@ export default function CatalogPage() {
     () => catalogScopeFor(useOutletStore.getState().outlet?.use_case).defaultItemUseCase ?? '',
   );
   const [statusFilter, setStatusFilter] = useState('active');
+  // "Not for selling" filter (mirrors Go-Digital's checkbox): show only items
+  // flagged not_for_sale (ingredients, supplies).
+  const [notForSaleOnly, setNotForSaleOnly] = useState(false);
+  // Server-driven DataTable sort (whitelisted columns on inventory-api).
+  const [sort, setSort] = useState<SortState | null>(null);
+  const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
+  // Row selection for bulk multi-select actions (keyed by item id).
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState<{ action: 'delete' | 'deactivate' | 'activate' | 'not_for_sale_on' | 'not_for_sale_off'; ids: string[] } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   useCreateFromQuery(() => setCreateOpen(true), 'item'); // mobile quick-add → open Add Item
   const [viewItem, setViewItem] = useState<Item | null>(null);
   const [editItem, setEditItem] = useState<Item | null>(null);
   const [deleteItem, setDeleteItem] = useState<Item | null>(null);
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
+  const [historySku, setHistorySku] = useState<string | null>(null);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
 
   const createItem = useCreateItem(orgSlug);
   const updateItem = useUpdateItem(orgSlug);
   const deleteItemMut = useDeleteItem(orgSlug);
+  const bulkDelete = useBulkDeleteItems(orgSlug);
+  const bulkStatus = useBulkItemStatus(orgSlug);
   const { data: categories } = useCategories(orgSlug);
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
   const [selectedWarehouseCode, setSelectedWarehouseCode] = useState('');
@@ -461,13 +474,134 @@ export default function CatalogPage() {
     ...(categoryId ? { category_id: categoryId } : {}),
     ...(typeFilter ? { type: typeFilter } : {}),
     ...(useCaseFilter ? { use_case: useCaseFilter } : {}),
+    ...(notForSaleOnly ? { not_for_sale: 'only' as const } : {}),
+    ...(sort ? { sort: sort.key, dir: sort.dir } : {}),
     status: statusFilter,
     page,
-    limit: ITEMS_PER_PAGE,
+    limit: pageSize,
   });
 
   const items = itemsPage?.data ?? [];
-  const totalPages = Math.max(1, Math.ceil((itemsPage?.total ?? 0) / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil((itemsPage?.total ?? 0) / pageSize));
+
+  // Bulk multi-select actions — idempotent server-side; the skipped[] breakdown
+  // is surfaced in the toast so users see e.g. "2 updated, 1 skipped (in use)".
+  const bulkLabel: Record<string, string> = {
+    delete: 'delete', deactivate: 'deactivate', activate: 'activate',
+    not_for_sale_on: 'mark not-for-sale', not_for_sale_off: 'mark for sale',
+  };
+  function runBulk(action: NonNullable<typeof bulkConfirm>['action'], ids: string[]) {
+    const done = (res: { processed: number; skipped: { reason: string }[] }) => {
+      const parts = [`${res.processed} ${bulkLabel[action]}${res.processed === 1 ? '' : 'd'}`];
+      if (res.skipped.length) parts.push(`${res.skipped.length} skipped`);
+      toast.success(parts.join(', '));
+      setSelected(new Set());
+      setBulkConfirm(null);
+    };
+    const onError = async (e: unknown) => toast.error(await apiErrorMessage(e, 'Bulk action failed'));
+    if (action === 'delete') bulkDelete.mutate(ids, { onSuccess: done, onError });
+    else bulkStatus.mutate({ ids, action }, { onSuccess: done, onError });
+  }
+
+  // Selection may reference items no longer on the current page (filter/page change);
+  // resolve the currently-visible selected ids for the bulk bar count/actions.
+  const selectedIds = [...selected];
+
+  // Inline-editable price cell reused by the Wholesale/Retail columns. INGREDIENT
+  // items are never sold — their cell shows the cost basis, not a price.
+  function renderPriceCell(item: Item, which: 'min' | 'max') {
+    if (item.type === 'INGREDIENT') {
+      if (which === 'min') return <span className="text-muted-foreground">—</span>;
+      return (
+        <span
+          className="font-mono text-xs text-muted-foreground tabular-nums"
+          title="Cost basis — ingredients are costed (per pack / base unit), not priced"
+        >
+          {item.purchase_price != null && item.purchase_unit
+            ? `${item.purchase_price.toFixed(2).replace(/\.?0+$/, '')}/${item.purchase_unit}`
+            : item.cost_price != null
+              ? `${item.cost_price.toFixed(4).replace(/\.?0+$/, '')}/${unitAbbrById.get(item.unit_id ?? '') ?? 'unit'}`
+              : '—'}
+        </span>
+      );
+    }
+    const value = which === 'min' ? (item.min_selling_price ?? null) : (item.max_selling_price ?? item.selling_price ?? null);
+    return (
+      <PriceCell
+        value={value}
+        editable={canChange && item.type !== 'RECIPE'}
+        saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+        onSave={(n) =>
+          updateItem.mutate(
+            { sku: item.sku, data: { ...itemToUpdateInput(item), [which === 'min' ? 'min_selling_price' : 'max_selling_price']: n } },
+            {
+              onSuccess: () => toast.success(`${item.name} ${which === 'min' ? 'wholesale' : 'retail'} price updated`),
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
+            },
+          )
+        }
+      />
+    );
+  }
+
+  const columns: DataTableColumn<Item>[] = [
+    { key: 'sku', header: 'SKU', accessor: (i) => i.sku, sortable: true, cellClassName: 'font-mono text-xs text-muted-foreground', render: (i) => i.sku },
+    {
+      key: 'name', header: 'Name', accessor: (i) => i.name, sortable: true, filterable: true,
+      render: (i) => (
+        <button className="font-medium hover:text-primary transition-colors text-left" onClick={() => setViewItem(i)}>
+          {i.name}
+          {i.not_for_sale && <Badge variant="outline" className="ml-1.5 text-[10px]">Not for sale</Badge>}
+        </button>
+      ),
+    },
+    { key: 'category_name', header: 'Category', accessor: (i) => i.category_name ?? '—', filterable: true, hideBelow: 'md', cellClassName: 'text-muted-foreground' },
+    {
+      key: 'type', header: 'Type', accessor: (i) => i.type, sortable: true, filterable: true, hideBelow: 'sm',
+      render: (i) => <Badge variant="outline" className="capitalize">{i.type?.toLowerCase() ?? '—'}</Badge>,
+    },
+    { key: 'min_selling_price', header: 'Wholesale', align: 'right', sortable: true, hideBelow: 'lg', accessor: (i) => i.min_selling_price, render: (i) => renderPriceCell(i, 'min') },
+    { key: 'max_selling_price', header: 'Retail', align: 'right', sortable: true, accessor: (i) => i.max_selling_price ?? i.selling_price, render: (i) => renderPriceCell(i, 'max') },
+    {
+      key: 'is_active', header: 'Status', accessor: (i) => (i.is_active ? 'Active' : 'Inactive'), sortable: true, filterable: true,
+      render: (i) => <Badge variant={i.is_active ? 'success' : 'outline'}>{i.is_active ? 'Active' : 'Inactive'}</Badge>,
+    },
+    {
+      key: 'actions', header: '', align: 'right', exportable: false,
+      render: (item) => (
+        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+          <button title="View details" aria-label="View item details" onClick={() => setViewItem(item)}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Eye className="h-4 w-4" /></button>
+          <button title="Product stock history" aria-label="Product stock history" onClick={() => setHistorySku(item.sku)}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><History className="h-4 w-4" /></button>
+          <button title="Show / print barcode" aria-label="Show item barcode" onClick={() => setBarcodeItem(item)}
+            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Barcode className="h-4 w-4" /></button>
+          {canChange && (
+            <button title="Edit item" aria-label="Edit item" onClick={() => setEditItem(item)}
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Edit2 className="h-4 w-4" /></button>
+          )}
+          {canDelete && (
+            <button title="Delete item" aria-label="Delete item" onClick={() => setDeleteItem(item)}
+              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
+  // Bulk actions gated by the same permissions as the single-row actions.
+  const bulkActions: BulkAction[] = [];
+  if (canChange) {
+    bulkActions.push(
+      { key: 'activate', label: 'Activate', icon: <BadgeCheck className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'activate', ids }) },
+      { key: 'deactivate', label: 'Deactivate', icon: <PackageX className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'deactivate', ids }) },
+      { key: 'nfs_on', label: 'Mark not-for-sale', icon: <Ban className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'not_for_sale_on', ids }) },
+      { key: 'nfs_off', label: 'Mark for sale', icon: <ShoppingCart className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'not_for_sale_off', ids }) },
+    );
+  }
+  if (canDelete) {
+    bulkActions.push({ key: 'delete', label: 'Delete', icon: <Trash2 className="h-3.5 w-3.5" />, variant: 'destructive', onClick: (ids) => setBulkConfirm({ action: 'delete', ids }) });
+  }
 
   return (
     <>
@@ -641,6 +775,17 @@ export default function CatalogPage() {
                   </button>
                 ))}
               </div>
+              {/* Not-for-selling filter (Go-Digital parity) — surface only the items
+                  hidden from every sales interface (ingredients, supplies). */}
+              <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground cursor-pointer select-none rounded-lg border border-border px-3 py-1.5">
+                <input
+                  type="checkbox"
+                  checked={notForSaleOnly}
+                  onChange={(e) => { setNotForSaleOnly(e.target.checked); setPage(1); }}
+                  className="rounded border-input"
+                />
+                Not for selling
+              </label>
               {/* Type filter — scoped to the item types relevant to this outlet's use_case */}
               <div className="flex items-center gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
                 {['', ...scope.itemTypes].map((t) => (
@@ -697,182 +842,33 @@ export default function CatalogPage() {
             </div>
           </CardHeader>
 
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border bg-muted/30">
-                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">SKU</th>
-                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Category</th>
-                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
-                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Wholesale</th>
-                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Retail</th>
-                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {isLoading ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                        Loading items...
-                      </td>
-                    </tr>
-                  ) : isError ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center">
-                        <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                        <p className="text-muted-foreground">Couldn&apos;t load items</p>
-                        <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                      </td>
-                    </tr>
-                  ) : items.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-6 py-12 text-center">
-                        <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                        <p className="text-muted-foreground">No {nomenclature.itemPlural.toLowerCase()} found</p>
-                        {(search || categoryId || typeFilter || statusFilter !== 'active') && (
-                          <button
-                            className="text-sm text-primary hover:underline mt-1"
-                            onClick={() => { setSearch(''); setCategoryId(''); setTypeFilter(''); setUseCaseFilter(scope.defaultItemUseCase ?? ''); setStatusFilter('active'); setPage(1); }}
-                          >
-                            Clear filters
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    items.map((item) => (
-                      <tr key={item.id} className="hover:bg-accent/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{item.sku}</td>
-                        <td className="px-6 py-4">
-                          <button
-                            className="font-medium hover:text-primary transition-colors text-left"
-                            onClick={() => setViewItem(item)}
-                          >
-                            {item.name}
-                          </button>
-                        </td>
-                        <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                          {item.category_name ?? '—'}
-                        </td>
-                        <td className="px-6 py-4 hidden sm:table-cell">
-                          <Badge variant="outline" className="capitalize">
-                            {item.type?.toLowerCase() ?? '—'}
-                          </Badge>
-                        </td>
-                        {/* Wholesale (min) / Retail (max) price profiles — inline-editable; a
-                            RECIPE item is priced from its recipe, so its cells are read-only.
-                            INGREDIENT items are never sold: no wholesale/retail is shown or
-                            derived — only the EP cost per BASE unit matters (it feeds recipe
-                            line/EP cost calculations). */}
-                        {item.type === 'INGREDIENT' ? (
-                          <>
-                            <td className="px-6 py-4 text-right hidden lg:table-cell text-muted-foreground">—</td>
-                            <td
-                              className="px-6 py-4 text-right font-mono text-xs text-muted-foreground tabular-nums"
-                              title="Cost basis — ingredients are costed (per pack / base unit), not priced"
-                            >
-                              {/* Show the REAL cost basis: the purchase pack when known
-                                  ("52.5/500 ml", "158/kg"), else EP cost per base unit ("0.13/g"). */}
-                              {item.purchase_price != null && item.purchase_unit
-                                ? `${item.purchase_price.toFixed(2).replace(/\.?0+$/, '')}/${item.purchase_unit}`
-                                : item.cost_price != null
-                                  ? `${item.cost_price.toFixed(4).replace(/\.?0+$/, '')}/${unitAbbrById.get(item.unit_id ?? '') ?? 'unit'}`
-                                  : '—'}
-                            </td>
-                          </>
-                        ) : (
-                          <>
-                            <td className="px-6 py-4 text-right hidden lg:table-cell">
-                              <PriceCell
-                                value={item.min_selling_price ?? null}
-                                editable={canChange && item.type !== 'RECIPE'}
-                                saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
-                                onSave={(n) =>
-                                  updateItem.mutate(
-                                    { sku: item.sku, data: { ...itemToUpdateInput(item), min_selling_price: n } },
-                                    {
-                                      onSuccess: () => toast.success(`${item.name} wholesale price updated`),
-                                      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
-                                    },
-                                  )
-                                }
-                              />
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <PriceCell
-                                value={item.max_selling_price ?? item.selling_price ?? null}
-                                editable={canChange && item.type !== 'RECIPE'}
-                                saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
-                                onSave={(n) =>
-                                  updateItem.mutate(
-                                    { sku: item.sku, data: { ...itemToUpdateInput(item), max_selling_price: n } },
-                                    {
-                                      onSuccess: () => toast.success(`${item.name} retail price updated`),
-                                      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update price')),
-                                    },
-                                  )
-                                }
-                              />
-                            </td>
-                          </>
-                        )}
-                        <td className="px-6 py-4">
-                          <Badge variant={item.is_active ? 'success' : 'outline'}>
-                            {item.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-end gap-0.5">
-                            <button
-                              title="View details"
-                              aria-label="View item details"
-                              onClick={() => setViewItem(item)}
-                              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            <button
-                              title="Show / print barcode"
-                              aria-label="Show item barcode"
-                              onClick={() => setBarcodeItem(item)}
-                              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Barcode className="h-4 w-4" />
-                            </button>
-                            {canChange && (
-                              <button
-                                title="Edit item"
-                                aria-label="Edit item"
-                                onClick={() => setEditItem(item)}
-                                className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"
-                              >
-                                <Edit2 className="h-4 w-4" />
-                              </button>
-                            )}
-                            {canDelete && (
-                              <button
-                                title="Delete item"
-                                aria-label="Delete item"
-                                onClick={() => setDeleteItem(item)}
-                                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {!isLoading && items.length > 0 && (
-              <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-            )}
+          <CardContent className="p-0 border-0">
+            <DataTable<Item>
+              columns={columns}
+              rows={items}
+              rowKey={(i) => i.id}
+              loading={isLoading}
+              error={isError}
+              onRetry={() => refetch()}
+              emptyText={`No ${nomenclature.itemPlural.toLowerCase()} found`}
+              storageKey="inventory-catalog"
+              selectable={canChange || canDelete}
+              selected={selected}
+              onSelectedChange={setSelected}
+              bulkActions={bulkActions}
+              sort={sort}
+              onSortChange={(s) => { setSort(s); setPage(1); }}
+              showExportCsv
+              exportFileName="catalog"
+              pageSize={pageSize}
+              onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
+              pageSizeOptions={[10, 20, 25, 50, 100]}
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              total={itemsPage?.total}
+              className="px-2 pb-2"
+            />
           </CardContent>
         </Card>
       </div>
@@ -940,6 +936,32 @@ export default function CatalogPage() {
       {/* Bulk label printing */}
       {printLabelsOpen && (
         <PrintLabelsDialog orgSlug={orgSlug} onClose={() => setPrintLabelsOpen(false)} />
+      )}
+
+      {/* Product stock history ledger (per-row button) */}
+      {historySku && (
+        <ProductStockHistoryModal orgSlug={orgSlug} sku={historySku} onClose={() => setHistorySku(null)} />
+      )}
+
+      {/* Bulk action confirmation */}
+      {bulkConfirm && (
+        <ConfirmDialog
+          open
+          title={`${bulkConfirm.action === 'delete' ? 'Delete' : bulkConfirm.action === 'activate' ? 'Activate' : bulkConfirm.action === 'deactivate' ? 'Deactivate' : bulkConfirm.action === 'not_for_sale_on' ? 'Mark not-for-sale' : 'Mark for sale'} ${bulkConfirm.ids.length} item${bulkConfirm.ids.length === 1 ? '' : 's'}?`}
+          description={
+            bulkConfirm.action === 'delete'
+              ? 'The selected items will be deactivated (soft-deleted). Items already inactive are skipped.'
+              : bulkConfirm.action === 'not_for_sale_on'
+                ? 'The selected items will be hidden from every sales interface (POS, ordering). They stay stockable and purchasable.'
+                : bulkConfirm.action === 'not_for_sale_off'
+                  ? 'The selected items will become sellable again on the POS and ordering surfaces.'
+                  : `The selected items will be ${bulkConfirm.action}d. Items already in that state are skipped.`
+          }
+          variant={bulkConfirm.action === 'delete' ? 'danger' : 'info'}
+          confirmLabel={bulkConfirm.action === 'delete' ? 'Delete' : 'Confirm'}
+          onCancel={() => setBulkConfirm(null)}
+          onConfirm={() => runBulk(bulkConfirm.action, bulkConfirm.ids)}
+        />
       )}
     </>
   );

@@ -1,13 +1,20 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { itemsApi, type CreateItemInput, type UpdateItemInput, type PaginatedItems } from '@/lib/api/items';
+import {
+  itemsApi,
+  type BulkStatusAction,
+  type CreateItemInput,
+  type ListItemsParams,
+  type UpdateItemInput,
+  type PaginatedItems,
+} from '@/lib/api/items';
 
 const ITEMS_KEY = 'items';
 
 const EMPTY_PAGE: PaginatedItems = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
 
-export function useItems(orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string; use_case?: string }) {
+export function useItems(orgSlug: string, params?: ListItemsParams) {
   return useQuery({
     queryKey: [ITEMS_KEY, orgSlug, params],
     queryFn: () => itemsApi.list(orgSlug, params),
@@ -53,6 +60,25 @@ export function useDeleteItem(orgSlug: string) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [ITEMS_KEY, orgSlug] });
     },
+  });
+}
+
+// Bulk multi-select actions (DataTable) — idempotent server-side; skipped ids come
+// back with reasons for the toast summary.
+export function useBulkDeleteItems(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => itemsApi.bulkDelete(orgSlug, ids),
+    onSuccess: () => invalidateItemViews(queryClient, orgSlug),
+  });
+}
+
+export function useBulkItemStatus(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ ids, action }: { ids: string[]; action: BulkStatusAction }) =>
+      itemsApi.bulkStatus(orgSlug, ids, action),
+    onSuccess: () => invalidateItemViews(queryClient, orgSlug),
   });
 }
 

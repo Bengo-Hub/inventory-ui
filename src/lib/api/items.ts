@@ -48,6 +48,8 @@ export interface Item {
   track_lots: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** Excluded from ALL sales surfaces (POS, ordering) while staying stockable/purchasable — ingredients, internal supplies. */
+  not_for_sale?: boolean;
   /** RECIPE items only: may be picked as an ingredient in other recipes (reusable menu component). */
   usable_in_recipes?: boolean;
   track_serial_numbers: boolean;
@@ -199,6 +201,8 @@ export interface CreateItemInput {
   track_lots?: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** Excluded from ALL sales surfaces (POS, ordering); still stockable/purchasable. */
+  not_for_sale?: boolean;
   /** RECIPE items only: may be picked as an ingredient in other recipes. */
   usable_in_recipes?: boolean;
   track_serial_numbers?: boolean;
@@ -308,8 +312,38 @@ function buildItemsTemplateCsv(): string {
   return [headers.join(','), example.map(escape).join(',')].join('\r\n') + '\r\n';
 }
 
+export interface ListItemsParams {
+  type?: string;
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+  unit_id?: string;
+  category_id?: string;
+  use_case?: string;
+  /** 'only' = the "Not for selling" filter checkbox; 'exclude' = sales surfaces. */
+  not_for_sale?: 'only' | 'exclude';
+  /** Server-driven DataTable sort: whitelisted columns (sku, name, type, cost_price,
+   *  min/max_selling_price, is_active, created_at, updated_at). */
+  sort?: string;
+  dir?: 'asc' | 'desc';
+}
+
+/** Per-id outcome reported by the bulk endpoints (idempotent skips, not errors). */
+export interface BulkSkipped {
+  id: string;
+  reason: string;
+}
+
+export interface BulkActionResult {
+  processed: number;
+  skipped: BulkSkipped[];
+}
+
+export type BulkStatusAction = 'activate' | 'deactivate' | 'not_for_sale_on' | 'not_for_sale_off';
+
 export const itemsApi = {
-  list: async (orgSlug: string, params?: { type?: string; status?: string; search?: string; page?: number; limit?: number; unit_id?: string; category_id?: string; use_case?: string }): Promise<PaginatedItems> => {
+  list: async (orgSlug: string, params?: ListItemsParams): Promise<PaginatedItems> => {
     const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), params as Record<string, string | number | undefined>);
     if (Array.isArray(res)) {
       return { data: res, total: res.length, page: 1, limit: res.length, hasMore: false };
@@ -342,6 +376,14 @@ export const itemsApi = {
 
   delete: (orgSlug: string, sku: string) =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${sku}`),
+
+  // Bulk multi-select actions (DataTable). Idempotent: re-posting the same ids is a
+  // no-op reported via skipped[], never an error.
+  bulkDelete: (orgSlug: string, ids: string[]) =>
+    apiClient.post<BulkActionResult>(`${itemsBase(orgSlug)}/bulk-delete`, { ids }),
+
+  bulkStatus: (orgSlug: string, ids: string[], action: BulkStatusAction) =>
+    apiClient.post<BulkActionResult>(`${itemsBase(orgSlug)}/bulk-status`, { ids, action }),
 
   // End-of-Life: mark hides the item everywhere (POS, lists, ordering) and schedules it for
   // auto hard-delete after the retention window; restore un-marks it. The EOL listing itself is
@@ -470,6 +512,8 @@ export interface MenuItemCompositeRequest {
   is_perishable?: boolean;
   /** Never charged at POS even if a selling price exists (free accompaniments, supplies). */
   non_billable?: boolean;
+  /** Excluded from all sales surfaces (POS, ordering); still stockable/purchasable. */
+  not_for_sale?: boolean;
   /** Reusable menu component: may be picked as an ingredient in other recipes. */
   usable_in_recipes?: boolean;
   /** Content per portion (300 + 'ml' for a pot of tea) — required for other recipes
