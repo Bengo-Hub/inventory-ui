@@ -7,12 +7,15 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
-import { useWarranties, useCreateWarranty, useUpdateWarranty, useClaimWarranty, useVoidWarranty, useDeleteWarranty } from '@/hooks/useWarranties';
+import { useWarranties, useCreateWarranty, useUpdateWarranty, useClaimWarranty, useVoidWarranty, useDeleteWarranty, useWarrantyLookup } from '@/hooks/useWarranties';
 import { type Warranty, type WarrantyStatus, type WarrantyWriteInput } from '@/lib/api/warranties';
-import { AlertTriangle, Plus, Search, ShieldCheck, X } from 'lucide-react';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
+import { AlertTriangle, CheckCircle2, Plus, ScanLine, Search, ShieldCheck, ShieldX, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -47,6 +50,8 @@ export default function WarrantiesPage() {
     const [editing, setEditing] = useState<Warranty | null>(null);
     const [viewing, setViewing] = useState<Warranty | null>(null);
     const [confirming, setConfirming] = useState<{ action: 'claim' | 'void' | 'delete'; w: Warranty } | null>(null);
+    // Return-desk verification: staff scan/enter a serial to surface its coverage status.
+    const [verifyOpen, setVerifyOpen] = useState(false);
 
     // Form state
     const [itemId, setItemId] = useState('');
@@ -68,6 +73,16 @@ export default function WarrantiesPage() {
     const claim = useClaimWarranty(org);
     const voidW = useVoidWarranty(org);
     const remove = useDeleteWarranty(org);
+
+    // Serial units of the selected item — lets staff pick the exact captured serial to
+    // register the warranty against (reuses GET /items/{id}/serials). Free entry stays allowed.
+    const { data: itemSerials } = useQuery<{ serial_number: string; status: string }[]>({
+        queryKey: ['warranty-item-serials', org, itemId],
+        queryFn: () => apiClient.get(`/api/v1/${org}/inventory/items/${itemId}/serials`),
+        enabled: open && !editing && !!itemId,
+        placeholderData: [],
+        staleTime: 30_000,
+    });
 
     const { canAny } = usePermissions();
     const canAdd = canAny([P.CATALOG_ADD, P.CATALOG_MANAGE]);
@@ -146,7 +161,10 @@ export default function WarrantiesPage() {
                         <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2"><ShieldCheck className="h-6 w-6" /> Warranties</h1>
                         <p className="text-muted-foreground mt-1">Warranty coverage for serialized items</p>
                     </div>
-                    {canAdd && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Register Warranty</Button>}
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => setVerifyOpen(true)}><ScanLine className="h-4 w-4 mr-2" /> Verify Return</Button>
+                        {canAdd && <Button onClick={openNew}><Plus className="h-4 w-4 mr-2" /> Register Warranty</Button>}
+                    </div>
                 </div>
 
                 <Card>
@@ -262,7 +280,15 @@ export default function WarrantiesPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <label className="text-sm font-medium">Serial number *</label>
-                                                <Input value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="e.g. SN-12345678" required />
+                                                <Input list="warranty-serial-suggestions" value={serial} onChange={(e) => setSerial(e.target.value)} placeholder="e.g. SN-12345678" required />
+                                                <datalist id="warranty-serial-suggestions">
+                                                    {(itemSerials ?? []).map((s) => (
+                                                        <option key={s.serial_number} value={s.serial_number}>{s.status}</option>
+                                                    ))}
+                                                </datalist>
+                                                {!editing && itemId && (itemSerials?.length ?? 0) > 0 && (
+                                                    <p className="text-xs text-muted-foreground">Pick a tracked serial unit for this item, or type one in.</p>
+                                                )}
                                             </div>
                                             <div className="space-y-2">
                                                 <label className="text-sm font-medium">Customer ID (optional)</label>
@@ -330,6 +356,8 @@ export default function WarrantiesPage() {
                     fields={viewing ? [
                         { label: 'Item', value: viewing.item_name || '—' },
                         { label: 'SKU', value: viewing.item_sku || '—' },
+                        { label: 'Brand', value: viewing.item_brand, hideIfEmpty: true },
+                        { label: 'Model', value: viewing.item_model, hideIfEmpty: true },
                         { label: 'Purchase date', value: fmtDate(viewing.purchase_date) },
                         { label: 'Coverage', value: `${fmtDate(viewing.warranty_start)} – ${fmtDate(viewing.warranty_end)}` },
                         { label: 'Customer', value: viewing.customer_id ?? '—' },
@@ -348,7 +376,110 @@ export default function WarrantiesPage() {
                         </>
                     )}
                 />
+
+                {verifyOpen && (
+                    <VerifyReturnDialog
+                        org={org}
+                        onClose={() => setVerifyOpen(false)}
+                        onClaim={canChange ? (w) => { setVerifyOpen(false); setConfirming({ action: 'claim', w }); } : undefined}
+                    />
+                )}
             </div>
         </SubscriptionGate>
+    );
+}
+
+// ─── Return verification (warranty-verified returns) ──────────────────────────────
+// The return desk scans/enters the serial off the unit being returned; we look up coverage
+// across all items and surface the exact product (brand/model/name), the coverage window and
+// the status: in-warranty (active) / expired / claimed / voided / not-found.
+function VerifyReturnDialog({ org, onClose, onClaim }: { org: string; onClose: () => void; onClaim?: (w: Warranty) => void }) {
+    const [input, setInput] = useState('');
+    const [serial, setSerial] = useState(''); // the submitted serial that actually triggers the lookup
+    const { data, isFetching, isError } = useWarrantyLookup(org, serial);
+
+    function run(e?: React.FormEvent) {
+        e?.preventDefault();
+        setSerial(input.trim());
+    }
+
+    // Coverage verdict for the best (latest-ending) match: the API already flips a lapsed
+    // "active" row to "expired", so status is authoritative.
+    const best = (data ?? [])[0];
+    const inWarranty = best?.status === 'active';
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative z-50 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <h2 className="text-lg font-semibold flex items-center gap-2"><ScanLine className="h-5 w-5" /> Verify Return</h2>
+                            <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent transition-colors"><X className="h-5 w-5 text-muted-foreground" /></button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <form onSubmit={run} className="space-y-2">
+                            <label className="text-sm font-medium">Serial number</label>
+                            <div className="flex items-center gap-2">
+                                <Input autoFocus value={input} onChange={(e) => setInput(e.target.value)} placeholder="Scan or type the unit's serial…" className="flex-1 font-mono" />
+                                <BarcodeScanButton title="Scan serial" hint="Point the camera at the serial barcode." onScan={(code) => { setInput(code); setSerial(code.trim()); }} />
+                                <Button type="submit" disabled={!input.trim() || isFetching}>{isFetching ? 'Checking…' : 'Check'}</Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">Enter the serial off the returned unit to confirm it is covered before accepting the return.</p>
+                        </form>
+
+                        {serial && !isFetching && (
+                            <div className="space-y-3">
+                                {isError && <p className="text-sm text-destructive">Couldn&apos;t verify — try again.</p>}
+
+                                {!isError && !best && (
+                                    <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/30 p-3">
+                                        <ShieldX className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="font-medium">No warranty found</p>
+                                            <p className="text-sm text-muted-foreground">No coverage is registered for serial <span className="font-mono">{serial}</span>. Handle as an out-of-warranty return.</p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!isError && best && (
+                                    <div className={`rounded-lg border p-3 ${inWarranty ? 'border-emerald-500/40 bg-emerald-500/5' : 'border-amber-500/40 bg-amber-500/5'}`}>
+                                        <div className="flex items-start gap-3">
+                                            {inWarranty
+                                                ? <CheckCircle2 className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                                                : <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />}
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="font-semibold">{inWarranty ? 'In warranty' : best.status === 'expired' ? 'Warranty expired' : `Warranty ${best.status}`}</p>
+                                                    <Badge variant={STATUS_VARIANT[best.status]}>{best.status}</Badge>
+                                                </div>
+                                                <p className="text-sm mt-1">
+                                                    {[best.item_brand, best.item_model].filter(Boolean).join(' ') || best.item_name}
+                                                    {best.item_name && (best.item_brand || best.item_model) ? ` · ${best.item_name}` : ''}
+                                                </p>
+                                                <p className="text-xs text-muted-foreground font-mono">{best.item_sku} · SN {best.serial_number}</p>
+                                                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                                                    <span className="text-muted-foreground">Purchased</span><span>{fmtDate(best.purchase_date)}</span>
+                                                    <span className="text-muted-foreground">Coverage</span><span>{fmtDate(best.warranty_start)} – {fmtDate(best.warranty_end)}</span>
+                                                </div>
+                                                {onClaim && inWarranty && (
+                                                    <Button size="sm" className="mt-3" onClick={() => onClaim(best)}>Record claim</Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {!isError && (data?.length ?? 0) > 1 && (
+                                    <p className="text-xs text-muted-foreground">{data!.length} coverage records match this serial — the most recent is shown.</p>
+                                )}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 }

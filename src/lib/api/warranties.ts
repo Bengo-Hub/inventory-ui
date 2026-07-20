@@ -13,6 +13,9 @@ export interface Warranty {
   item_id: string;
   item_name: string;
   item_sku: string;
+  /** Brand name + model of the covered product (electronics returns verification). */
+  item_brand?: string;
+  item_model?: string;
   serial_number: string;
   customer_id?: string;
   purchase_date: string;

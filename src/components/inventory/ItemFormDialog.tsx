@@ -12,6 +12,8 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
+import { BrandCombobox } from '@/components/inventory/BrandCombobox';
+import { ModelCombobox } from '@/components/inventory/ModelCombobox';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
 import { useCreateSupplier } from '@/hooks/useSuppliers';
 import { type CreateSupplierInput } from '@/lib/api/suppliers';
@@ -140,6 +142,11 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   );
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
+  // Brand (ItemBrand master) + free-text manufacturer/model — GOODS only. model names the
+  // exact product variant (e.g. "HP 840 8/256") that serial units + warranties register against.
+  const [brandId, setBrandId] = useState(item?.brand_id ?? '');
+  const [manufacturer, setManufacturer] = useState(item?.manufacturer ?? '');
+  const [model, setModel] = useState(item?.model ?? '');
   // Preferred supplier (procurement). preferredSupplierName seeds the combobox label in edit
   // mode before its page loads. addVendorOpen drives the inline "+ Add new vendor" dialog.
   const [preferredSupplierId, setPreferredSupplierId] = useState(item?.preferred_supplier_id ?? '');
@@ -277,6 +284,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setType(item.type);
       setCategoryId(item.category_id ?? '');
       setUnitId(item.unit_id ?? '');
+      setBrandId(item.brand_id ?? '');
+      setManufacturer(item.manufacturer ?? '');
+      setModel(item.model ?? '');
       setPreferredSupplierId(item.preferred_supplier_id ?? '');
       setPreferredSupplierName(item.preferred_supplier_name ?? '');
       setBarcode(item.barcode ?? '');
@@ -548,6 +558,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       description: description.trim() || undefined,
       type,
       category_id: categoryId || undefined,
+      // Brand / manufacturer / model — GOODS only. brand_id assigns the ItemBrand; manufacturer
+      // and model are per-item free text (hydrated from the item on edit so an unchanged value
+      // persists, an emptied one clears server-side).
+      brand_id: type === 'GOODS' && brandId ? brandId : undefined,
+      manufacturer: type === 'GOODS' ? (manufacturer.trim() || undefined) : undefined,
+      model: type === 'GOODS' ? (model.trim() || undefined) : undefined,
       // Preferred supplier: send the chosen uuid; when editing and cleared, send the nil UUID
       // so the backend explicitly unassigns it (nil/omitted would leave it untouched). On
       // create, omit when empty.
@@ -753,6 +769,38 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   />
                 </div>
               </div>
+
+              {/* Brand / Model / Manufacturer — GOODS only (retail electronics, appliances, hardware).
+                  Brand is the tenant ItemBrand master (searchable + creatable); model names the exact
+                  product variant (e.g. "HP 840 8/256") that serial units + warranties register against.
+                  Hidden for SERVICE/RECIPE/INGREDIENT/VOUCHER/EQUIPMENT — matches the form's other
+                  type-conditional sections. */}
+              {type === 'GOODS' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Brand <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <BrandCombobox orgSlug={orgSlug} value={brandId} onChange={setBrandId} />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium inline-flex items-center gap-1">
+                      Model <span className="text-muted-foreground font-normal">(optional)</span>
+                      <InfoHint title="Model identifies the exact product">
+                        The specific product/variant — e.g. &ldquo;HP 840 8/256&rdquo;. Units of the same
+                        model share brand, name and specs but each carry their own serial number, so serial
+                        units and warranties are registered against this product.
+                      </InfoHint>
+                    </label>
+                    {/* Searchable + creatable combobox over models already used on the tenant's goods,
+                        narrowed to the selected brand (a model belongs to a brand). No Model master —
+                        model stays per-item free text, so "+ New model" simply selects the typed string. */}
+                    <ModelCombobox orgSlug={orgSlug} value={model} onChange={setModel} brandId={brandId || undefined} />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <label className="text-sm font-medium">Manufacturer <span className="text-muted-foreground font-normal">(optional)</span></label>
+                    <Input placeholder="e.g. HP Inc." value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} />
+                  </div>
+                </div>
+              )}
 
               {/* Preferred Supplier — procurement attribute (drives per-vendor PO split). Shown
                   for stockable items; searchable combobox with an inline "+ Add new vendor". */}
@@ -1098,7 +1146,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     {scope.showSerialTracking && (
                       <label className="flex items-center gap-2 text-sm cursor-pointer">
                         <input type="checkbox" checked={trackSerial} onChange={(e) => setTrackSerial(e.target.checked)} className="rounded" />
-                        Track Serial Numbers
+                        <span className="inline-flex items-center gap-1">
+                          Track Serial Numbers
+                          <InfoHint title="One product, many serial numbers">
+                            Turn this on when every unit of this product is individually identified — e.g. a
+                            &ldquo;HP 840 8/256&rdquo; laptop. You keep <strong>one item</strong> here (the model), and
+                            each physical unit is a separate <strong>serial</strong>: serials are captured per unit at
+                            goods receipt, on-hand equals the count of available serials, and the exact serial sold is
+                            marked sold at POS — which is what a warranty is later verified against.
+                          </InfoHint>
+                        </span>
                       </label>
                     )}
                   </div>

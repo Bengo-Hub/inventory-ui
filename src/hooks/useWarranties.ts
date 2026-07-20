@@ -17,6 +17,17 @@ export function useWarranties(org: string, params?: WarrantyListParams) {
   });
 }
 
+// Return-desk fast path: look up coverage for a scanned/typed serial (across all items).
+// Enabled only once a serial is submitted so the query fires on demand, not per keystroke.
+export function useWarrantyLookup(org: string, serial: string) {
+  return useQuery<Warranty[]>({
+    queryKey: [KEY, org, 'lookup', serial],
+    queryFn: () => warrantiesApi.lookup(org, serial),
+    enabled: !!org && !!serial,
+    staleTime: 0,
+  });
+}
+
 export function useCreateWarranty(org: string) {
   const qc = useQueryClient();
   return useMutation({

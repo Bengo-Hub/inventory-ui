@@ -19,6 +19,15 @@ export interface Item {
   type: 'GOODS' | 'SERVICE' | 'RECIPE' | 'INGREDIENT' | 'VOUCHER' | 'EQUIPMENT';
   category_id?: string;
   category_name?: string;
+  // Brand (ItemBrand master, tenant-scoped) + free-text manufacturer/model. GOODS-only on
+  // the item form. brand_name/brand_code are read-only, surfaced by inventory-api when the
+  // brand edge is loaded. model identifies the exact product variant (e.g. "HP 840 8/256")
+  // that serial units + warranties are registered against.
+  brand_id?: string | null;
+  brand_name?: string;
+  brand_code?: string;
+  manufacturer?: string;
+  model?: string;
   // Preferred supplier for procurement (drives per-vendor PO split). Bound on the item form.
   // preferred_supplier_name is read-only, surfaced by inventory-api when the edge is loaded.
   preferred_supplier_id?: string | null;
@@ -154,6 +163,10 @@ export interface CreateItemInput {
   description?: string;
   type: string;
   category_id?: string;
+  // Brand (ItemBrand uuid) + free-text manufacturer/model. GOODS-only on the item form.
+  brand_id?: string | null;
+  manufacturer?: string;
+  model?: string;
   // Preferred supplier (uuid). Empty-string/null sentinel clears it on update.
   preferred_supplier_id?: string | null;
   unit_id?: string;
