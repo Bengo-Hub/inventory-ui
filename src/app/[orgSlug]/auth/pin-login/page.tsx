@@ -3,10 +3,10 @@
 import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { ExternalLink, KeyRound, LayoutDashboard, Store } from 'lucide-react';
+import { KeyRound, LayoutDashboard, Store } from 'lucide-react';
 import {
   PinLoginLayout, PinLoginHeader, PinLoginBrandPanel, PasscodeField, PinKeypad, QwertyKeyboard,
-  OutletCard,
+  OutletCard, PinLoginSSOButton,
 } from '@bengo-hub/shared-ui-lib/pin-login';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -126,25 +126,6 @@ function PinLoginContent() {
 
   const goSSO = () => redirectToSSO(orgSlug, returnTo ? `${window.location.origin}${returnTo}` : `${window.location.origin}/${orgSlug}`);
 
-  const SSOButton = ({ tall }: { tall?: boolean }) => (
-    <button
-      type="button"
-      onClick={goSSO}
-      className={cn(
-        'flex flex-col items-center justify-center gap-2 rounded-2xl',
-        'text-primary-foreground font-bold shadow-md ring-1 ring-inset ring-white/15',
-        'active:scale-[0.98] transition-all duration-150 hover:brightness-105',
-        tall ? 'flex-1 py-6' : 'w-full py-4'
-      )}
-      style={{ background: 'linear-gradient(160deg, hsl(var(--primary)) 0%, hsl(var(--primary-dark, var(--primary))) 100%)' }}
-    >
-      <span className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-white/20 ring-1 ring-inset ring-white/25 flex items-center justify-center">
-        <ExternalLink className="h-5 w-5 sm:h-6 sm:w-6" />
-      </span>
-      <span className="text-sm">SSO Login</span>
-    </button>
-  );
-
   const header = (
     <PinLoginHeader
       serviceName="Codevertex Inventory"
@@ -166,7 +147,7 @@ function PinLoginContent() {
         header={header}
         brandPanel={brandPanel}
         card={
-          <div className="flex-1 min-h-0 flex flex-col p-4 sm:p-6 overflow-y-auto">
+          <div className="flex-1 min-h-0 flex flex-col p-3 sm:p-6 overflow-y-auto">
             {loadingOutlets ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {Array.from({ length: 2 }).map((_, i) => <div key={i} className="h-28 rounded-2xl bg-muted/60 animate-pulse" />)}
@@ -179,7 +160,7 @@ function PinLoginContent() {
               </div>
             )}
             <div className="w-full max-w-xs mx-auto mt-6">
-              <SSOButton />
+              <PinLoginSSOButton onClick={goSSO} />
             </div>
           </div>
         }
@@ -192,7 +173,7 @@ function PinLoginContent() {
       header={header}
       brandPanel={brandPanel}
       card={
-        <div className="flex-1 min-h-0 flex flex-col gap-3 p-4 sm:p-6">
+        <div className="flex-1 min-h-0 flex flex-col gap-3 p-3 sm:p-6">
           <PasscodeField
             value={pinDigits.join('')}
             error={error}
@@ -203,8 +184,8 @@ function PinLoginContent() {
 
           {/* ── SMALL SCREENS (< lg) ── */}
           <div className="flex-1 min-h-0 flex flex-col gap-4 lg:hidden overflow-y-auto">
-            <SSOButton />
-            <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 border border-border p-3 sm:p-4">
+            <PinLoginSSOButton onClick={goSSO} />
+            <div className="flex flex-col gap-3 rounded-2xl bg-muted/40 border border-border p-2.5 sm:p-4">
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
                 <KeyRound className="h-3.5 w-3.5" />
                 <span className="text-[11px] font-semibold uppercase tracking-[0.18em]">
@@ -224,7 +205,7 @@ function PinLoginContent() {
           {/* ── LARGE SCREENS (lg+) — 3-zone ── */}
           <div className="hidden lg:flex flex-1 min-h-0 items-stretch gap-5">
             <div className="w-44 shrink-0 flex flex-col">
-              <SSOButton tall />
+              <PinLoginSSOButton onClick={goSSO} tall />
             </div>
             <div className="flex-1 min-w-0 flex flex-col gap-3 rounded-2xl bg-muted/40 border border-border p-4">
               <div className="flex items-center justify-center gap-2 text-muted-foreground">
