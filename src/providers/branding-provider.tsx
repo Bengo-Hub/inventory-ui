@@ -9,6 +9,39 @@ function hexToRgbTriplet(hex: string): string {
   return `${parseInt(t.slice(0, 2), 16)} ${parseInt(t.slice(2, 4), 16)} ${parseInt(t.slice(4, 6), 16)}`;
 }
 
+function hexToDarkRgbTriplet(hex: string): string {
+  // Very dark tonal variant (L=7%, S=38%) of the brand hue — used for deep surfaces (e.g. the
+  // PIN-login brand panel gradient). Mirrors pos-ui/library-ui's branding provider so the same
+  // shared PinLoginLayout renders identically across services.
+  const raw = hex.replace(/^#/, '').trim();
+  if (!/^[0-9a-fA-F]{6}$/.test(raw)) return '23 37 84';
+  const r = parseInt(raw.slice(0, 2), 16) / 255;
+  const g = parseInt(raw.slice(2, 4), 16) / 255;
+  const b = parseInt(raw.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let h = 0;
+  if (max !== mn) {
+    const d = max - mn;
+    h = max === r ? ((g - b) / d + (g < b ? 6 : 0)) / 6
+      : max === g ? ((b - r) / d + 2) / 6
+      : ((r - g) / d + 4) / 6;
+  }
+  const hDeg = Math.round(h * 360);
+  // Fixed low lightness/mid saturation — convert HSL(hDeg, 38%, 7%) to an RGB triplet.
+  const s = 0.38, l = 0.07;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs(((hDeg / 60) % 2) - 1));
+  const m = l - c / 2;
+  let [r2, g2, b2] = [0, 0, 0];
+  if (hDeg < 60) [r2, g2, b2] = [c, x, 0];
+  else if (hDeg < 120) [r2, g2, b2] = [x, c, 0];
+  else if (hDeg < 180) [r2, g2, b2] = [0, c, x];
+  else if (hDeg < 240) [r2, g2, b2] = [0, x, c];
+  else if (hDeg < 300) [r2, g2, b2] = [x, 0, c];
+  else [r2, g2, b2] = [c, 0, x];
+  return `${Math.round((r2 + m) * 255)} ${Math.round((g2 + m) * 255)} ${Math.round((b2 + m) * 255)}`;
+}
+
 function hexToHslTriplet(hex: string): string {
   const t = hex.replace(/^#/, '').trim();
   if (!/^[0-9a-fA-F]{6}$/.test(t)) return '24 91% 50%';
@@ -84,6 +117,10 @@ export function BrandingProvider({ children }: { children: ReactNode }) {
       // Drive brand RGB triplets for bg-brand-primary / bg-brand-emphasis
       root.style.setProperty('--brand-primary', hexToRgbTriplet(primary));
       root.style.setProperty('--brand-emphasis', hexToRgbTriplet(secondary));
+      // Deep-surface variants (PIN-login brand panel gradient + darker primary button state).
+      root.style.setProperty('--brand-dark', hexToDarkRgbTriplet(primary));
+      const hue = hexToHslTriplet(primary).split(' ')[0];
+      root.style.setProperty('--primary-dark', `${hue} 68% 40%`);
     }
   }, [effectiveBrand]);
 
