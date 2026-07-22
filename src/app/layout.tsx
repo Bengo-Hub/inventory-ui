@@ -1,4 +1,3 @@
-import { PWARegistration } from "@/components/pwa-registration";
 import { ThemeProvider } from "@/components/theme-provider";
 import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono, Outfit } from "next/font/google";
@@ -59,7 +58,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
-          <PWARegistration />
           <Toaster richColors position="top-right" />
         </ThemeProvider>
       </body>
