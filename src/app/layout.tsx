@@ -33,8 +33,12 @@ export const metadata: Metadata = {
   description: "Inventory management for the Codevertex ecosystem",
   manifest: "/manifest.json",
   icons: {
-    icon: "/logo.svg",
-    apple: "/logo.svg",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: "/icons/apple-touch-icon.png", // iOS "Add to Home Screen" needs a real PNG (was /logo.svg)
   },
   appleWebApp: {
     capable: true,
