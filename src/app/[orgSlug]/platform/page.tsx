@@ -5,11 +5,14 @@ import { useAuthStore, UserProfile } from '@/store/auth';
 import { isPlatformOwner } from '@/lib/auth/permissions';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { serviceConfigApi, PROVIDER_FOOTER_KEY } from '@/lib/api/service-config';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     AlertTriangle,
     Bell,
     Building2,
+    Loader2,
+    Megaphone,
     PackageX,
     Plug,
     RefreshCw,
@@ -18,6 +21,7 @@ import {
     Settings,
     Shield,
     Warehouse,
+    X,
 } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -62,7 +66,7 @@ interface StockAlertConfig {
     dashboardAlerts: boolean;
 }
 
-type TabKey = 'connectors' | 'config' | 'warehouses' | 'auto-reorder' | 'stock-alerts';
+type TabKey = 'connectors' | 'config' | 'warehouses' | 'auto-reorder' | 'stock-alerts' | 'documents';
 
 /* ─── Helpers ────────────────────────────────────────────────────────── */
 
@@ -214,6 +218,7 @@ export default function PlatformPage() {
         { key: 'warehouses', label: 'Warehouses', icon: Warehouse },
         { key: 'auto-reorder', label: 'Auto-Reorder', icon: RefreshCw },
         { key: 'stock-alerts', label: 'Stock Alerts', icon: Bell },
+        { key: 'documents', label: 'Documents', icon: Megaphone },
     ];
 
     return (
@@ -560,6 +565,210 @@ export default function PlatformPage() {
                     </CardContent>
                 </Card>
             )}
+
+            {/* ─── Documents Tab ───────────────────────────────────────── */}
+            {activeTab === 'documents' && <ProviderFooterTab />}
         </div>
+    );
+}
+
+/* ─── Documents — Provider Footer ───────────────────────────────────────
+ * The "Developed & maintained by CodeVertex" line printed on purchase orders and reports.
+ * Platform default + per-tenant override, platform-owner only — never a tenant self-service
+ * setting (that's what distinguishes serviceConfigApi's *Admin methods from listTenant/upsertTenant). */
+
+const PROVIDER_FOOTER_TENANTS_URL =
+    (process.env.NEXT_PUBLIC_AUTH_API_URL ||
+        process.env.NEXT_PUBLIC_SSO_URL ||
+        'https://sso.codevertexitsolutions.com') + '/api/v1/admin/tenants';
+
+interface PlatformTenantOption {
+    id: string;
+    name: string;
+    slug: string;
+}
+
+function ProviderFooterTab() {
+    const accessToken = useAuthStore((s) => s.session?.accessToken);
+    const [platformEnabled, setPlatformEnabled] = useState(true);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+
+    const [tenants, setTenants] = useState<PlatformTenantOption[]>([]);
+    const [selectedTenantId, setSelectedTenantId] = useState('');
+    const [overrideValue, setOverrideValue] = useState<'true' | 'false' | null>(null);
+    const [overrideLoading, setOverrideLoading] = useState(false);
+    const [overrideSaving, setOverrideSaving] = useState(false);
+
+    const loadPlatformDefault = () => {
+        serviceConfigApi
+            .listPlatform()
+            .then((configs) => {
+                const entry = configs.find((c) => c.config_key === PROVIDER_FOOTER_KEY);
+                setPlatformEnabled(entry ? entry.config_value === 'true' : true);
+            })
+            .catch(() => setPlatformEnabled(true))
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        loadPlatformDefault();
+        if (!accessToken) return;
+        fetch(`${PROVIDER_FOOTER_TENANTS_URL}?limit=200`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+        })
+            .then((r) => (r.ok ? r.json() : { data: [] }))
+            .then((json) => {
+                const list = Array.isArray(json) ? json : json.data ?? json.tenants ?? [];
+                setTenants((list as PlatformTenantOption[]).filter((t) => t.id && t.slug));
+            })
+            .catch(() => setTenants([]));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [accessToken]);
+
+    const handleTogglePlatform = () => {
+        setSaving(true);
+        serviceConfigApi
+            .upsertPlatform(
+                PROVIDER_FOOTER_KEY,
+                platformEnabled ? 'false' : 'true',
+                'Show the CodeVertex platform advertisement footer on generated documents',
+            )
+            .then(() => {
+                loadPlatformDefault();
+                toast.success('Platform default saved');
+            })
+            .catch(async (e) => toast.error(await apiErrorMessage(e, 'Failed to save platform default')))
+            .finally(() => setSaving(false));
+    };
+
+    const loadOverride = (tenantID: string) => {
+        if (!tenantID) { setOverrideValue(null); return; }
+        setOverrideLoading(true);
+        serviceConfigApi
+            .listTenantOverridesAdmin(tenantID)
+            .then((configs) => {
+                const entry = configs.find((c) => c.config_key === PROVIDER_FOOTER_KEY);
+                setOverrideValue(entry ? (entry.config_value as 'true' | 'false') : null);
+            })
+            .catch(() => setOverrideValue(null))
+            .finally(() => setOverrideLoading(false));
+    };
+
+    const handleSelectTenant = (id: string) => {
+        setSelectedTenantId(id);
+        loadOverride(id);
+    };
+
+    const setOverride = (value: 'true' | 'false') => {
+        if (!selectedTenantId) return;
+        setOverrideSaving(true);
+        serviceConfigApi
+            .upsertTenantOverrideAdmin(selectedTenantId, PROVIDER_FOOTER_KEY, value)
+            .then(() => {
+                loadOverride(selectedTenantId);
+                toast.success('Tenant override saved');
+            })
+            .catch(async (e) => toast.error(await apiErrorMessage(e, 'Failed to save tenant override')))
+            .finally(() => setOverrideSaving(false));
+    };
+
+    const clearOverride = () => {
+        if (!selectedTenantId) return;
+        setOverrideSaving(true);
+        serviceConfigApi
+            .deleteTenantOverrideAdmin(selectedTenantId, PROVIDER_FOOTER_KEY)
+            .then(() => {
+                loadOverride(selectedTenantId);
+                toast.success('Tenant override cleared — reverted to platform default');
+            })
+            .catch(async (e) => toast.error(await apiErrorMessage(e, 'Failed to clear tenant override')))
+            .finally(() => setOverrideSaving(false));
+    };
+
+    const selectedTenant = tenants.find((t) => t.id === selectedTenantId);
+
+    return (
+        <Card className="max-w-2xl">
+            <CardHeader>
+                <div className="flex items-center gap-2">
+                    <Megaphone className="h-5 w-5 text-primary" />
+                    <h2 className="text-lg font-semibold">Provider Footer</h2>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                    The &quot;Developed &amp; maintained by CodeVertex&quot; line printed on purchase
+                    orders and reports. Shows by default unless turned off — platform-wide or for one
+                    specific tenant.
+                </p>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                {loading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                            <p className="text-sm font-medium">Platform default</p>
+                            <p className="text-xs text-muted-foreground">Applies to every tenant with no override.</p>
+                        </div>
+                        <Button variant="outline" size="sm" disabled={saving} onClick={handleTogglePlatform}>
+                            {platformEnabled ? 'Shown — click to hide' : 'Hidden — click to show'}
+                        </Button>
+                    </div>
+                )}
+
+                <div className="border-t border-border pt-5 space-y-3">
+                    <div>
+                        <p className="text-sm font-medium">Tenant exception</p>
+                        <p className="text-xs text-muted-foreground">
+                            Grant one tenant an override that differs from the platform default.
+                        </p>
+                    </div>
+                    <select
+                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                        value={selectedTenantId}
+                        onChange={(e) => handleSelectTenant(e.target.value)}
+                    >
+                        <option value="">Select a tenant…</option>
+                        {tenants.map((t) => (
+                            <option key={t.id} value={t.id}>{t.name} ({t.slug})</option>
+                        ))}
+                    </select>
+
+                    {selectedTenantId && (
+                        <div className="rounded-lg border border-border p-3 space-y-2">
+                            {overrideLoading ? (
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading override…
+                                </div>
+                            ) : (
+                                <>
+                                    <p className="text-xs text-muted-foreground">
+                                        {selectedTenant?.name}:{' '}
+                                        {overrideValue != null
+                                            ? `override — footer ${overrideValue === 'true' ? 'shown' : 'hidden'}`
+                                            : `no override — inherits platform default (${platformEnabled ? 'shown' : 'hidden'})`}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <Button size="sm" variant="outline" disabled={overrideSaving} onClick={() => setOverride('true')}>
+                                            Show for this tenant
+                                        </Button>
+                                        <Button size="sm" variant="outline" disabled={overrideSaving} onClick={() => setOverride('false')}>
+                                            Hide for this tenant
+                                        </Button>
+                                        {overrideValue != null && (
+                                            <Button size="sm" variant="ghost" disabled={overrideSaving} onClick={clearOverride}>
+                                                <X className="h-3.5 w-3.5 mr-1" /> Clear override
+                                            </Button>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </CardContent>
+        </Card>
     );
 }

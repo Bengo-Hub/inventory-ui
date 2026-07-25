@@ -31,6 +31,10 @@ interface ListResponse {
 /** Config key for the branded screensaver idle timeout (seconds). */
 export const SCREENSAVER_IDLE_KEY = 'inventory.screensaver_idle_timeout_seconds';
 
+/** Config key for the "Developed & maintained by CodeVertex" document footer. Platform default
+ *  true (shown); a tenant override lets platform staff grant a specific tenant an opt-out. */
+export const PROVIDER_FOOTER_KEY = 'provider_footer_enabled';
+
 export const serviceConfigApi = {
   /** Platform-level defaults (platform owner only). GET /api/v1/admin/config */
   listPlatform: () =>
@@ -52,4 +56,18 @@ export const serviceConfigApi = {
     apiClient.put<ServiceConfigEntry>(`/api/v1/${orgSlug}/settings/${key}`, {
       config_value: configValue,
     }),
+
+  /** A SPECIFIC tenant's config overrides, chosen by the platform owner (distinct from
+   *  listTenant/upsertTenant above, which are the CALLING tenant's own self-service route).
+   *  GET /api/v1/admin/tenants/{tenantID}/config */
+  listTenantOverridesAdmin: (tenantID: string) =>
+    apiClient.get<ListResponse>(`/api/v1/admin/tenants/${tenantID}/config`).then((r) => r.data ?? []),
+
+  upsertTenantOverrideAdmin: (tenantID: string, key: string, configValue: string) =>
+    apiClient.put<ServiceConfigEntry>(`/api/v1/admin/tenants/${tenantID}/config/${key}`, {
+      config_value: configValue,
+    }),
+
+  deleteTenantOverrideAdmin: (tenantID: string, key: string) =>
+    apiClient.delete(`/api/v1/admin/tenants/${tenantID}/config/${key}`),
 };
