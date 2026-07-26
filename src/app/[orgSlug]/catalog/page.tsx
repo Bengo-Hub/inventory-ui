@@ -5,6 +5,7 @@ import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
+import { ProductsExportDialog } from '@/components/inventory/ExportDialogs';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
 import { useBulkDeleteItems, useBulkItemStatus, useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
@@ -410,6 +411,7 @@ export default function CatalogPage() {
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
   const [historySku, setHistorySku] = useState<string | null>(null);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const createItem = useCreateItem(orgSlug);
   const updateItem = useUpdateItem(orgSlug);
@@ -677,6 +679,11 @@ export default function CatalogPage() {
               </Button>
             )}
 
+            {/* Branded PDF/CSV export of the current catalog — filters/outlet-aware */}
+            <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} title="Export products as PDF or CSV">
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" />Export
+            </Button>
+
             {/* Create actions */}
             {canAdd && (
               <>
@@ -936,6 +943,21 @@ export default function CatalogPage() {
       {/* Bulk label printing */}
       {printLabelsOpen && (
         <PrintLabelsDialog orgSlug={orgSlug} onClose={() => setPrintLabelsOpen(false)} />
+      )}
+
+      {/* Branded PDF/CSV export */}
+      {exportOpen && (
+        <ProductsExportDialog
+          orgSlug={orgSlug}
+          initial={{
+            ...(search ? { search } : {}),
+            ...(categoryId ? { category_id: categoryId } : {}),
+            ...(typeFilter ? { type: typeFilter } : {}),
+            status: statusFilter,
+            ...(useCaseFilter ? { use_case: useCaseFilter } : {}),
+          }}
+          onClose={() => setExportOpen(false)}
+        />
       )}
 
       {/* Product stock history ledger (per-row button) */}

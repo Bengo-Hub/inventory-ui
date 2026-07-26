@@ -469,7 +469,26 @@ export const itemsApi = {
 
   deleteImage: (orgSlug: string, itemId: string, imageId: string): Promise<void> =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${itemId}/images/${imageId}`),
+
+  // Branded PDF/CSV export of the catalog — same filters as the list (minus pagination/sort),
+  // plus an outlet override. Streamed from inventory-api's docs report engine; feed the blob to
+  // the shared PdfPreview (pdf) or trigger a direct download (csv), same pattern as reportsApi's
+  // *Doc functions.
+  exportDoc: (orgSlug: string, params?: ProductsExportParams): Promise<Blob> =>
+    apiClient.getBlob(`${itemsBase(orgSlug)}/export`, params as Record<string, string | undefined>),
 };
+
+export interface ProductsExportParams {
+  format?: 'pdf' | 'csv';
+  search?: string;
+  category_id?: string;
+  type?: string;
+  status?: string;
+  use_case?: string;
+  outlet_id?: string;
+  /** 'category' renders one section per category instead of one flat table. */
+  group_by?: 'category';
+}
 
 // ── Composite menu item types ─────────────────────────────────────────────────
 

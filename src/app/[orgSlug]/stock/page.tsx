@@ -12,8 +12,9 @@ import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, History, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
+import { StockExportDialog } from '@/components/inventory/ExportDialogs';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -472,6 +473,7 @@ export default function StockPage() {
     const [drawerAction, setDrawerAction] = useState<'adjust' | 'breakdown' | undefined>(undefined);
     // Centralized per-item stock ledger modal (Go-Digital "Product stock history").
     const [historySku, setHistorySku] = useState<string | null>(null);
+    const [exportOpen, setExportOpen] = useState(false);
 
     function openItem(item: StockLevel, action?: 'adjust' | 'breakdown') {
         setSelectedItem(item);
@@ -540,9 +542,14 @@ export default function StockPage() {
 
     return (
         <div className="p-6 space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold tracking-tight">Stock Levels</h1>
-                <p className="text-muted-foreground mt-1">Real-time stock availability across all warehouses</p>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h1 className="text-2xl font-bold tracking-tight">Stock Levels</h1>
+                    <p className="text-muted-foreground mt-1">Real-time stock availability across all warehouses</p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} title="Export stock levels as PDF or CSV">
+                    <FileSpreadsheet className="h-4 w-4 mr-1.5" />Export
+                </Button>
             </div>
 
             {/* View tabs (capsule) — live stock vs the End-of-Life holding area. */}
@@ -849,6 +856,21 @@ export default function StockPage() {
             {/* Centralized Product stock history ledger (per-row button + drawer link) */}
             {historySku && (
                 <ProductStockHistoryModal orgSlug={orgSlug} sku={historySku} onClose={() => setHistorySku(null)} />
+            )}
+
+            {/* Branded PDF/CSV export */}
+            {exportOpen && (
+                <StockExportDialog
+                    orgSlug={orgSlug}
+                    initial={{
+                        ...(search ? { search } : {}),
+                        ...(categoryId ? { category_id: categoryId } : {}),
+                        ...(typeFilter ? { type: typeFilter } : {}),
+                        ...(statusFilter === 'low' ? { low_stock: true } : {}),
+                        ...(statusFilter === 'out' ? { out_of_stock: true } : {}),
+                    }}
+                    onClose={() => setExportOpen(false)}
+                />
             )}
         </div>
     );

@@ -74,6 +74,14 @@ export interface StockListParams {
   type?: string;
 }
 
+export interface StockExportParams extends StockListParams {
+  format?: 'pdf' | 'csv';
+  location_id?: string;
+  outlet_id?: string;
+  /** 'category' renders one section per category instead of one flat table. */
+  group_by?: 'category';
+}
+
 export interface AdjustmentListParams {
   warehouse_id?: string;
   item_id?: string;
@@ -84,6 +92,11 @@ export interface AdjustmentListParams {
 export const stockApi = {
   list: (orgSlug: string, params?: StockListParams) =>
     apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params),
+
+  // Branded PDF/CSV export of stock levels — same filters as list() plus warehouse/location
+  // drill-down and an outlet override. Streamed from inventory-api's docs report engine.
+  exportDoc: (orgSlug: string, params?: StockExportParams): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock/export`, params as Record<string, string | boolean | undefined>),
 
   listAdjustments: async (orgSlug: string, params?: AdjustmentListParams): Promise<StockAdjustment[]> => {
     const res = await apiClient.get<{ data: StockAdjustment[]; total: number } | StockAdjustment[]>(
