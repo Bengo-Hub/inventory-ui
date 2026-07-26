@@ -4,8 +4,8 @@
 **MVP deadline:** 2026-03-17
 **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
 **Styling:** Tailwind CSS + Shadcn UI
-**Backend:** inventory-api (`inventoryapi.codevertexitsolutions.com`, port 4003)
-**Auth:** SSO via auth-ui (OIDC/OAuth2 from `sso.codevertexitsolutions.com`)
+**Backend:** inventory-api (`inventoryapi.codevertexafrica.com`, port 4003)
+**Auth:** SSO via auth-ui (OIDC/OAuth2 from `sso.codevertexafrica.com`)
 
 ---
 

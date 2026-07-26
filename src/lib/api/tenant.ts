@@ -6,7 +6,7 @@
 const AUTH_API_URL =
   process.env.NEXT_PUBLIC_AUTH_API_URL ||
   process.env.NEXT_PUBLIC_SSO_URL ||
-  'https://sso.codevertexitsolutions.com';
+  'https://sso.codevertexafrica.com';
 
 export interface TenantBrandMetadata {
   logo_url?: string;

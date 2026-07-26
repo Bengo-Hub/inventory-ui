@@ -259,7 +259,7 @@ export const useAuthStore = create<AuthState>()(
                     // SSO with tenant=<slug>, so the login screen shows the RIGHT organisation.
                     window.location.href = slug
                         ? buildLogoutUrl(`${window.location.origin}/${slug}`)
-                        : buildLogoutUrl(`https://accounts.codevertexitsolutions.com/login?return_to=${encodeURIComponent(window.location.origin)}`);
+                        : buildLogoutUrl(`https://accounts.codevertexafrica.com/login?return_to=${encodeURIComponent(window.location.origin)}`);
                 }
             },
 

@@ -580,7 +580,7 @@ export default function PlatformPage() {
 const PROVIDER_FOOTER_TENANTS_URL =
     (process.env.NEXT_PUBLIC_AUTH_API_URL ||
         process.env.NEXT_PUBLIC_SSO_URL ||
-        'https://sso.codevertexitsolutions.com') + '/api/v1/admin/tenants';
+        'https://sso.codevertexafrica.com') + '/api/v1/admin/tenants';
 
 interface PlatformTenantOption {
     id: string;

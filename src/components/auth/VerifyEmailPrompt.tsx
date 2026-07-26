@@ -9,7 +9,7 @@ import { useAuthStore } from '@/store/auth';
 const AUTH_BASE =
   process.env.NEXT_PUBLIC_SSO_URL ||
   process.env.NEXT_PUBLIC_AUTH_URL ||
-  'https://sso.codevertexitsolutions.com';
+  'https://sso.codevertexafrica.com';
 
 async function postVerify(path: string, body: unknown): Promise<void> {
   const token = useAuthStore.getState().session?.accessToken;

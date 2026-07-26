@@ -2,8 +2,8 @@
 
 **Framework:** Next.js 15 (App Router)
 **Language:** TypeScript
-**Backend:** inventory-api at `inventoryapi.codevertexitsolutions.com`
-**Auth:** OIDC/OAuth2 via auth-ui (`sso.codevertexitsolutions.com`)
+**Backend:** inventory-api at `inventoryapi.codevertexafrica.com`
+**Auth:** OIDC/OAuth2 via auth-ui (`sso.codevertexafrica.com`)
 **Last updated:** 2026-05-21
 **Status:** Fully implemented — Sprint 1 MVP + Phase 15 post-MVP pages all shipped
 
@@ -67,7 +67,7 @@ src/app/
 
 1. User navigates to inventory-ui
 2. `AuthProvider` checks for valid JWT in local storage
-3. If no token: redirect to auth-ui login page (`sso.codevertexitsolutions.com`)
+3. If no token: redirect to auth-ui login page (`sso.codevertexafrica.com`)
 4. auth-ui authenticates user, redirects back with authorization code
 5. inventory-ui exchanges code for JWT tokens (access + refresh)
 6. Axios interceptor attaches `Authorization: Bearer <token>` to all API calls
@@ -93,7 +93,7 @@ src/app/
 ## API Client
 
 Axios instance configured with:
-- `baseURL`: `https://inventoryapi.codevertexitsolutions.com/v1/{tenantID}`
+- `baseURL`: `https://inventoryapi.codevertexafrica.com/v1/{tenantID}`
 - Request interceptor: attach JWT from Zustand auth store
 - Response interceptor: handle 401 (token refresh), 403 (redirect to unauthorized page)
 - Timeout: 10 seconds

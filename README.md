@@ -11,7 +11,7 @@ pnpm dev
 
 ## Deploy
 
-Deployed at `https://inventory.codevertexitsolutions.com`. CI on push to `main`.
+Deployed at `https://inventory.codevertexafrica.com`. CI on push to `main`.
 
 ## Push from this folder (own repo)
 

@@ -13,7 +13,7 @@ interface UsageAlert {
 
 const SUBSCRIPTIONS_API_URL =
   process.env.NEXT_PUBLIC_SUBSCRIPTIONS_API_URL ||
-  'https://pricingapi.codevertexitsolutions.com';
+  'https://pricingapi.codevertexafrica.com';
 
 export function useUsageAlerts(): UsageAlert[] {
   const token = useAuthStore((s) => s.session?.accessToken);

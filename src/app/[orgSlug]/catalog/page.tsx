@@ -369,7 +369,7 @@ export default function CatalogPage() {
   // rather than hiding the control. Returns true when the action may proceed.
   function guardBulkImport(): boolean {
     if (canBulkImport) return true;
-    const subscribeUrl = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexitsolutions.com';
+    const subscribeUrl = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexafrica.com';
     toast.info('Bulk import needs a plan upgrade', {
       description: 'Upgrade your plan to import items in bulk from a spreadsheet.',
       action: { label: 'Upgrade', onClick: () => window.open(`${subscribeUrl}/subscribe`, '_blank') },

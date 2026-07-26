@@ -11,7 +11,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SubscriptionProvider, type FeatureCatalogEntry } from '@bengo-hub/shared-ui-lib/subscription';
 import { useSubscription } from '@/hooks/use-subscription';
 
-const UPGRADE_BASE = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexitsolutions.com';
+const UPGRADE_BASE = process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexafrica.com';
 
 interface CatalogItem {
   featureCode: string;

@@ -121,7 +121,7 @@ const UNIVERSAL_MODULES = new Set<string>([
 
 // Cross-service ERP UI (linked, never duplicated). Code fallback is the safety net since
 // NEXT_PUBLIC URLs are baked at build time.
-const ERP_UI_URL = process.env.NEXT_PUBLIC_ERP_UI_URL || 'https://erp.codevertexitsolutions.com';
+const ERP_UI_URL = process.env.NEXT_PUBLIC_ERP_UI_URL || 'https://erp.codevertexafrica.com';
 
 // Gating is driven by the SELECTED outlet's use_case for everyone (admins included).
 // When no specific outlet is selected — the HQ "All Outlets" view, where useCase is

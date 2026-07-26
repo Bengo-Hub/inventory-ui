@@ -643,8 +643,8 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
 // Integrations tab
 // ══════════════════════════════════════════════════════════════════════════════
 
-const AUTH_API_URL_DEFAULT = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://sso.codevertexitsolutions.com';
-const INV_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.codevertexitsolutions.com';
+const AUTH_API_URL_DEFAULT = process.env.NEXT_PUBLIC_AUTH_API_URL || 'https://sso.codevertexafrica.com';
+const INV_API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.codevertexafrica.com';
 
 function IntegrationsTab() {
   const [authApiUrl, setAuthApiUrl] = useState(AUTH_API_URL_DEFAULT);
