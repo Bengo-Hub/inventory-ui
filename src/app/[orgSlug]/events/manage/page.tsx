@@ -16,7 +16,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 type Tab = 'upcoming' | 'past' | 'soldout';
 
 // Public ticket storefront base URL (ordering-frontend). Matches the "Online Store" nav convention.
-const ORDERING_URL = process.env.NEXT_PUBLIC_ORDERING_UI_URL ?? 'https://ordersapp.codevertexitsolutions.com';
+const ORDERING_URL = process.env.NEXT_PUBLIC_ORDERING_UI_URL ?? 'https://ordering.codevertexafrica.com';
 
 // copyEventLink copies the public, shareable event ticket page URL for a tenant's event.
 function copyEventLink(slug: string, eventId: string) {
