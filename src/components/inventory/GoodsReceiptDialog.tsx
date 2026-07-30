@@ -27,6 +27,17 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [received, setReceived] = useState<Record<string, string>>({});
     const [rejected, setRejected] = useState<Record<string, string>>({});
     const [reason, setReason] = useState<Record<string, string>>({});
+    // Actual unit cost paid on THIS receipt — pre-filled from the PO line but editable, since the
+    // supplier's delivered price often differs from what was originally ordered. This is the value
+    // that becomes the new stock's own cost layer; it never rewrites the cost of stock already on
+    // hand (see InventoryLot cost layers / postGoodsReceiptCore).
+    const [unitCost, setUnitCost] = useState<Record<string, string>>({});
+    // Selling-price adjustment captured alongside this receipt's cost — optional. scope decides
+    // whether it applies immediately to all stock (default — matches editing the price from the
+    // item screen) or is queued so only stock received from now on carries the new price, with
+    // existing stock selling at its current price until it's gone.
+    const [newPrice, setNewPrice] = useState<Record<string, string>>({});
+    const [priceScope, setPriceScope] = useState<Record<string, 'all_stock' | 'new_stock_only'>>({});
     // Free-text serials per line (comma / space / newline separated). Optional — only for
     // serial-tracked items, where the backend requires one unique serial per accepted unit.
     const [serials, setSerials] = useState<Record<string, string>>({});
@@ -54,15 +65,16 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     // Map item_id -> lot-tracking flags so we can surface lot/expiry inputs only where relevant.
     const { data: itemsPage } = useItems(org, { limit: 500 });
     const lotInfo = useMemo(() => {
-        const m = new Map<string, { track: boolean }>();
+        const m = new Map<string, { track: boolean; currentPrice?: number }>();
         for (const it of itemsPage?.data ?? []) {
-            m.set(it.id, { track: !!it.track_lots || !!it.is_perishable });
+            const currentPrice = it.selling_price ?? it.max_selling_price ?? undefined;
+            m.set(it.id, { track: !!it.track_lots || !!it.is_perishable, currentPrice: currentPrice ?? undefined });
         }
         return m;
     }, [itemsPage]);
 
     const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
-    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); };
+    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); setUnitCost({}); setNewPrice({}); setPriceScope({}); };
     const parseSerials = (raw: string | undefined) =>
         (raw ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
@@ -80,6 +92,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                 const sn = parseSerials(serials[l.id]);
                 const lot = lotNumber[l.id]?.trim();
                 const exp = expiryDate[l.id];
+                const cost = unitCost[l.id] !== undefined ? parseDecimal(unitCost[l.id]) : l.unit_cost;
+                const priceStr = newPrice[l.id]?.trim();
+                const price = priceStr ? parseDecimal(priceStr) : undefined;
                 return {
                     purchase_order_line_id: l.id,
                     item_id: l.item_id,
@@ -87,11 +102,13 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                     quantity_accepted: acc,
                     quantity_rejected: rej,
                     rejection_reason: rej > 0 ? (reason[l.id]?.trim() || undefined) : undefined,
-                    unit_cost: l.unit_cost,
+                    unit_cost: cost,
                     serials: sn.length > 0 ? sn : undefined,
                     lot_number: lot || undefined,
                     // <input type="date"> gives YYYY-MM-DD; backend expects RFC3339.
                     expiry_date: exp ? new Date(exp).toISOString() : undefined,
+                    new_selling_price: price && price > 0 ? price : undefined,
+                    price_scope: price && price > 0 ? (priceScope[l.id] ?? 'all_stock') : undefined,
                 };
             })
             .filter((l) => l.quantity_received > 0);
@@ -150,7 +167,18 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                             const acc = Math.max(0, rec - rej);
                                             const snCount = parseSerials(serials[l.id]).length;
                                             const snMismatch = snCount > 0 && snCount !== acc;
-                                            const lotTracked = lotInfo.get(l.item_id)?.track ?? false;
+                                            const info = lotInfo.get(l.item_id);
+                                            const lotTracked = info?.track ?? false;
+                                            const currentPrice = info?.currentPrice;
+                                            const costStr = unitCost[l.id];
+                                            const cost = costStr !== undefined ? parseDecimal(costStr) : l.unit_cost;
+                                            const costChanged = Number.isFinite(cost) && cost !== l.unit_cost;
+                                            const costDeltaPct = costChanged && l.unit_cost > 0 ? ((cost - l.unit_cost) / l.unit_cost) * 100 : 0;
+                                            const priceStr = newPrice[l.id];
+                                            const priceEntered = priceStr !== undefined && priceStr.trim() !== '';
+                                            const priceVal = priceEntered ? parseDecimal(priceStr) : undefined;
+                                            const priceChanged = priceEntered && currentPrice !== undefined && Number.isFinite(priceVal) && priceVal !== currentPrice;
+                                            const scope = priceScope[l.id] ?? 'all_stock';
                                             return (
                                                 <div key={l.id} className="px-3 py-2 space-y-1.5">
                                                   <div className="grid grid-cols-12 gap-2 items-center">
@@ -162,6 +190,65 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                     <Input className="col-span-2" type="number" min="0" max={rec} step={DECIMAL_STEP} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                   </div>
+                                                  <div className="grid grid-cols-12 gap-2 items-center">
+                                                    <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
+                                                      Actual unit cost {costChanged && (
+                                                        <span className={costDeltaPct >= 0 ? 'text-amber-600' : 'text-emerald-600'}>
+                                                          ({costDeltaPct >= 0 ? '+' : ''}{costDeltaPct.toFixed(1)}% vs PO {l.unit_cost.toFixed(2)})
+                                                        </span>
+                                                      )}
+                                                    </label>
+                                                    <Input
+                                                      className="col-span-3"
+                                                      type="number"
+                                                      min="0"
+                                                      step={DECIMAL_STEP}
+                                                      value={costStr ?? String(l.unit_cost)}
+                                                      onChange={(e) => setUnitCost((s) => ({ ...s, [l.id]: e.target.value }))}
+                                                    />
+                                                  </div>
+                                                  {costChanged && (
+                                                    <p className="text-[11px] text-muted-foreground">
+                                                      This receipt's stock will carry its own cost ({cost.toFixed(2)}) — stock already on hand keeps what it actually cost.
+                                                    </p>
+                                                  )}
+
+                                                  <details className="text-xs" open={priceEntered}>
+                                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                                                      Update selling price {priceEntered ? '(set)' : '(optional)'}
+                                                    </summary>
+                                                    <div className="mt-1.5 space-y-1.5">
+                                                      <div className="grid grid-cols-12 gap-2 items-center">
+                                                        <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
+                                                          New selling price {currentPrice !== undefined && <span>(currently {currentPrice.toFixed(2)})</span>}
+                                                        </label>
+                                                        <Input
+                                                          className="col-span-3"
+                                                          type="number"
+                                                          min="0"
+                                                          step={DECIMAL_STEP}
+                                                          placeholder={currentPrice !== undefined ? currentPrice.toFixed(2) : ''}
+                                                          value={priceStr ?? ''}
+                                                          onChange={(e) => setNewPrice((s) => ({ ...s, [l.id]: e.target.value }))}
+                                                        />
+                                                      </div>
+                                                      {priceEntered && (
+                                                        <div className="space-y-1 rounded-lg border border-border p-2">
+                                                          <label className="flex items-start gap-2 text-[11px]">
+                                                            <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'all_stock'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'all_stock' }))} />
+                                                            <span><span className="font-medium text-foreground">Update price for all stock</span> — applies immediately, including units already in stock.</span>
+                                                          </label>
+                                                          <label className="flex items-start gap-2 text-[11px]">
+                                                            <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'new_stock_only'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'new_stock_only' }))} />
+                                                            <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {currentPrice !== undefined ? currentPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
+                                                          </label>
+                                                          {priceChanged && scope === 'all_stock' && (
+                                                            <p className="text-amber-600">This changes the price of every unit of this item right away, including stock bought at the old cost.</p>
+                                                          )}
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  </details>
                                                   <details className="text-xs">
                                                     <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
                                                       Serial numbers {snCount > 0 ? `(${snCount}/${acc})` : '(optional — serial-tracked items)'}

@@ -45,6 +45,14 @@ export interface CreateGRNLineInput {
   lot_number?: string;
   /** Lot expiry date (RFC3339) for perishable items. */
   expiry_date?: string;
+  /** New selling price captured alongside this receipt's cost, if adjusted here. */
+  new_selling_price?: number;
+  /**
+   * 'all_stock' (default): applies new_selling_price immediately, everywhere.
+   * 'new_stock_only': queues it — old stock keeps selling at its current price until every
+   * cost layer that existed before this receipt has sold through.
+   */
+  price_scope?: 'all_stock' | 'new_stock_only';
 }
 
 export interface CreateGRNInput {
