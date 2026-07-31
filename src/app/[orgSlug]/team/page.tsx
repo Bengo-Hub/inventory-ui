@@ -13,6 +13,7 @@ import {
   useRoleAssignments,
   useRolePermissions,
   useRoles,
+  useSetPin,
   useSetRolePermissions,
   useUpdateUserStatus,
   useUserOutlets,
@@ -20,9 +21,11 @@ import {
 import { useAuthStore } from '@/store/auth';
 import { userHasPermission } from '@/lib/auth/permissions';
 import type { Permission } from '@/lib/api/rbac';
+import type { InventoryUserRow } from '@/lib/api/rbac';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import {
   ChevronRight,
+  KeyRound,
   Loader2,
   Lock,
   Plus,
@@ -31,6 +34,7 @@ import {
   Store,
   UserCog,
   Users,
+  X,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -112,6 +116,7 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
   const updateStatus = useUpdateUserStatus(orgSlug);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [pinTarget, setPinTarget] = useState<InventoryUserRow | null>(null);
 
   const roleName = useMemo(() => {
     const m = new Map(roles.map((r) => [r.id, r.name]));
@@ -152,6 +157,11 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
                   </button>
                   <Badge variant={u.status === 'active' ? 'success' : 'warning'}>{u.status}</Badge>
                   {canManage && (
+                    <Button variant="outline" className="gap-1.5" onClick={() => setPinTarget(u)}>
+                      <KeyRound className="h-3.5 w-3.5" /> PIN
+                    </Button>
+                  )}
+                  {canManage && (
                     <Button
                       variant="outline"
                       onClick={() => updateStatus.mutate({ userId: u.id, status: u.status === 'active' ? 'inactive' : 'active' }, {
@@ -174,7 +184,61 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
           {filtered.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No users found.</p>}
         </div>
       </CardContent>
+      {pinTarget && <SetPinDialog orgSlug={orgSlug} member={pinTarget} onClose={() => setPinTarget(null)} />}
     </Card>
+  );
+}
+
+// Self-service "Set PIN" — lets a manager set/replace a staff member's terminal PIN from
+// the Team page instead of the separate, central auth-ui admin screens.
+function SetPinDialog({ orgSlug, member, onClose }: { orgSlug: string; member: InventoryUserRow; onClose: () => void }) {
+  const [pin, setPin] = useState('');
+  const setPinMutation = useSetPin(orgSlug);
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (pin.length < 4) { toast.error('PIN must be at least 4 digits'); return; }
+    setPinMutation.mutate({ userId: member.id, pin }, {
+      onSuccess: () => { toast.success(`PIN set for ${member.email}`); onClose(); },
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to set PIN')),
+    });
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative z-[60] w-full max-w-sm mx-4">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Set PIN · {member.email}</h2>
+              <button onClick={onClose} className="p-1 rounded-lg hover:bg-accent transition-colors"><X className="h-5 w-5 text-muted-foreground" /></button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={submit} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Terminal PIN</label>
+                <Input
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  inputMode="numeric"
+                  placeholder="4-6 digits"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">Used to log in at warehouse/desk terminals.</p>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+                <Button type="submit" className="flex-1" disabled={setPinMutation.isPending || pin.length < 4}>
+                  {setPinMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save PIN'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { rbacApi, type AssignRoleInput, type CreateRoleInput } from '@/lib/api/rbac';
+import { pinApi } from '@/lib/api/pin';
 
 const ROLES_KEY = 'rbac-roles';
 const PERMS_KEY = 'rbac-permissions';
@@ -150,6 +151,12 @@ export function useRemoveUserOutlet(orgSlug: string) {
     onSuccess: (_d, vars) => {
       queryClient.invalidateQueries({ queryKey: [USER_OUTLETS_KEY, orgSlug, vars.userId] });
     },
+  });
+}
+
+export function useSetPin(orgSlug: string) {
+  return useMutation({
+    mutationFn: ({ userId, pin }: { userId: string; pin: string }) => pinApi.setPin(orgSlug, userId, pin),
   });
 }
 

@@ -35,4 +35,12 @@ export const pinApi = {
   /** Authenticate by PIN alone at the chosen outlet (staff need not pick their name). */
   identify: (orgSlug: string, pin: string, outletId?: string) =>
     apiClient.post<PinLoginResult>(`${base(orgSlug)}/identify`, { pin, outlet_id: outletId }),
+
+  /**
+   * Set/replace a staff member's terminal PIN (SSO-authed manager action, Team page).
+   * userId is the local InventoryUser id (as returned by GET /users), not the
+   * auth-service user id used by identify/login.
+   */
+  setPin: (orgSlug: string, userId: string, pin: string) =>
+    apiClient.post<{ updated: boolean }>(`${base(orgSlug)}/set`, { user_id: userId, pin }),
 };
