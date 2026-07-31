@@ -39,6 +39,11 @@ export const barcodeApi = {
   itemBarcodePng: (orgSlug: string, itemId: string): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/items/${itemId}/barcode.png`),
 
+  // Single-item printable label PDF (title/SKU/barcode/human-readable — same card layout the
+  // bulk Avery sheet uses per cell). Replaces printing the bare barcode PNG with no item details.
+  itemLabelPdf: (orgSlug: string, itemId: string): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/items/${itemId}/label.pdf`),
+
   // Run a bulk label-print job → returns a Blob (PDF for avery_a4, text for zpl/dymo).
   printLabels: (orgSlug: string, body: PrintLabelsRequest): Promise<Blob> =>
     apiClient.postBlob(`/api/v1/${orgSlug}/inventory/labels/print`, body),
