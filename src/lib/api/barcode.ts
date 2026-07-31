@@ -16,6 +16,11 @@ export interface PrintLabelsRequest {
 
   format: LabelFormat;
 
+  // Avery grid preset when format=avery_a4: "l7160" (default, A4, 21/sheet) | "5160" (US Letter, 30/sheet)
+  sheet?: string;
+  // Physical label size when format=thermal_zpl: "2x1" | "3x2" | "4x2" (default) | "4x6", all @203dpi
+  thermal_size?: string;
+
   include_lot?: boolean;
   include_serial?: boolean;
   include_price?: boolean;

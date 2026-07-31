@@ -20,6 +20,18 @@ const FORMATS: { value: LabelFormat; label: string; hint: string }[] = [
   { value: 'dymo', label: 'DYMO label', hint: 'Download DYMO label text' },
 ];
 
+const AVERY_SHEETS: { value: string; label: string }[] = [
+  { value: 'l7160', label: 'Avery L7160 (A4, 21/sheet)' },
+  { value: '5160', label: 'Avery 5160 (US Letter, 30/sheet)' },
+];
+
+const THERMAL_SIZES: { value: string; label: string }[] = [
+  { value: '2x1', label: '2" x 1" (standard barcode/SKU label)' },
+  { value: '3x2', label: '3" x 2" (recommended for lot/serial GS1-128 codes)' },
+  { value: '4x2', label: '4" x 2" (default)' },
+  { value: '4x6', label: '4" x 6" (shipping-label size)' },
+];
+
 /**
  * PrintLabelsDialog — bulk label-print surface. Pick a selection (category / supplier /
  * purchase-order / preselected items), per-item quantity, an output format, and optional
@@ -45,6 +57,8 @@ export function PrintLabelsDialog({
   const [poId, setPoId] = useState('');
   const [qty, setQty] = useState(1);
   const [format, setFormat] = useState<LabelFormat>('avery_a4');
+  const [sheet, setSheet] = useState('l7160');
+  const [thermalSize, setThermalSize] = useState('4x2');
   const [includeLot, setIncludeLot] = useState(false);
   const [includeSerial, setIncludeSerial] = useState(false);
   const [includePrice, setIncludePrice] = useState(false);
@@ -64,6 +78,8 @@ export function PrintLabelsDialog({
     const base: PrintLabelsRequest = {
       format,
       qty_per_item: qty,
+      ...(format === 'avery_a4' ? { sheet } : {}),
+      ...(format === 'thermal_zpl' ? { thermal_size: thermalSize } : {}),
       include_lot: includeLot,
       include_serial: includeSerial,
       include_price: includePrice,
@@ -227,6 +243,42 @@ export function PrintLabelsDialog({
                 </label>
               ))}
             </div>
+
+            {/* Avery sheet preset (avery_a4 only) */}
+            {format === 'avery_a4' && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Sheet</p>
+                {AVERY_SHEETS.map((s) => (
+                  <label key={s.value} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="mt-0.5"
+                      checked={sheet === s.value}
+                      onChange={() => setSheet(s.value)}
+                    />
+                    <span>{s.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            {/* Thermal label size (thermal_zpl only) */}
+            {format === 'thermal_zpl' && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground">Label size</p>
+                {THERMAL_SIZES.map((t) => (
+                  <label key={t.value} className="flex items-start gap-2 text-sm">
+                    <input
+                      type="radio"
+                      className="mt-0.5"
+                      checked={thermalSize === t.value}
+                      onChange={() => setThermalSize(t.value)}
+                    />
+                    <span>{t.label}</span>
+                  </label>
+                ))}
+              </div>
+            )}
 
             {/* Lot / serial / price toggles */}
             <div className="space-y-2">
