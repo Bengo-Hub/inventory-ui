@@ -15,7 +15,9 @@ export interface BackupSettings {
 }
 
 function backupsBase(orgSlug: string) {
-  return `/api/v1/${orgSlug}/inventory/backups`;
+  // Backend mounts this at /api/v1/{tenant}/backups directly (tenant-scoped private routes),
+  // not under /inventory — see inventory-api's router.go private group + backups.go.
+  return `/api/v1/${orgSlug}/backups`;
 }
 
 export const backupsApi = {

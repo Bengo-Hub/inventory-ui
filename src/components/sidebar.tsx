@@ -18,12 +18,12 @@ import {
   FileText,
   FolderTree,
   Gauge,
-  Key,
   LayoutDashboard,
   Layers,
   LogOut,
-  Monitor,
   Package,
+  PackagePlus,
+  Bookmark,
   RotateCcw,
   Ruler,
   Settings,
@@ -117,6 +117,10 @@ const MODULE_FEATURE: Record<string, string> = {
 // to every use case (subscription-locked below tier 2 instead).
 const UNIVERSAL_MODULES = new Set<string>([
   'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'erp',
+  // Bundles spans retail kits, hospitality room-rate/board plans, and service sessions — not
+  // scoped to one use case. Reservations is a stock concept underlying order fulfillment for
+  // any use case that tracks stock (every use case already has 'stock' in its module list).
+  'bundles', 'reservations',
 ]);
 
 // Cross-service ERP UI (linked, never duplicated). Code fallback is the safety net since
@@ -271,6 +275,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         // Manufacturing outlets get "Bill of Materials" under the Manufacturing group instead.
         ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' }]),
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
+        { label: 'Bundles & Packages', icon: PackagePlus, href: '/bundles', moduleKey: 'bundles' },
       ],
     },
     {
@@ -285,6 +290,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Warehouses', icon: Warehouse, href: '/warehouses', moduleKey: 'warehouses' },
         { label: 'Stock Levels', icon: BookOpen, href: '/stock', moduleKey: 'stock' },
+        { label: 'Reservations', icon: Bookmark, href: '/reservations', moduleKey: 'reservations' },
         { label: 'Adjustments', icon: ClipboardList, href: '/adjustments', moduleKey: 'adjustments' },
         { label: 'Stock Take', icon: ClipboardCheck, href: '/stock-take', moduleKey: 'stock_take' },
         { label: 'Transfers', icon: ArrowRightLeft, href: '/transfers', moduleKey: 'transfers' },
@@ -440,8 +446,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
             </p>
             <div className="space-y-0.5">
               <NavLink item={{ label: 'Platform Admin', icon: Shield, href: '/platform' }} orgSlug={orgSlug} onClose={onClose} />
-              <NavLink item={{ label: 'Devices', icon: Monitor, href: '/platform/devices' }} orgSlug={orgSlug} onClose={onClose} />
-              <NavLink item={{ label: 'Licenses', icon: Key, href: '/platform/licenses' }} orgSlug={orgSlug} onClose={onClose} />
+              {/* "Devices" and "Licenses" links removed — no corresponding pages exist under
+                  src/app/[orgSlug]/platform/ (confirmed 404s), and no spec exists for what they
+                  were meant to contain. Re-add once those pages/features are actually built. */}
             </div>
           </div>
         )}

@@ -16,6 +16,11 @@ export interface Lot {
   notes?: string;
   status?: 'active' | 'expired' | 'recalled' | 'depleted';
   created_at: string;
+  /** True for an internal layer auto-created at goods receipt to preserve a non-lot-tracked
+   * item's cost — not a real batch a merchant manages. Excluded from the list response unless
+   * include_cost_layers=true was passed. */
+  is_cost_layer?: boolean;
+  received_at?: string;
 }
 
 export interface CreateLotInput {
