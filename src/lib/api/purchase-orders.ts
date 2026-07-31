@@ -13,6 +13,13 @@ export interface POLineItem {
   total_cost: number;
   unit_id?: string;
   unit?: string; // unit abbreviation, e.g. "kg"
+  /** Selling-price adjustment decided at order time — carried through to (and still editable
+   * on) the goods receipt, applied only once this line is actually received. */
+  new_selling_price?: number;
+  price_scope?: 'all_stock' | 'new_stock_only';
+  /** The item's selling price as of now — context only, shown as "currently X" next to the
+   * input; never itself written anywhere. */
+  current_selling_price?: number;
 }
 
 export interface PurchaseOrder {
@@ -42,7 +49,14 @@ export interface CreatePOInput {
   notes?: string;
   pay_term_days?: number;
   additional_shipping_charges?: number;
-  line_items: { item_id: string; quantity: number; unit_cost: number; unit_id?: string }[];
+  line_items: {
+    item_id: string;
+    quantity: number;
+    unit_cost: number;
+    unit_id?: string;
+    new_selling_price?: number;
+    price_scope?: 'all_stock' | 'new_stock_only';
+  }[];
 }
 
 export interface POListParams {

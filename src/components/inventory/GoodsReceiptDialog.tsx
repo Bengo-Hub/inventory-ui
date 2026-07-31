@@ -62,6 +62,33 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [po?.warehouse_id]);
 
+    // Carry through a selling-price decision made when this PO was placed/amended — the buyer
+    // already decided whether a price change applies to all stock or new stock only, so the
+    // receiving clerk shouldn't have to re-decide it from scratch. Still fully editable below:
+    // this only seeds the initial values once per PO selection.
+    useEffect(() => {
+        if (!po?.line_items?.length) return;
+        setNewPrice((s) => {
+            const next = { ...s };
+            for (const l of po.line_items) {
+                if (l.new_selling_price != null && next[l.id] === undefined) {
+                    next[l.id] = String(l.new_selling_price);
+                }
+            }
+            return next;
+        });
+        setPriceScope((s) => {
+            const next = { ...s };
+            for (const l of po.line_items) {
+                if (l.new_selling_price != null && next[l.id] === undefined) {
+                    next[l.id] = l.price_scope ?? 'all_stock';
+                }
+            }
+            return next;
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [po?.id]);
+
     // Map item_id -> lot-tracking flags so we can surface lot/expiry inputs only where relevant.
     const { data: itemsPage } = useItems(org, { limit: 500 });
     const lotInfo = useMemo(() => {

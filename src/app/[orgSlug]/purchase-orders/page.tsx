@@ -56,6 +56,12 @@ interface POLine {
         purchaseUnit: string | null;
         itemUnitId: string | null;
     };
+    // Selling-price adjustment decided at order time — carried through to (and still editable
+    // on) the goods receipt when this PO is received; applied only then, never at order time.
+    newSellingPrice: string;
+    priceScope: 'all_stock' | 'new_stock_only';
+    // The item's selling price as of when it was picked — context only ("currently X").
+    currentSellingPrice?: number | null;
 }
 
 // Default the line's unit to the item's purchase_unit (how it's actually bought — e.g. "kg"),
@@ -153,7 +159,7 @@ export default function PurchaseOrdersPage() {
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
     const [additionalShipping, setAdditionalShipping] = useState('');
-    const [poLines, setPoLines] = useState<POLine[]>([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
+    const [poLines, setPoLines] = useState<POLine[]>([blankPOLine()]);
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const { data: units } = useUnits(orgSlug);
@@ -200,8 +206,12 @@ export default function PurchaseOrdersPage() {
 
     useMemo(() => { setPage(1); }, [search, statusFilter]);
 
+    function blankPOLine(): POLine {
+        return { itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '', newSellingPrice: '', priceScope: 'all_stock' };
+    }
+
     function addPOLine() {
-        setPoLines([...poLines, { itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
+        setPoLines([...poLines, blankPOLine()]);
     }
 
     function removePOLine(idx: number) {
@@ -221,7 +231,7 @@ export default function PurchaseOrdersPage() {
         setPoNotes('');
         setPayTermDays('');
         setAdditionalShipping('');
-        setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
+        setPoLines([blankPOLine()]);
     }
 
     function closePODialog() {
@@ -254,10 +264,13 @@ export default function PurchaseOrdersPage() {
                 quantity: String(li.quantity),
                 unitPrice: String(li.unit_cost),
                 unitId: li.unit_id ?? '',
+                newSellingPrice: li.new_selling_price != null ? String(li.new_selling_price) : '',
+                priceScope: li.price_scope ?? 'all_stock',
+                currentSellingPrice: li.current_selling_price ?? null,
             }))
         );
         if ((po.line_items?.length ?? 0) === 0) {
-            setPoLines([{ itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '' }]);
+            setPoLines([blankPOLine()]);
         }
         setCreateOpen(true);
     }
@@ -268,12 +281,17 @@ export default function PurchaseOrdersPage() {
         if (!activeWarehouse.warehouseId || activeWarehouse.unresolved) { toast.error('Select a warehouse'); return; }
         const lines = poLines
             .filter((l) => l.itemId && parseFloat(l.quantity) > 0)
-            .map((l) => ({
-                item_id: l.itemId,
-                quantity: parseDecimal(l.quantity),
-                unit_cost: parseDecimal(l.unitPrice),
-                unit_id: l.unitId || undefined,
-            }));
+            .map((l) => {
+                const newPrice = l.newSellingPrice.trim() ? parseDecimal(l.newSellingPrice) : undefined;
+                return {
+                    item_id: l.itemId,
+                    quantity: parseDecimal(l.quantity),
+                    unit_cost: parseDecimal(l.unitPrice),
+                    unit_id: l.unitId || undefined,
+                    new_selling_price: newPrice && newPrice > 0 ? newPrice : undefined,
+                    price_scope: newPrice && newPrice > 0 ? l.priceScope : undefined,
+                };
+            });
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
 
         const payload = {
@@ -436,7 +454,7 @@ export default function PurchaseOrdersPage() {
         {createOpen && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={closePODialog} />
-                <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <div className="relative z-50 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
@@ -541,6 +559,7 @@ export default function PurchaseOrdersPage() {
                                                             purchaseUnit: item.purchase_unit ?? null,
                                                             itemUnitId: item.unit_id ?? null,
                                                         },
+                                                        currentSellingPrice: item.selling_price ?? null,
                                                     };
                                                     setPoLines(updated);
                                                 }}
@@ -607,6 +626,69 @@ export default function PurchaseOrdersPage() {
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {/* Selling-price adjustment — decide it now, while placing the order; it's
+                                                carried through (still editable) to the goods receipt when this line is
+                                                actually received, and applied only then. */}
+                                            {line.itemId && (
+                                                <details className="text-xs" open={!!line.newSellingPrice.trim()}>
+                                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
+                                                        Update selling price on receipt {line.newSellingPrice.trim() ? '(set)' : '(optional)'}
+                                                    </summary>
+                                                    <div className="mt-1.5 space-y-1.5">
+                                                        <div className="grid grid-cols-4 gap-2 items-center">
+                                                            <label className="col-span-2 text-[11px] font-medium text-muted-foreground">
+                                                                New selling price {line.currentSellingPrice != null && <span>(currently {line.currentSellingPrice.toFixed(2)})</span>}
+                                                            </label>
+                                                            <Input
+                                                                className="col-span-2"
+                                                                type="number"
+                                                                min="0"
+                                                                step={DECIMAL_STEP}
+                                                                placeholder={line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : ''}
+                                                                value={line.newSellingPrice}
+                                                                onChange={(e) => {
+                                                                    const updated = [...poLines];
+                                                                    updated[idx] = { ...updated[idx], newSellingPrice: e.target.value };
+                                                                    setPoLines(updated);
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        {line.newSellingPrice.trim() && (
+                                                            <div className="space-y-1 rounded-lg border border-border p-2">
+                                                                <label className="flex items-start gap-2 text-[11px]">
+                                                                    <input
+                                                                        type="radio"
+                                                                        className="mt-0.5"
+                                                                        name={`po-price-scope-${idx}`}
+                                                                        checked={line.priceScope === 'all_stock'}
+                                                                        onChange={() => {
+                                                                            const updated = [...poLines];
+                                                                            updated[idx] = { ...updated[idx], priceScope: 'all_stock' };
+                                                                            setPoLines(updated);
+                                                                        }}
+                                                                    />
+                                                                    <span><span className="font-medium text-foreground">Update price for all stock</span> — applies the moment this order is received, including units already in stock.</span>
+                                                                </label>
+                                                                <label className="flex items-start gap-2 text-[11px]">
+                                                                    <input
+                                                                        type="radio"
+                                                                        className="mt-0.5"
+                                                                        name={`po-price-scope-${idx}`}
+                                                                        checked={line.priceScope === 'new_stock_only'}
+                                                                        onChange={() => {
+                                                                            const updated = [...poLines];
+                                                                            updated[idx] = { ...updated[idx], priceScope: 'new_stock_only' };
+                                                                            setPoLines(updated);
+                                                                        }}
+                                                                    />
+                                                                    <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
+                                                                </label>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </details>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
