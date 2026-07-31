@@ -26,7 +26,7 @@ import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { AlertTriangle, BarChart3, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, BarChart3, DollarSign, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { useParams } from 'next/navigation';
@@ -602,7 +602,13 @@ export default function PurchaseOrdersPage() {
                                                     />
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs text-muted-foreground">Unit Cost</label>
+                                                    <label className="text-xs text-muted-foreground">
+                                                        Unit Cost
+                                                        {(() => {
+                                                            const lastCost = line.costBasis?.purchasePrice ?? line.costBasis?.costPrice;
+                                                            return lastCost != null ? <span className="ml-1 text-[11px] font-medium text-foreground/70">(last paid {lastCost.toFixed(2)})</span> : null;
+                                                        })()}
+                                                    </label>
                                                     <Input
                                                         type="number"
                                                         min="0"
@@ -629,65 +635,69 @@ export default function PurchaseOrdersPage() {
 
                                             {/* Selling-price adjustment — decide it now, while placing the order; it's
                                                 carried through (still editable) to the goods receipt when this line is
-                                                actually received, and applied only then. */}
+                                                actually received, and applied only then. Always visible (not a
+                                                collapsed disclosure) — this is a first-class part of ordering, not an
+                                                easy-to-miss extra. */}
                                             {line.itemId && (
-                                                <details className="text-xs" open={!!line.newSellingPrice.trim()}>
-                                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                                                        Update selling price on receipt {line.newSellingPrice.trim() ? '(set)' : '(optional)'}
-                                                    </summary>
-                                                    <div className="mt-1.5 space-y-1.5">
-                                                        <div className="grid grid-cols-4 gap-2 items-center">
-                                                            <label className="col-span-2 text-[11px] font-medium text-muted-foreground">
-                                                                New selling price {line.currentSellingPrice != null && <span>(currently {line.currentSellingPrice.toFixed(2)})</span>}
-                                                            </label>
-                                                            <Input
-                                                                className="col-span-2"
-                                                                type="number"
-                                                                min="0"
-                                                                step={DECIMAL_STEP}
-                                                                placeholder={line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : ''}
-                                                                value={line.newSellingPrice}
-                                                                onChange={(e) => {
-                                                                    const updated = [...poLines];
-                                                                    updated[idx] = { ...updated[idx], newSellingPrice: e.target.value };
-                                                                    setPoLines(updated);
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        {line.newSellingPrice.trim() && (
-                                                            <div className="space-y-1 rounded-lg border border-border p-2">
-                                                                <label className="flex items-start gap-2 text-[11px]">
-                                                                    <input
-                                                                        type="radio"
-                                                                        className="mt-0.5"
-                                                                        name={`po-price-scope-${idx}`}
-                                                                        checked={line.priceScope === 'all_stock'}
-                                                                        onChange={() => {
-                                                                            const updated = [...poLines];
-                                                                            updated[idx] = { ...updated[idx], priceScope: 'all_stock' };
-                                                                            setPoLines(updated);
-                                                                        }}
-                                                                    />
-                                                                    <span><span className="font-medium text-foreground">Update price for all stock</span> — applies the moment this order is received, including units already in stock.</span>
-                                                                </label>
-                                                                <label className="flex items-start gap-2 text-[11px]">
-                                                                    <input
-                                                                        type="radio"
-                                                                        className="mt-0.5"
-                                                                        name={`po-price-scope-${idx}`}
-                                                                        checked={line.priceScope === 'new_stock_only'}
-                                                                        onChange={() => {
-                                                                            const updated = [...poLines];
-                                                                            updated[idx] = { ...updated[idx], priceScope: 'new_stock_only' };
-                                                                            setPoLines(updated);
-                                                                        }}
-                                                                    />
-                                                                    <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
-                                                                </label>
-                                                            </div>
-                                                        )}
+                                                <div className={`rounded-lg border-2 p-2.5 space-y-2 ${line.newSellingPrice.trim() ? 'border-primary/50 bg-primary/6' : 'border-dashed border-primary/25 bg-primary/2'}`}>
+                                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                                        <DollarSign className="h-3.5 w-3.5 text-primary" />
+                                                        Selling price adjustment
                                                     </div>
-                                                </details>
+                                                    <div className="grid grid-cols-4 gap-2 items-center">
+                                                        <label className="col-span-2 text-[11px] font-medium text-muted-foreground">
+                                                            New selling price
+                                                            {line.currentSellingPrice != null && (
+                                                                <span className="ml-1 font-semibold text-foreground">(current: {line.currentSellingPrice.toFixed(2)})</span>
+                                                            )}
+                                                        </label>
+                                                        <Input
+                                                            className="col-span-2"
+                                                            type="number"
+                                                            min="0"
+                                                            step={DECIMAL_STEP}
+                                                            placeholder={line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : 'Optional'}
+                                                            value={line.newSellingPrice}
+                                                            onChange={(e) => {
+                                                                const updated = [...poLines];
+                                                                updated[idx] = { ...updated[idx], newSellingPrice: e.target.value };
+                                                                setPoLines(updated);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    {line.newSellingPrice.trim() && (
+                                                        <div className="space-y-1 rounded-lg border border-border bg-background p-2">
+                                                            <label className="flex items-start gap-2 text-[11px]">
+                                                                <input
+                                                                    type="radio"
+                                                                    className="mt-0.5"
+                                                                    name={`po-price-scope-${idx}`}
+                                                                    checked={line.priceScope === 'all_stock'}
+                                                                    onChange={() => {
+                                                                        const updated = [...poLines];
+                                                                        updated[idx] = { ...updated[idx], priceScope: 'all_stock' };
+                                                                        setPoLines(updated);
+                                                                    }}
+                                                                />
+                                                                <span><span className="font-medium text-foreground">Update price for all stock</span> — applies the moment this order is received, including units already in stock.</span>
+                                                            </label>
+                                                            <label className="flex items-start gap-2 text-[11px]">
+                                                                <input
+                                                                    type="radio"
+                                                                    className="mt-0.5"
+                                                                    name={`po-price-scope-${idx}`}
+                                                                    checked={line.priceScope === 'new_stock_only'}
+                                                                    onChange={() => {
+                                                                        const updated = [...poLines];
+                                                                        updated[idx] = { ...updated[idx], priceScope: 'new_stock_only' };
+                                                                        setPoLines(updated);
+                                                                    }}
+                                                                />
+                                                                <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {line.currentSellingPrice != null ? line.currentSellingPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
+                                                            </label>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                         </div>
                                     ))}

@@ -9,7 +9,7 @@ import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePic
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { DollarSign, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -151,7 +151,7 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative z-50 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="relative z-50 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -219,9 +219,10 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                   </div>
                                                   <div className="grid grid-cols-12 gap-2 items-center">
                                                     <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
-                                                      Actual unit cost {costChanged && (
-                                                        <span className={costDeltaPct >= 0 ? 'text-amber-600' : 'text-emerald-600'}>
-                                                          ({costDeltaPct >= 0 ? '+' : ''}{costDeltaPct.toFixed(1)}% vs PO {l.unit_cost.toFixed(2)})
+                                                      Actual unit cost <span className="font-semibold text-foreground">(PO price: {l.unit_cost.toFixed(2)})</span>
+                                                      {costChanged && (
+                                                        <span className={costDeltaPct >= 0 ? 'ml-1 text-amber-600' : 'ml-1 text-emerald-600'}>
+                                                          {costDeltaPct >= 0 ? '+' : ''}{costDeltaPct.toFixed(1)}%
                                                         </span>
                                                       )}
                                                     </label>
@@ -240,42 +241,44 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                     </p>
                                                   )}
 
-                                                  <details className="text-xs" open={priceEntered}>
-                                                    <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
-                                                      Update selling price {priceEntered ? '(set)' : '(optional)'}
-                                                    </summary>
-                                                    <div className="mt-1.5 space-y-1.5">
-                                                      <div className="grid grid-cols-12 gap-2 items-center">
-                                                        <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
-                                                          New selling price {currentPrice !== undefined && <span>(currently {currentPrice.toFixed(2)})</span>}
-                                                        </label>
-                                                        <Input
-                                                          className="col-span-3"
-                                                          type="number"
-                                                          min="0"
-                                                          step={DECIMAL_STEP}
-                                                          placeholder={currentPrice !== undefined ? currentPrice.toFixed(2) : ''}
-                                                          value={priceStr ?? ''}
-                                                          onChange={(e) => setNewPrice((s) => ({ ...s, [l.id]: e.target.value }))}
-                                                        />
-                                                      </div>
-                                                      {priceEntered && (
-                                                        <div className="space-y-1 rounded-lg border border-border p-2">
-                                                          <label className="flex items-start gap-2 text-[11px]">
-                                                            <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'all_stock'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'all_stock' }))} />
-                                                            <span><span className="font-medium text-foreground">Update price for all stock</span> — applies immediately, including units already in stock.</span>
-                                                          </label>
-                                                          <label className="flex items-start gap-2 text-[11px]">
-                                                            <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'new_stock_only'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'new_stock_only' }))} />
-                                                            <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {currentPrice !== undefined ? currentPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
-                                                          </label>
-                                                          {priceChanged && scope === 'all_stock' && (
-                                                            <p className="text-amber-600">This changes the price of every unit of this item right away, including stock bought at the old cost.</p>
-                                                          )}
-                                                        </div>
-                                                      )}
+                                                  {/* Selling-price adjustment — always visible (not a collapsed disclosure)
+                                                      so it reads as a first-class part of receiving, not an easy-to-miss extra. */}
+                                                  <div className={`rounded-lg border-2 p-2.5 space-y-2 ${priceEntered ? 'border-primary/50 bg-primary/6' : 'border-dashed border-primary/25 bg-primary/2'}`}>
+                                                    <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                                                      <DollarSign className="h-3.5 w-3.5 text-primary" />
+                                                      Selling price adjustment
                                                     </div>
-                                                  </details>
+                                                    <div className="grid grid-cols-12 gap-2 items-center">
+                                                      <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
+                                                        New selling price
+                                                        {currentPrice !== undefined && <span className="ml-1 font-semibold text-foreground">(current: {currentPrice.toFixed(2)})</span>}
+                                                      </label>
+                                                      <Input
+                                                        className="col-span-3"
+                                                        type="number"
+                                                        min="0"
+                                                        step={DECIMAL_STEP}
+                                                        placeholder={currentPrice !== undefined ? currentPrice.toFixed(2) : 'Optional'}
+                                                        value={priceStr ?? ''}
+                                                        onChange={(e) => setNewPrice((s) => ({ ...s, [l.id]: e.target.value }))}
+                                                      />
+                                                    </div>
+                                                    {priceEntered && (
+                                                      <div className="space-y-1 rounded-lg border border-border bg-background p-2">
+                                                        <label className="flex items-start gap-2 text-[11px]">
+                                                          <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'all_stock'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'all_stock' }))} />
+                                                          <span><span className="font-medium text-foreground">Update price for all stock</span> — applies immediately, including units already in stock.</span>
+                                                        </label>
+                                                        <label className="flex items-start gap-2 text-[11px]">
+                                                          <input type="radio" className="mt-0.5" name={`price-scope-${l.id}`} checked={scope === 'new_stock_only'} onChange={() => setPriceScope((s) => ({ ...s, [l.id]: 'new_stock_only' }))} />
+                                                          <span><span className="font-medium text-foreground">Only for new stock</span> — existing stock keeps selling at {currentPrice !== undefined ? currentPrice.toFixed(2) : 'its current price'} until it sells out, then the new price takes over automatically.</span>
+                                                        </label>
+                                                        {priceChanged && scope === 'all_stock' && (
+                                                          <p className="text-amber-600">This changes the price of every unit of this item right away, including stock bought at the old cost.</p>
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </div>
                                                   <details className="text-xs">
                                                     <summary className="cursor-pointer text-muted-foreground hover:text-foreground select-none">
                                                       Serial numbers {snCount > 0 ? `(${snCount}/${acc})` : '(optional — serial-tracked items)'}
