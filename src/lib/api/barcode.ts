@@ -8,6 +8,7 @@ export type LabelFormat = 'avery_a4' | 'thermal_zpl' | 'thermal_tspl' | 'dymo';
 export type LabelTemplateName =
   | '2x1' | '3x2' | '4x2' | '4x6'
   | '1row_40x30' | '2row_38x30' | '3row_25x40' | '4row_18x30'
+  | '1row_29x62'
   | 'custom';
 
 // PrintLabelsRequest — selection (exactly one of category/supplier/PO/item_ids), per-item

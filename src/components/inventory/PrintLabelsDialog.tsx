@@ -41,6 +41,7 @@ const THERMAL_TEMPLATES: { value: LabelTemplateName; label: string; hint: string
   { value: '2row_38x30', label: '2 rows — 38x30mm each', hint: 'Wider roll, 2 labels side by side' },
   { value: '3row_25x40', label: '3 rows — 25x40mm each', hint: 'Wider roll, 3 labels side by side' },
   { value: '4row_18x30', label: '4 rows — 18x30mm each', hint: 'Wider roll, 4 labels side by side' },
+  { value: '1row_29x62', label: '1 row — 29x62mm (bench-verified)', hint: 'Confirmed by printing directly to an Xprinter XP-330B' },
   { value: 'custom', label: 'Custom…', hint: "Enter your roll's exact size/rows/gaps" },
 ];
 
@@ -183,22 +184,29 @@ export function PrintLabelsDialog({
     }
     setSubmitting(true);
     try {
-      // Fetch the blob up-front so any backend error (EMPTY_SELECTION / NO_LABELS …)
-      // is caught here and shown verbatim, rather than being swallowed by the preview.
-      const blob = await barcodeApi.printLabels(orgSlug, req);
       if (format === 'avery_a4') {
-        // Preview the already-generated Avery PDF inline (reuses shared PdfPreview).
+        // Preview the already-generated Avery PDF inline (reuses shared PdfPreview). Fetch the
+        // blob up-front so any backend error (EMPTY_SELECTION / NO_LABELS …) is caught here and
+        // shown verbatim, rather than being swallowed by the preview.
+        const blob = await barcodeApi.printLabels(orgSlug, req);
         await openPreview(() => Promise.resolve(blob), {
           fileName: `labels-${Date.now()}.pdf`,
           title: 'Labels',
         });
+      } else if (isThermal) {
+        // ZPL/TSPL: attempt direct-USB printing via the agent when a printer is remembered, and
+        // ALWAYS fall back to a normal browser-printable PDF (avery_a4) rather than leaving a
+        // raw printer-command-text download as the only outcome — that's not something an end
+        // user can act on by itself (the reported "no fallback browser printing" gap).
+        await printThermalOrFallbackToPdf(req);
       } else {
-        // Thermal/Dymo → download the printer text.
-        const ext = format === 'thermal_zpl' ? 'zpl' : format === 'thermal_tspl' ? 'tspl' : 'txt';
+        // DYMO → download the printer text (this format is meant for a host-side DYMO bridge,
+        // not direct-USB agent printing, so a download is the correct/only outcome here).
+        const blob = await barcodeApi.printLabels(orgSlug, req);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `labels-${Date.now()}.${ext}`;
+        a.download = `labels-${Date.now()}.txt`;
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -212,10 +220,38 @@ export function PrintLabelsDialog({
     }
   }
 
+  /** Attempts direct-USB thermal printing via the local agent when a printer is remembered, and
+   *  ALWAYS falls back to opening a normal browser-printable PDF (avery_a4) when no printer is
+   *  configured or the agent rejects/can't be reached. The agent attempt is made directly
+   *  regardless of the earlier agentUp probe (see printRawToLocalName's doc comment) since that
+   *  probe can occasionally disagree with a live attempt. */
+  async function printThermalOrFallbackToPdf(req: PrintLabelsRequest) {
+    if (selectedPrinter) {
+      try {
+        const blob = await barcodeApi.printLabels(orgSlug, req);
+        const hex = await blobToHex(blob);
+        const ok = await printRawToLocalName(selectedPrinter, hex);
+        if (ok) {
+          toast.success(`Sent to ${selectedPrinter}`);
+          return;
+        }
+      } catch {
+        // fall through to the PDF fallback below
+      }
+      toast.error('Could not reach the local print agent — opening a printable PDF instead');
+    } else {
+      toast('No printer configured for direct USB printing — opening a printable PDF instead. Set one in Settings > Printing.');
+    }
+    const pdfBlob = await barcodeApi.printLabels(orgSlug, { ...req, format: 'avery_a4', sheet });
+    await openPreview(() => Promise.resolve(pdfBlob), { fileName: `labels-${Date.now()}.pdf`, title: 'Labels' });
+  }
+
   /** Print directly via USB through the local print-agent (bypasses the OS print dialog
    *  entirely — see lib/inventory/print-agent.ts and docs/barcode-labels.md). Only offered for
    *  thermal_zpl/thermal_tspl, since those are the formats that emit raw printer command bytes
-   *  the agent's RAW-datatype spooler write can send straight to the printer. */
+   *  the agent's RAW-datatype spooler write can send straight to the printer. Unlike submit()'s
+   *  fallback, this button is an explicit "force via agent" action, so it errors out (rather
+   *  than silently falling back to a PDF) when nothing is picked/reachable. */
   async function printViaAgent() {
     const req = buildRequest();
     if (!req) {

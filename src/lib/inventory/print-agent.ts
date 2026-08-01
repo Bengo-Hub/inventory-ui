@@ -41,7 +41,12 @@ export async function getAgentInfo(): Promise<AgentInfo> {
     if (!res.ok) return { reachable: false };
     const body = (await res.json().catch(() => ({}))) as { version?: string };
     return { reachable: true, version: body.version };
-  } catch {
+  } catch (e) {
+    // Logged (not swallowed silently) because a loopback fetch failing while the agent is
+    // confirmably running (e.g. `curl http://127.0.0.1:9330/health` succeeds) points at a
+    // browser-side block (Private Network Access, an extension, or a permission prompt the
+    // user dismissed) rather than the agent actually being down — worth seeing in devtools.
+    console.warn('print-agent: /health unreachable from this page', e);
     return { reachable: false };
   }
 }
@@ -57,13 +62,17 @@ export async function listLocalPrinters(): Promise<string[]> {
     if (!res.ok) return [];
     const body = (await res.json()) as { printers?: string[] };
     return body.printers ?? [];
-  } catch {
+  } catch (e) {
+    console.warn('print-agent: /printers unreachable from this page', e);
     return [];
   }
 }
 
 /** Send raw bytes (hex-encoded) to a locally-installed printer by name via the agent's OS-spooler
- *  RAW-datatype path. Returns true on success. */
+ *  RAW-datatype path. Returns true on success. Attempted directly regardless of a prior
+ *  agentAvailable()/getAgentInfo() check — that check is only a UI hint and can occasionally
+ *  disagree with a live /print POST, so callers should treat THIS call's own result as the
+ *  source of truth for whether printing actually worked, not the earlier health probe. */
 export async function printRawToLocalName(name: string, hex: string): Promise<boolean> {
   try {
     const res = await fetch(`${AGENT_BASE}/print`, {
@@ -72,7 +81,8 @@ export async function printRawToLocalName(name: string, hex: string): Promise<bo
       body: JSON.stringify({ name, format: 'rawhex', data: hex }),
     });
     return res.ok;
-  } catch {
+  } catch (e) {
+    console.warn('print-agent: /print request failed', e);
     return false;
   }
 }
