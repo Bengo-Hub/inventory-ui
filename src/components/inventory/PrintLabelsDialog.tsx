@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card } from '@/components/ui/base';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
-import { barcodeApi, type LabelFormat, type PrintLabelsRequest } from '@/lib/api/barcode';
+import { barcodeApi, type LabelFormat, type LabelTemplateName, type PrintLabelsRequest } from '@/lib/api/barcode';
+import { agentAvailable, blobToHex, listLocalPrinters, printRawToLocalName } from '@/lib/inventory/print-agent';
 import { useCategories } from '@/hooks/useCategories';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
-import { Download, Printer, X } from 'lucide-react';
+import { Download, Printer, Usb, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
@@ -16,7 +17,8 @@ type SelectionMode = 'category' | 'supplier' | 'purchase_order' | 'item_ids';
 
 const FORMATS: { value: LabelFormat; label: string; hint: string }[] = [
   { value: 'avery_a4', label: 'Avery A4 sheet (PDF)', hint: 'Printable label-sheet PDF' },
-  { value: 'thermal_zpl', label: 'Zebra thermal (ZPL)', hint: 'Download ZPL for a Zebra printer' },
+  { value: 'thermal_zpl', label: 'Zebra thermal (ZPL)', hint: 'For genuine Zebra (or ZPL-emulation) printers' },
+  { value: 'thermal_tspl', label: 'Xprinter thermal (TSPL)', hint: 'For Xprinter/TSC-compatible printers (e.g. Xprinter XP-330B)' },
   { value: 'dymo', label: 'DYMO label', hint: 'Download DYMO label text' },
 ];
 
@@ -25,11 +27,20 @@ const AVERY_SHEETS: { value: string; label: string }[] = [
   { value: '5160', label: 'Avery 5160 (US Letter, 30/sheet)' },
 ];
 
-const THERMAL_SIZES: { value: string; label: string }[] = [
-  { value: '2x1', label: '2" x 1" (standard barcode/SKU label)' },
-  { value: '3x2', label: '3" x 2" (recommended for lot/serial GS1-128 codes)' },
-  { value: '4x2', label: '4" x 2" (default)' },
-  { value: '4x6', label: '4" x 6" (shipping-label size)' },
+// Thermal label-roll templates: "rows" = labels side-by-side across the roll's width (lanes), not
+// the Avery sheet's grid rows. Sizes/gaps for the multi-row presets are engineering estimates —
+// operators with different real stock should pick "Custom" and enter their roll's exact
+// dimensions rather than assume one of these matches. See inventory-api/docs/barcode-labels.md.
+const THERMAL_TEMPLATES: { value: LabelTemplateName; label: string; hint: string }[] = [
+  { value: '2x1', label: '2" x 1" — 1 row', hint: 'Standard small barcode/SKU label' },
+  { value: '3x2', label: '3" x 2" — 1 row', hint: 'Recommended for lot/serial GS1-128 codes' },
+  { value: '4x2', label: '4" x 2" — 1 row (default)', hint: 'General-purpose item label' },
+  { value: '4x6', label: '4" x 6" — 1 row', hint: 'Shipping-label size' },
+  { value: '1row_40x30', label: '1 row — 40x30mm', hint: 'Single narrow lane, one label at a time down the roll' },
+  { value: '2row_38x30', label: '2 rows — 38x30mm each', hint: 'Wider roll, 2 labels side by side' },
+  { value: '3row_25x40', label: '3 rows — 25x40mm each', hint: 'Wider roll, 3 labels side by side' },
+  { value: '4row_18x30', label: '4 rows — 18x30mm each', hint: 'Wider roll, 4 labels side by side' },
+  { value: 'custom', label: 'Custom…', hint: "Enter your roll's exact size/rows/gaps" },
 ];
 
 /**
@@ -58,11 +69,43 @@ export function PrintLabelsDialog({
   const [qty, setQty] = useState(1);
   const [format, setFormat] = useState<LabelFormat>('avery_a4');
   const [sheet, setSheet] = useState('l7160');
-  const [thermalSize, setThermalSize] = useState('4x2');
+  const [template, setTemplate] = useState<LabelTemplateName>('4x2');
+  const [rotate, setRotate] = useState(false);
+  const [customW, setCustomW] = useState(4);
+  const [customH, setCustomH] = useState(2);
+  const [customLanes, setCustomLanes] = useState(1);
+  const [customGapX, setCustomGapX] = useState(0.08);
+  const [customGapY, setCustomGapY] = useState(0.08);
   const [includeLot, setIncludeLot] = useState(false);
   const [includeSerial, setIncludeSerial] = useState(false);
   const [includePrice, setIncludePrice] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Direct USB printing via the local print-agent (see lib/inventory/print-agent.ts) — reuses
+  // the same loopback agent pos-ui talks to, no separate install needed if it's already running.
+  const [agentUp, setAgentUp] = useState(false);
+  const [localPrinters, setLocalPrinters] = useState<string[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState('');
+  const [agentPrinting, setAgentPrinting] = useState(false);
+  const isThermal = format === 'thermal_zpl' || format === 'thermal_tspl';
+
+  useEffect(() => {
+    if (!isThermal) return;
+    let cancelled = false;
+    (async () => {
+      const up = await agentAvailable();
+      if (cancelled) return;
+      setAgentUp(up);
+      if (up) {
+        const printers = await listLocalPrinters();
+        if (!cancelled) {
+          setLocalPrinters(printers);
+          setSelectedPrinter((prev) => prev || printers[0] || '');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isThermal]);
 
   // Only offer categories that actually have items linked — picking an empty
   // category would otherwise fail server-side with EMPTY_SELECTION.
@@ -79,7 +122,21 @@ export function PrintLabelsDialog({
       format,
       qty_per_item: qty,
       ...(format === 'avery_a4' ? { sheet } : {}),
-      ...(format === 'thermal_zpl' ? { thermal_size: thermalSize } : {}),
+      ...(isThermal
+        ? {
+            template,
+            rotate,
+            ...(template === 'custom'
+              ? {
+                  custom_label_w_in: customW,
+                  custom_label_h_in: customH,
+                  custom_lanes: customLanes,
+                  custom_gap_x_in: customGapX,
+                  custom_gap_y_in: customGapY,
+                }
+              : {}),
+          }
+        : {}),
       include_lot: includeLot,
       include_serial: includeSerial,
       include_price: includePrice,
@@ -120,7 +177,7 @@ export function PrintLabelsDialog({
         });
       } else {
         // Thermal/Dymo → download the printer text.
-        const ext = format === 'thermal_zpl' ? 'zpl' : 'txt';
+        const ext = format === 'thermal_zpl' ? 'zpl' : format === 'thermal_tspl' ? 'tspl' : 'txt';
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -135,6 +192,45 @@ export function PrintLabelsDialog({
       toast.error(await apiErrorMessage(err, 'Failed to generate labels'));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  /** Print directly via USB through the local print-agent (bypasses the OS print dialog
+   *  entirely — see lib/inventory/print-agent.ts and docs/barcode-labels.md). Only offered for
+   *  thermal_zpl/thermal_tspl, since those are the formats that emit raw printer command bytes
+   *  the agent's RAW-datatype spooler write can send straight to the printer. */
+  async function printViaAgent() {
+    const req = buildRequest();
+    if (!req) {
+      toast.error('Pick a selection first');
+      return;
+    }
+    if (!selectedPrinter) {
+      toast.error('Pick a printer first');
+      return;
+    }
+    setAgentPrinting(true);
+    try {
+      const blob = await barcodeApi.printLabels(orgSlug, req);
+      const hex = await blobToHex(blob);
+      const ok = await printRawToLocalName(selectedPrinter, hex);
+      if (ok) {
+        toast.success(`Sent to ${selectedPrinter}`);
+      } else {
+        toast.error('Local print agent rejected the job — falling back to download');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `labels-${Date.now()}.${format === 'thermal_zpl' ? 'zpl' : 'tspl'}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      toast.error(await apiErrorMessage(err, 'Failed to print via local agent'));
+    } finally {
+      setAgentPrinting(false);
     }
   }
 
@@ -262,21 +358,116 @@ export function PrintLabelsDialog({
               </div>
             )}
 
-            {/* Thermal label size (thermal_zpl only) */}
-            {format === 'thermal_zpl' && (
+            {/* Thermal label template (thermal_zpl / thermal_tspl) */}
+            {isThermal && (
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Label size</p>
-                {THERMAL_SIZES.map((t) => (
+                <p className="text-xs font-medium text-muted-foreground">
+                  Label template — &quot;rows&quot; are labels side-by-side across the roll&apos;s width
+                </p>
+                {THERMAL_TEMPLATES.map((t) => (
                   <label key={t.value} className="flex items-start gap-2 text-sm">
                     <input
                       type="radio"
                       className="mt-0.5"
-                      checked={thermalSize === t.value}
-                      onChange={() => setThermalSize(t.value)}
+                      checked={template === t.value}
+                      onChange={() => setTemplate(t.value)}
                     />
-                    <span>{t.label}</span>
+                    <span>
+                      {t.label}
+                      <span className="block text-xs text-muted-foreground">{t.hint}</span>
+                    </span>
                   </label>
                 ))}
+
+                {template === 'custom' && (
+                  <div className="grid grid-cols-2 gap-2 pl-6 pt-1">
+                    <label className="text-xs text-muted-foreground">
+                      Label width (in)
+                      <input
+                        type="number" step="0.1" min={0.1} value={customW}
+                        onChange={(e) => setCustomW(Number(e.target.value) || 0.1)}
+                        className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      Label height (in)
+                      <input
+                        type="number" step="0.1" min={0.1} value={customH}
+                        onChange={(e) => setCustomH(Number(e.target.value) || 0.1)}
+                        className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      Rows (1-4)
+                      <input
+                        type="number" min={1} max={4} value={customLanes}
+                        onChange={(e) => setCustomLanes(Math.min(4, Math.max(1, Number(e.target.value) || 1)))}
+                        className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground">
+                      Gap between rows (in)
+                      <input
+                        type="number" step="0.01" min={0} value={customGapX}
+                        onChange={(e) => setCustomGapX(Number(e.target.value) || 0)}
+                        className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    </label>
+                    <label className="text-xs text-muted-foreground col-span-2">
+                      Gap between labels along the feed (in)
+                      <input
+                        type="number" step="0.01" min={0} value={customGapY}
+                        onChange={(e) => setCustomGapY(Number(e.target.value) || 0)}
+                        className="mt-0.5 w-full rounded-lg border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-2 text-sm pt-1">
+                  <input type="checkbox" checked={rotate} onChange={(e) => setRotate(e.target.checked)} />
+                  Rotate 90° (roll is mounted with the label&apos;s long edge along the feed)
+                </label>
+
+                {/* Direct USB printing via the local print-agent — see docs/barcode-labels.md */}
+                <div className="rounded-lg border border-input p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                    <Usb className="h-3.5 w-3.5" />
+                    Direct USB printing
+                  </div>
+                  {agentUp ? (
+                    localPrinters.length > 0 ? (
+                      <>
+                        <select
+                          value={selectedPrinter}
+                          onChange={(e) => setSelectedPrinter(e.target.value)}
+                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                        >
+                          {localPrinters.map((p) => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          onClick={printViaAgent}
+                          disabled={agentPrinting}
+                        >
+                          <Usb className="h-4 w-4 mr-1.5" />
+                          {agentPrinting ? 'Sending…' : `Print via Local Agent (${selectedPrinter})`}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Print agent detected, but no installed printers found. Install the Xprinter driver so it appears in Windows first.
+                      </p>
+                    )
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Local print agent not detected on this machine. Install/start it to print directly via USB instead of downloading a file.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
