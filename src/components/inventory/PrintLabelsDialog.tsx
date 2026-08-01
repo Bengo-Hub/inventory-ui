@@ -5,6 +5,7 @@ import { Button, Card } from '@/components/ui/base';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { barcodeApi, type LabelFormat, type LabelTemplateName, type PrintLabelsRequest } from '@/lib/api/barcode';
 import { agentAvailable, blobToHex, listLocalPrinters, printRawToLocalName } from '@/lib/inventory/print-agent';
+import { getLabelPrintPrefs, setLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
 import { useCategories } from '@/hooks/useCategories';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
@@ -67,15 +68,21 @@ export function PrintLabelsDialog({
   const [supplierId, setSupplierId] = useState('');
   const [poId, setPoId] = useState('');
   const [qty, setQty] = useState(1);
-  const [format, setFormat] = useState<LabelFormat>('avery_a4');
+  // Seeded from the last-saved label-print prefs (see lib/inventory/label-print-prefs.ts) so this
+  // dialog and the single-item BarcodeDialog quick-print action stay on the SAME physical
+  // template/rotate/format — otherwise a template fixed here for the bulk job wouldn't apply to
+  // the quick single-item print, which is exactly the divergence that let a rotated-label bug
+  // through even after the bulk path was fixed.
+  const initialPrefs = useState(() => getLabelPrintPrefs())[0];
+  const [format, setFormat] = useState<LabelFormat>(initialPrefs.format ?? 'avery_a4');
   const [sheet, setSheet] = useState('l7160');
-  const [template, setTemplate] = useState<LabelTemplateName>('4x2');
-  const [rotate, setRotate] = useState(false);
-  const [customW, setCustomW] = useState(4);
-  const [customH, setCustomH] = useState(2);
-  const [customLanes, setCustomLanes] = useState(1);
-  const [customGapX, setCustomGapX] = useState(0.08);
-  const [customGapY, setCustomGapY] = useState(0.08);
+  const [template, setTemplate] = useState<LabelTemplateName>(initialPrefs.template ?? '4x2');
+  const [rotate, setRotate] = useState(initialPrefs.rotate ?? false);
+  const [customW, setCustomW] = useState(initialPrefs.custom_label_w_in ?? 4);
+  const [customH, setCustomH] = useState(initialPrefs.custom_label_h_in ?? 2);
+  const [customLanes, setCustomLanes] = useState(initialPrefs.custom_lanes ?? 1);
+  const [customGapX, setCustomGapX] = useState(initialPrefs.custom_gap_x_in ?? 0.08);
+  const [customGapY, setCustomGapY] = useState(initialPrefs.custom_gap_y_in ?? 0.08);
   const [includeLot, setIncludeLot] = useState(false);
   const [includeSerial, setIncludeSerial] = useState(false);
   const [includePrice, setIncludePrice] = useState(false);
@@ -85,7 +92,7 @@ export function PrintLabelsDialog({
   // the same loopback agent pos-ui talks to, no separate install needed if it's already running.
   const [agentUp, setAgentUp] = useState(false);
   const [localPrinters, setLocalPrinters] = useState<string[]>([]);
-  const [selectedPrinter, setSelectedPrinter] = useState('');
+  const [selectedPrinter, setSelectedPrinter] = useState(initialPrefs.printerName ?? '');
   const [agentPrinting, setAgentPrinting] = useState(false);
   const isThermal = format === 'thermal_zpl' || format === 'thermal_tspl';
 
@@ -106,6 +113,16 @@ export function PrintLabelsDialog({
     })();
     return () => { cancelled = true; };
   }, [isThermal]);
+
+  // Persist every choice so BarcodeDialog's single-item quick print reuses it.
+  useEffect(() => {
+    setLabelPrintPrefs({
+      format, template, rotate,
+      custom_label_w_in: customW, custom_label_h_in: customH, custom_lanes: customLanes,
+      custom_gap_x_in: customGapX, custom_gap_y_in: customGapY,
+      printerName: selectedPrinter,
+    });
+  }, [format, template, rotate, customW, customH, customLanes, customGapX, customGapY, selectedPrinter]);
 
   // Only offer categories that actually have items linked — picking an empty
   // category would otherwise fail server-side with EMPTY_SELECTION.

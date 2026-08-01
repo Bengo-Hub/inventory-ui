@@ -2,7 +2,9 @@
 
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
-import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { getAgentInfo, listLocalPrinters } from '@/lib/inventory/print-agent';
+import { getLabelPrintPrefs, setLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
 import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
 import {
   useInventorySettings,
@@ -21,6 +23,7 @@ import {
   Building2,
   CalendarDays,
   ChefHat,
+  Download,
   FileText,
   Globe,
   Layers,
@@ -29,10 +32,13 @@ import {
   Lock,
   Package,
   Percent,
+  Printer,
+  RefreshCw,
   Save,
   Settings,
   ShieldCheck,
   Truck,
+  Usb,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -51,7 +57,7 @@ function GatedRow({ feature, children }: { feature?: string; children: React.Rea
   );
 }
 
-type Tab = 'general' | 'stock' | 'modules' | 'tax' | 'documents' | 'integrations' | 'platform';
+type Tab = 'general' | 'stock' | 'modules' | 'tax' | 'documents' | 'printing' | 'integrations' | 'platform';
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'general', label: 'General', icon: Settings },
@@ -59,6 +65,7 @@ const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: 'modules', label: 'Modules', icon: Layers },
   { id: 'tax', label: 'Tax & Compliance', icon: Percent },
   { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'printing', label: 'Printing', icon: Printer },
   { id: 'integrations', label: 'Integrations', icon: Link2 },
   { id: 'platform', label: 'Platform', icon: ShieldCheck },
 ];
@@ -847,6 +854,124 @@ function DocumentsTab({ orgSlug }: { orgSlug: string }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// Printing tab — print-agent status/download + local printer detection. Promotes what used to
+// be an inline banner buried inside the "Print Labels" dialog into a persistent settings page,
+// so staff can install/verify the agent and pick a default printer BEFORE they need to print.
+// ══════════════════════════════════════════════════════════════════════════════
+
+// pos-service hosts the print-agent installer + its download redirect (public, no auth — a plain
+// browser <a> navigation, so no CORS/cross-origin auth is needed here). No equivalent exists in
+// inventory-api because the agent itself is shared platform-wide, not per-service — see
+// inventory-api/docs/barcode-labels.md's "Direct USB printing" section.
+const POS_API_BASE = process.env.NEXT_PUBLIC_POS_API_URL ?? 'https://posapi.codevertexafrica.com';
+const AGENT_DOWNLOAD_URL = `${POS_API_BASE}/api/v1/pos/print-agent/download?os=windows`;
+
+function PrintingTab() {
+  const [reachable, setReachable] = useState(false);
+  const [version, setVersion] = useState<string | undefined>();
+  const [printers, setPrinters] = useState<string[]>([]);
+  const [selectedPrinter, setSelectedPrinter] = useState(() => getLabelPrintPrefs().printerName ?? '');
+  const [detecting, setDetecting] = useState(false);
+
+  async function detect() {
+    setDetecting(true);
+    try {
+      const [info, list] = await Promise.all([getAgentInfo(), listLocalPrinters()]);
+      setReachable(info.reachable);
+      setVersion(info.version);
+      setPrinters(list);
+      setSelectedPrinter((prev) => prev || list[0] || '');
+    } finally {
+      setDetecting(false);
+    }
+  }
+
+  useEffect(() => { void detect(); }, []);
+
+  // Saving the selected printer here is what "connect" means for direct-USB printing — no
+  // pairing step exists (or is needed): the print dialogs already read this same saved
+  // preference (see lib/inventory/label-print-prefs.ts) so picking it here is enough to make
+  // both the bulk and single-item "Print via Local Agent" actions default to it.
+  function saveSelectedPrinter(name: string) {
+    setSelectedPrinter(name);
+    setLabelPrintPrefs({ ...getLabelPrintPrefs(), printerName: name });
+    toast.success(`${name} set as the default label printer`);
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Usb className="h-4 w-4 text-primary" />
+              <span className="font-bold text-sm">Background Printing (Print Agent)</span>
+            </div>
+            {reachable ? (
+              <Badge variant="success">Agent running{version ? ` v${version}` : ''}</Badge>
+            ) : (
+              <Badge variant="outline">Agent not detected</Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            A small Windows service that runs on this terminal so labels print directly via USB —
+            bypassing the print dialog entirely (no paper-preset guessing, no rotated labels).
+            It&apos;s shared platform-wide: if it&apos;s already installed/running for POS on this
+            machine, it works here too with no separate install.
+          </p>
+        </CardHeader>
+        <CardContent className="flex items-center gap-2">
+          <a href={AGENT_DOWNLOAD_URL} className="inline-flex">
+            <Button variant="outline" className="gap-1.5"><Download className="h-4 w-4" /> Download print agent</Button>
+          </a>
+          <Button variant="outline" className="gap-1.5" onClick={detect} disabled={detecting}>
+            <RefreshCw className={`h-4 w-4 ${detecting ? 'animate-spin' : ''}`} /> {detecting ? 'Checking…' : 'Refresh status'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm">Local Printers</span>
+            <Button variant="outline" className="gap-1.5" onClick={detect} disabled={detecting}>
+              <RefreshCw className={`h-4 w-4 ${detecting ? 'animate-spin' : ''}`} /> Detect Printers
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!reachable ? (
+            <p className="text-sm text-muted-foreground">
+              Install/start the print agent above, then click Detect Printers.
+            </p>
+          ) : printers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Print agent detected, but no installed printers found. Install the printer&apos;s Windows driver first, then Detect Printers again.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              <label className={labelClass}>Default label printer</label>
+              <select
+                value={selectedPrinter}
+                onChange={(e) => saveSelectedPrinter(e.target.value)}
+                className={inputClass}
+              >
+                {printers.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Used by &quot;Print via Local Agent&quot; on the Print Labels dialog and the item-detail Barcode action.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // Platform tab
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -1008,6 +1133,7 @@ export default function SettingsPage() {
         {activeTab === 'modules' && <ModulesTab orgSlug={orgSlug} />}
         {activeTab === 'tax' && <TaxComplianceTab orgSlug={orgSlug} />}
         {activeTab === 'documents' && <DocumentsTab orgSlug={orgSlug} />}
+        {activeTab === 'printing' && <PrintingTab />}
         {activeTab === 'integrations' && <IntegrationsTab />}
         {activeTab === 'platform' && isPlatformOwner && <PlatformTab />}
       </div>

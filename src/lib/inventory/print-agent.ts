@@ -21,15 +21,28 @@ export const AGENT_BASE = `http://127.0.0.1:${AGENT_PORT}`;
 
 /** Is the local print-agent running on this machine? (UI hint before offering direct-print.) */
 export async function agentAvailable(): Promise<boolean> {
-  if (typeof window === 'undefined') return false;
+  return (await getAgentInfo()).reachable;
+}
+
+export interface AgentInfo {
+  reachable: boolean;
+  version?: string;
+}
+
+/** Same loopback probe as agentAvailable(), but also surfaces the agent's version (from its
+ *  /health response) for a "Agent running vX.Y.Z" status pill in Settings. */
+export async function getAgentInfo(): Promise<AgentInfo> {
+  if (typeof window === 'undefined') return { reachable: false };
   try {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 2500);
     const res = await fetch(`${AGENT_BASE}/health`, { signal: ctrl.signal, mode: 'cors' });
     clearTimeout(t);
-    return res.ok;
+    if (!res.ok) return { reachable: false };
+    const body = (await res.json().catch(() => ({}))) as { version?: string };
+    return { reachable: true, version: body.version };
   } catch {
-    return false;
+    return { reachable: false };
   }
 }
 
