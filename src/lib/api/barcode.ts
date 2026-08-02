@@ -2,6 +2,11 @@ import { apiClient } from './client';
 
 // Output formats supported by the bulk label-print job (mirrors inventory-api barcode module).
 export type LabelFormat = 'avery_a4' | 'thermal_zpl' | 'thermal_tspl' | 'dymo';
+// Internal-only pseudo-format — NOT a user-facing Format radio choice. Renders a PDF matching
+// EXACTLY what thermal_zpl/thermal_tspl would print (same template, per-label pages, rotation)
+// instead of printer command bytes, so the print dialogs can always preview the actual thermal
+// layout before dispatching anything to the printer — see docs/barcode-labels.md.
+export type BulkPrintFormat = LabelFormat | 'thermal_preview';
 
 // A thermal label-roll template: a named preset (see THERMAL_TEMPLATES in PrintLabelsDialog) or
 // "custom" (paired with the custom_* fields below). Mirrors barcode.LabelTemplateByName.
@@ -74,10 +79,11 @@ export const barcodeApi = {
   // output instead of the default Avery-shaped PDF — pass the SAME opts the bulk print job used
   // (see lib/inventory/label-print-prefs.ts) so a quick single-item print never diverges from
   // the bulk job's physical-label assumptions (that mismatch was the rotated-label bug).
-  itemLabelPdf: (orgSlug: string, itemId: string, opts?: LabelPrintOpts): Promise<Blob> =>
+  itemLabelPdf: (orgSlug: string, itemId: string, opts?: Omit<LabelPrintOpts, 'format'> & { format?: BulkPrintFormat }): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/items/${itemId}/label.pdf`, opts),
 
-  // Run a bulk label-print job → returns a Blob (PDF for avery_a4, text for zpl/dymo).
-  printLabels: (orgSlug: string, body: PrintLabelsRequest): Promise<Blob> =>
+  // Run a bulk label-print job → returns a Blob (PDF for avery_a4/thermal_preview, text for
+  // zpl/tspl/dymo).
+  printLabels: (orgSlug: string, body: Omit<PrintLabelsRequest, 'format'> & { format: BulkPrintFormat }): Promise<Blob> =>
     apiClient.postBlob(`/api/v1/${orgSlug}/inventory/labels/print`, body),
 };

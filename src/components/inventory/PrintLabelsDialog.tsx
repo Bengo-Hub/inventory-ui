@@ -184,7 +184,16 @@ export function PrintLabelsDialog({
     }
     setSubmitting(true);
     try {
-      if (format === 'avery_a4') {
+      if (isThermal) {
+        // ALWAYS preview first — format=thermal_preview renders a PDF matching EXACTLY what the
+        // real thermal_zpl/thermal_tspl job would print (same template, per-label pages,
+        // rotation), NOT the unrelated Avery grid. Silently substituting that grid as a
+        // "preview" for a thermal-roll job was misleading (labels got printed in columns on a
+        // single-lane roll). Direct USB dispatch is a separate, explicit action — see
+        // printViaAgent / the "Print via Local Agent" button.
+        const blob = await barcodeApi.printLabels(orgSlug, { ...req, format: 'thermal_preview' });
+        await openPreview(() => Promise.resolve(blob), { fileName: `labels-${Date.now()}.pdf`, title: 'Labels' });
+      } else if (format === 'avery_a4') {
         // Preview the already-generated Avery PDF inline (reuses shared PdfPreview). Fetch the
         // blob up-front so any backend error (EMPTY_SELECTION / NO_LABELS …) is caught here and
         // shown verbatim, rather than being swallowed by the preview.
@@ -193,12 +202,6 @@ export function PrintLabelsDialog({
           fileName: `labels-${Date.now()}.pdf`,
           title: 'Labels',
         });
-      } else if (isThermal) {
-        // ZPL/TSPL: attempt direct-USB printing via the agent when a printer is remembered, and
-        // ALWAYS fall back to a normal browser-printable PDF (avery_a4) rather than leaving a
-        // raw printer-command-text download as the only outcome — that's not something an end
-        // user can act on by itself (the reported "no fallback browser printing" gap).
-        await printThermalOrFallbackToPdf(req);
       } else {
         // DYMO → download the printer text (this format is meant for a host-side DYMO bridge,
         // not direct-USB agent printing, so a download is the correct/only outcome here).
@@ -218,32 +221,6 @@ export function PrintLabelsDialog({
     } finally {
       setSubmitting(false);
     }
-  }
-
-  /** Attempts direct-USB thermal printing via the local agent when a printer is remembered, and
-   *  ALWAYS falls back to opening a normal browser-printable PDF (avery_a4) when no printer is
-   *  configured or the agent rejects/can't be reached. The agent attempt is made directly
-   *  regardless of the earlier agentUp probe (see printRawToLocalName's doc comment) since that
-   *  probe can occasionally disagree with a live attempt. */
-  async function printThermalOrFallbackToPdf(req: PrintLabelsRequest) {
-    if (selectedPrinter) {
-      try {
-        const blob = await barcodeApi.printLabels(orgSlug, req);
-        const hex = await blobToHex(blob);
-        const ok = await printRawToLocalName(selectedPrinter, hex);
-        if (ok) {
-          toast.success(`Sent to ${selectedPrinter}`);
-          return;
-        }
-      } catch {
-        // fall through to the PDF fallback below
-      }
-      toast.error('Could not reach the local print agent — opening a printable PDF instead');
-    } else {
-      toast('No printer configured for direct USB printing — opening a printable PDF instead. Set one in Settings > Printing.');
-    }
-    const pdfBlob = await barcodeApi.printLabels(orgSlug, { ...req, format: 'avery_a4', sheet });
-    await openPreview(() => Promise.resolve(pdfBlob), { fileName: `labels-${Date.now()}.pdf`, title: 'Labels' });
   }
 
   /** Print directly via USB through the local print-agent (bypasses the OS print dialog
@@ -554,8 +531,8 @@ export function PrintLabelsDialog({
                 Cancel
               </Button>
               <Button className="flex-1" onClick={submit} disabled={submitting}>
-                {isPdf ? <Printer className="h-4 w-4 mr-1.5" /> : <Download className="h-4 w-4 mr-1.5" />}
-                {submitting ? 'Generating…' : isPdf ? 'Preview PDF' : 'Download'}
+                {isPdf || isThermal ? <Printer className="h-4 w-4 mr-1.5" /> : <Download className="h-4 w-4 mr-1.5" />}
+                {submitting ? 'Generating…' : isPdf || isThermal ? 'Preview PDF' : 'Download'}
               </Button>
             </div>
           </Card>

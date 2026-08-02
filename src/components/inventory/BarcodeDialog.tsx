@@ -6,7 +6,7 @@ import type { Item } from '@/lib/api/items';
 import { toast } from 'sonner';
 import { useDocumentPreview, PdfPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { getLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
+import { getLabelPrintPrefs, type LabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
 import { blobToHex, printRawToLocalName } from '@/lib/inventory/print-agent';
 
 /**
@@ -16,10 +16,11 @@ import { blobToHex, printRawToLocalName } from '@/lib/inventory/print-agent';
  * on — calling the endpoint bare (no template/rotate) was the bug: it silently defaulted to an
  * un-rotated 4x2 template regardless of what the bulk job had been configured/fixed to use.
  *
- * format=avery_a4 (the default until a thermal format is chosen at least once) previews the PDF
- * as before. format=thermal_zpl/thermal_tspl isn't a previewable PDF — if a printer was
- * remembered and the local print-agent is reachable, sends it straight there (no dialog at all);
- * otherwise downloads the printer-command text so the print job is never silently lost.
+ * ALWAYS opens a preview before anything reaches the printer: format=avery_a4 previews that PDF
+ * directly; format=thermal_zpl/thermal_tspl previews via format=thermal_preview (a PDF rendered
+ * from the EXACT same template/rotation as the real printer-command job, not a raw-bytes
+ * download the operator can't otherwise inspect). If a printer is remembered, the preview is
+ * followed by a toast offering a one-click "Send to printer" action.
  */
 export function BarcodeDialog({
   orgSlug,
@@ -37,46 +38,38 @@ export function BarcodeDialog({
   useEffect(() => {
     const prefs = getLabelPrintPrefs();
     const isThermal = prefs.format === 'thermal_zpl' || prefs.format === 'thermal_tspl';
+    const previewOpts = isThermal ? { ...prefs, format: 'thermal_preview' as const } : prefs;
 
-    if (!isThermal) {
-      void openPreview(() => barcodeApi.itemLabelPdf(orgSlug, item.id, prefs), {
-        fileName: `${item.sku}-label.pdf`,
-        title: `Barcode · ${item.sku}`,
-      }).catch(async (e: unknown) => {
-        toast.error(await apiErrorMessage(e, 'Failed to generate barcode label'));
-        onClose();
-      });
-      return;
-    }
-
-    void (async () => {
-      try {
-        const blob = await barcodeApi.itemLabelPdf(orgSlug, item.id, prefs);
-        if (prefs.printerName) {
-          const hex = await blobToHex(blob);
-          const ok = await printRawToLocalName(prefs.printerName, hex);
-          if (ok) {
-            toast.success(`Sent to ${prefs.printerName}`);
-            onClose();
-            return;
-          }
-          toast.error('Local print agent rejected the job — downloading instead');
-        }
-        const ext = prefs.format === 'thermal_zpl' ? 'zpl' : 'tspl';
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${item.sku}-label.${ext}`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        URL.revokeObjectURL(url);
-        onClose();
-      } catch (e) {
-        toast.error(await apiErrorMessage(e, 'Failed to generate barcode label'));
-        onClose();
+    void openPreview(() => barcodeApi.itemLabelPdf(orgSlug, item.id, previewOpts), {
+      fileName: `${item.sku}-label.pdf`,
+      title: `Barcode · ${item.sku}`,
+    }).then(() => {
+      if (isThermal && prefs.printerName) {
+        toast('Preview opened', {
+          description: `Send directly to ${prefs.printerName} via USB?`,
+          action: {
+            label: 'Send to printer',
+            onClick: () => void sendToAgent(prefs),
+          },
+        });
       }
-    })();
+    }).catch(async (e: unknown) => {
+      toast.error(await apiErrorMessage(e, 'Failed to generate barcode label'));
+      onClose();
+    });
+
+    async function sendToAgent(p: LabelPrintPrefs) {
+      if (!p.printerName) return;
+      try {
+        const blob = await barcodeApi.itemLabelPdf(orgSlug, item.id, p);
+        const hex = await blobToHex(blob);
+        const ok = await printRawToLocalName(p.printerName, hex);
+        if (ok) toast.success(`Sent to ${p.printerName}`);
+        else toast.error('Local print agent rejected the job');
+      } catch (e) {
+        toast.error(await apiErrorMessage(e, 'Failed to print via local agent'));
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orgSlug, item.id]);
 
