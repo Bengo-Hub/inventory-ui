@@ -562,8 +562,18 @@ export default function CatalogPage() {
       key: 'type', header: 'Type', accessor: (i) => i.type, sortable: true, filterable: true, hideBelow: 'sm',
       render: (i) => <Badge variant="outline" className="capitalize">{i.type?.toLowerCase() ?? '—'}</Badge>,
     },
-    { key: 'min_selling_price', header: 'Wholesale', align: 'right', sortable: true, hideBelow: 'lg', accessor: (i) => i.min_selling_price, render: (i) => renderPriceCell(i, 'min') },
-    { key: 'max_selling_price', header: 'Retail', align: 'right', sortable: true, accessor: (i) => i.max_selling_price ?? i.selling_price, render: (i) => renderPriceCell(i, 'max') },
+    {
+      key: 'cost_price', header: 'Cost', align: 'right', sortable: true, hideBelow: 'md',
+      accessor: (i) => i.cost_price, cellClassName: 'font-mono text-xs text-muted-foreground tabular-nums',
+      render: (i) => KES(i.cost_price),
+    },
+    {
+      key: 'selling_price', header: 'Selling Price', align: 'right', sortable: true,
+      accessor: (i) => i.selling_price, cellClassName: 'font-mono text-xs tabular-nums',
+      render: (i) => KES(i.selling_price),
+    },
+    { key: 'min_selling_price', header: 'Wholesale', align: 'right', sortable: true, hideBelow: 'lg', defaultHidden: true, accessor: (i) => i.min_selling_price, render: (i) => renderPriceCell(i, 'min') },
+    { key: 'max_selling_price', header: 'Retail', align: 'right', sortable: true, defaultHidden: true, accessor: (i) => i.max_selling_price ?? i.selling_price, render: (i) => renderPriceCell(i, 'max') },
     {
       key: 'is_active', header: 'Status', accessor: (i) => (i.is_active ? 'Active' : 'Inactive'), sortable: true, filterable: true,
       render: (i) => <Badge variant={i.is_active ? 'success' : 'outline'}>{i.is_active ? 'Active' : 'Inactive'}</Badge>,

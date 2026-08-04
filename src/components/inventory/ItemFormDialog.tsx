@@ -251,7 +251,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [sellingPrice, setSellingPrice] = useState('');
   const [servings, setServings] = useState('1');
   const [recipeIngredients, setRecipeIngredients] = useState<IngredientRowValue[]>([]);
-  const [recipeOpen, setRecipeOpen] = useState(false);
+  // Expanded by default — Selling Price lives inside this section and must not be hidden
+  // behind an extra click (recipes/menu items are sellable just like goods/equipment).
+  const [recipeOpen, setRecipeOpen] = useState(true);
   const queryClient = useQueryClient();
   const compositeMut = useMutation({
     mutationFn: (payload: MenuItemCompositeRequest) => itemsApi.createMenuItemComposite(orgSlug, payload),
@@ -305,6 +307,18 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       setStockTrackingMode(item.stock_tracking_mode ?? 'default');
       setMinSellingPrice(item.min_selling_price != null ? String(item.min_selling_price) : '');
       setMaxSellingPrice(item.max_selling_price != null ? String(item.max_selling_price) : '');
+      // Selling Price is shared state with the RECIPE flow (mutually exclusive types, see
+      // declaration above) — only hydrate it here for the non-RECIPE sellable types; RECIPE
+      // hydrates it separately from the fetched recipe record once that query resolves.
+      if (['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE'].includes(item.type)) {
+        setSellingPrice(
+          item.max_selling_price != null
+            ? String(item.max_selling_price)
+            : item.selling_price != null
+              ? String(item.selling_price)
+              : ''
+        );
+      }
       setTargetMargin(item.target_margin_percent != null ? String(item.target_margin_percent) : '');
       setTaxCode(item.tax_code_id ?? '');
       setTaxInclusive(item.tax_inclusive ?? false);
@@ -603,8 +617,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       usable_in_recipes: isRecipe ? usableInRecipes : undefined,
       not_for_sale: notForSale,
       stock_tracking_mode: stockTrackingMode !== 'default' || item ? stockTrackingMode : undefined,
-      min_selling_price: minSellingPrice !== '' ? parseDecimal(minSellingPrice) : undefined,
-      max_selling_price: maxSellingPrice !== '' ? parseDecimal(maxSellingPrice) : undefined,
+      // Retail/Wholesale are optional overrides — left blank, both default to the mandatory
+      // Selling Price above (GOODS/EQUIPMENT only; sellingPrice is empty for other types).
+      min_selling_price: minSellingPrice !== ''
+        ? parseDecimal(minSellingPrice)
+        : (sellingPrice !== '' ? parseDecimal(sellingPrice) : undefined),
+      max_selling_price: maxSellingPrice !== ''
+        ? parseDecimal(maxSellingPrice)
+        : (sellingPrice !== '' ? parseDecimal(sellingPrice) : undefined),
       target_margin_percent: targetMargin !== '' ? parseDecimal(targetMargin) : undefined,
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
@@ -848,6 +868,22 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 onPrimaryChange={setImageUrl}
               />
 
+              {/* Not for sale — hidden from EVERY sales surface (POS, ordering) while still
+                  stocked/purchased/counted. For raw ingredients bought pre-portioned,
+                  cleaning supplies, internal consumables. Distinct from non-billable
+                  (which still reaches the till at KES 0). Placed BEFORE the Cost/Selling-price
+                  sections below since it gates whether those become mandatory. */}
+              <label className="flex items-start gap-2 text-sm cursor-pointer rounded-lg border border-border p-3" title="Excluded from all sales interfaces (POS, ordering) — the item stays fully stockable and purchasable.">
+                <input type="checkbox" checked={notForSale} onChange={(e) => setNotForSale(e.target.checked)} className="rounded mt-0.5" />
+                <span>
+                  Not for sale
+                  <br />
+                  <span className="text-xs text-muted-foreground font-normal">
+                    Never appears on any sales interface (POS, ordering). For ingredients, cleaning supplies and internal consumables that are still stocked, purchased and counted. Cost and Selling Price below are optional when this is checked.
+                  </span>
+                </span>
+              </label>
+
               {/* Cost — pack-aware: price paid per pack/amount, e.g. 52.50 per 500 ml */}
               {['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type) && (
                 <div className="space-y-2">
@@ -872,6 +908,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       value={costPrice}
                       onChange={(e) => setCostPrice(e.target.value)}
                       className="sm:flex-1 sm:min-w-0"
+                      required={!notForSale}
                     />
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground shrink-0">per</span>
@@ -928,31 +965,55 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </div>
               )}
 
-              {/* Selling-price guardrails + goods margin (GOODS/EQUIPMENT) */}
-              {['GOODS', 'EQUIPMENT'].includes(type) && (
+              {/* Pricing: Selling Price (the mandatory default price) + optional Retail/Wholesale
+                  tier overrides. Not GOODS/EQUIPMENT-only — ingredients and services are sellable
+                  too (e.g. selling excess raw stock, a standalone salon/professional service with
+                  no ticket tiers), so this must not be hidden for those types. RECIPE keeps its
+                  own dedicated Selling Price field in the BOM section below (tied to food-cost /
+                  batch economics) rather than duplicating it here. Retail/Wholesale default to
+                  Selling Price on submit when left blank — see handleSubmit. */}
+              {['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE'].includes(type) && (
                 <div className="space-y-3 border border-border rounded-lg p-3">
-                  <p className="text-sm font-semibold">Selling prices</p>
+                  <p className="text-sm font-semibold">Pricing</p>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Selling Price (KES)</label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step={DECIMAL_STEP}
+                      placeholder="e.g. 2500"
+                      value={sellingPrice}
+                      onChange={(e) => setSellingPrice(e.target.value)}
+                      required={!notForSale}
+                      className="sm:max-w-xs"
+                    />
+                    <p className="text-xs text-muted-foreground">The default price customers pay. Used at POS whenever no Retail price is set below.</p>
+                  </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Wholesale / Min Price (KES)</label>
+                      <label className="text-sm font-medium">Wholesale / Min Price (KES) <span className="text-muted-foreground font-normal">(optional)</span></label>
                       <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Wholesale" value={minSellingPrice} onChange={(e) => setMinSellingPrice(e.target.value)} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Retail / Max Price (KES)</label>
+                      <label className="text-sm font-medium">Retail / Max Price (KES) <span className="text-muted-foreground font-normal">(optional)</span></label>
                       <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Retail" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Target Margin (%) <span className="text-muted-foreground font-normal">(optional)</span></label>
-                      <Input type="number" min="0" max="99.9" step={DECIMAL_STEP} placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
-                    </div>
+                    {/* Margin is cost-derived — only meaningful where a Cost input exists
+                        (GOODS/INGREDIENT/EQUIPMENT); SERVICE has no purchase cost in this model. */}
+                    {isStockable && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Target Margin (%) <span className="text-muted-foreground font-normal">(optional)</span></label>
+                        <Input type="number" min="0" max="99.9" step={DECIMAL_STEP} placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
+                      </div>
+                    )}
                   </div>
                   {minMaxInvalid && (
                     <p className="text-xs text-destructive">Wholesale price cannot exceed the retail price.</p>
                   )}
                   <p className="text-xs text-muted-foreground">
-                    The <span className="font-semibold">Retail / Max</span> price sets the default (Retail) price profile customers pay; the
-                    {' '}<span className="font-semibold">Wholesale / Min</span> price sets the Wholesale profile. These are the prices used at POS —
-                    the system never substitutes a cost-plus-margin estimate when a retail price is provided.
+                    Left blank, <span className="font-semibold">Retail / Max</span> and <span className="font-semibold">Wholesale / Min</span> both
+                    default to the Selling Price above. Set them only to run separate Retail/Wholesale price profiles at POS — the
+                    system never substitutes a cost-plus-margin estimate when a selling price is provided.
                   </p>
                   {suggestedFromMargin != null && (
                     <p className="text-xs text-muted-foreground">
@@ -1011,21 +1072,6 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   </span>
                 </label>
               )}
-
-              {/* Not for sale — hidden from EVERY sales surface (POS, ordering) while still
-                  stocked/purchased/counted. For raw ingredients bought pre-portioned,
-                  cleaning supplies, internal consumables. Distinct from non-billable
-                  (which still reaches the till at KES 0). */}
-              <label className="flex items-start gap-2 text-sm cursor-pointer rounded-lg border border-border p-3" title="Excluded from all sales interfaces (POS, ordering) — the item stays fully stockable and purchasable.">
-                <input type="checkbox" checked={notForSale} onChange={(e) => setNotForSale(e.target.checked)} className="rounded mt-0.5" />
-                <span>
-                  Not for sale
-                  <br />
-                  <span className="text-xs text-muted-foreground font-normal">
-                    Never appears on any sales interface (POS, ordering). For ingredients, cleaning supplies and internal consumables that are still stocked, purchased and counted.
-                  </span>
-                </span>
-              </label>
 
               {/* Reusable menu component — RECIPE items that other recipes may consume
                   (Black Tea 30 ml inside an Iced Passion Tea). The content-per-portion
