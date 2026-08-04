@@ -8,7 +8,7 @@ import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { ProductsExportDialog } from '@/components/inventory/ExportDialogs';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
-import { useBulkDeleteItems, useBulkItemStatus, useCreateItem, useDeleteItem, useItems, useUpdateItem } from '@/hooks/useItems';
+import { useBulkDeleteItems, useBulkItemStatus, useCreateItem, useDeleteItem, useItems, useSetItemPrice, useUpdateItem } from '@/hooks/useItems';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
@@ -415,6 +415,7 @@ export default function CatalogPage() {
 
   const createItem = useCreateItem(orgSlug);
   const updateItem = useUpdateItem(orgSlug);
+  const setItemPrice = useSetItemPrice(orgSlug);
   const deleteItemMut = useDeleteItem(orgSlug);
   const bulkDelete = useBulkDeleteItems(orgSlug);
   const bulkStatus = useBulkItemStatus(orgSlug);
@@ -509,6 +510,54 @@ export default function CatalogPage() {
   // resolve the currently-visible selected ids for the bulk bar count/actions.
   const selectedIds = [...selected];
 
+  // Inline-editable Cost Price cell. Cost is only a directly-settable field for
+  // GOODS/INGREDIENT/EQUIPMENT (mirrors ItemFormDialog's Cost section gate) — RECIPE cost is
+  // BOM-derived and SERVICE has no purchase cost, so both stay read-only here.
+  function renderCostCell(item: Item) {
+    const editable = canChange && ['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(item.type);
+    return (
+      <PriceCell
+        value={item.cost_price ?? null}
+        editable={editable}
+        saving={updateItem.isPending && updateItem.variables?.sku === item.sku}
+        onSave={(n) =>
+          updateItem.mutate(
+            { sku: item.sku, data: { ...itemToUpdateInput(item), cost_price: n } },
+            {
+              onSuccess: () => toast.success(`${item.name} cost price updated`),
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update cost price')),
+            },
+          )
+        }
+      />
+    );
+  }
+
+  // Inline-editable Selling Price cell — routed through the dedicated PATCH /items/{sku}/price
+  // endpoint (setSellingPrice), the platform's single price-adjustment choke point: it updates
+  // guardrails + tier rows, cascades to a linked RECIPE's own selling_price, and publishes
+  // inventory.item.updated so POS/treasury pick up the change in real time (no separate refresh
+  // needed) — the same reuse this session's "centralize price-adjustment logic" fix wired up for
+  // every other price-writing path (goods receipt, manual item edit, pending-price promotion).
+  function renderSellingPriceCell(item: Item) {
+    return (
+      <PriceCell
+        value={item.selling_price ?? null}
+        editable={canChange}
+        saving={setItemPrice.isPending && setItemPrice.variables?.sku === item.sku}
+        onSave={(n) =>
+          setItemPrice.mutate(
+            { sku: item.sku, price: n },
+            {
+              onSuccess: () => toast.success(`${item.name} selling price updated`),
+              onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update selling price')),
+            },
+          )
+        }
+      />
+    );
+  }
+
   // Inline-editable price cell reused by the Wholesale/Retail columns. INGREDIENT
   // items are never sold — their cell shows the cost basis, not a price.
   function renderPriceCell(item: Item, which: 'min' | 'max') {
@@ -565,12 +614,12 @@ export default function CatalogPage() {
     {
       key: 'cost_price', header: 'Cost', align: 'right', sortable: true, hideBelow: 'md',
       accessor: (i) => i.cost_price, cellClassName: 'font-mono text-xs text-muted-foreground tabular-nums',
-      render: (i) => KES(i.cost_price),
+      render: (i) => renderCostCell(i),
     },
     {
       key: 'selling_price', header: 'Selling Price', align: 'right', sortable: true,
       accessor: (i) => i.selling_price, cellClassName: 'font-mono text-xs tabular-nums',
-      render: (i) => KES(i.selling_price),
+      render: (i) => renderSellingPriceCell(i),
     },
     { key: 'min_selling_price', header: 'Wholesale', align: 'right', sortable: true, hideBelow: 'lg', defaultHidden: true, accessor: (i) => i.min_selling_price, render: (i) => renderPriceCell(i, 'min') },
     { key: 'max_selling_price', header: 'Retail', align: 'right', sortable: true, defaultHidden: true, accessor: (i) => i.max_selling_price ?? i.selling_price, render: (i) => renderPriceCell(i, 'max') },

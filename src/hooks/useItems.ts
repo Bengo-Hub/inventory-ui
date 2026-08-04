@@ -53,6 +53,21 @@ export function useUpdateItem(orgSlug: string) {
   });
 }
 
+// useSetItemPrice wraps itemsApi.setPrice (PATCH /items/{sku}/price) — the targeted
+// selling-price correction endpoint, not the generic full-object PUT. Prefer this for an
+// inline Selling Price edit: it updates guardrails/tier rows and RECIPE cascade server-side
+// and publishes inventory.item.updated so POS/treasury pick up the change in real time.
+export function useSetItemPrice(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sku, price }: { sku: string; price: number }) =>
+      itemsApi.setPrice(orgSlug, sku, price),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [ITEMS_KEY, orgSlug] });
+    },
+  });
+}
+
 export function useDeleteItem(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

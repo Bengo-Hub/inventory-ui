@@ -394,6 +394,15 @@ export const itemsApi = {
   restoreEOL: (orgSlug: string, sku: string) =>
     apiClient.post<Item>(`${itemsBase(orgSlug)}/${sku}/eol/restore`, {}),
 
+  // setPrice is the targeted selling-price correction endpoint (PATCH /items/{sku}/price →
+  // SetSellingPriceBySKU) — the platform's single price-adjustment choke point: it updates
+  // guardrails + RETAIL/WHOLESALE tier rows, cascades to the linked recipe's selling_price for
+  // RECIPE items, and (2026-08) publishes inventory.item.updated so POS/treasury sync in real
+  // time. Prefer this over update() for a pure price edit — it does strictly more than a
+  // generic PUT and is the same tool a manager's "fix the catalog too" correction uses.
+  setPrice: (orgSlug: string, sku: string, price: number) =>
+    apiClient.patch<Item>(`${itemsBase(orgSlug)}/${sku}/price`, { price }),
+
   listEvents: (orgSlug: string, params?: { page?: number; limit?: number }): Promise<PaginatedItems> =>
     apiClient.get<PaginatedItems>(`/api/v1/${orgSlug}/inventory/events`, params as Record<string, string | number | undefined>),
 
