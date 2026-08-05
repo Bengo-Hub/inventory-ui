@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/api/client';
+import { revokeServerSession as sharedRevokeServerSession } from '@bengo-hub/shared-ui-lib/auth';
 
 /**
  * Fetch user profile from inventory-api GET /api/v1/{tenantSlug}/auth/me.
@@ -101,16 +102,7 @@ export function buildLogoutUrl(postLogoutRedirectUri?: string): string {
 }
 
 export async function revokeServerSession(accessToken?: string | null): Promise<void> {
-  try {
-    await fetch(new URL('/api/v1/auth/logout', SSO_BASE_URL).toString(), {
-      method: 'POST',
-      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-      credentials: 'include',
-      keepalive: true,
-    });
-  } catch {
-    /* best-effort: still clear local state + redirect below */
-  }
+  return sharedRevokeServerSession(SSO_BASE_URL, accessToken);
 }
 
 export async function exchangeCodeForTokens(params: TokenExchangeParams) {
