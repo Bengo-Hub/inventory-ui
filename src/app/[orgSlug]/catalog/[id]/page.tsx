@@ -65,6 +65,13 @@ export default function ItemDetailPage() {
 
   const isRecipe = item?.type === 'RECIPE';
   const isStockable = item ? STOCKABLE_TYPES.includes(item.type) : false;
+  // Only surface the E-commerce card when at least one of these optional attributes is
+  // actually set — most items never touch this section, so an empty card would just be noise.
+  const hasEcommerceDetails = !!item && (
+    !!item.gtin || !!item.mpn || !!item.condition || !!item.country_of_origin || !!item.hs_code ||
+    !!item.slug || !!item.short_description || item.return_window_days != null ||
+    item.is_returnable === false || !!item.allow_backorder || !!item.is_discontinued
+  );
 
   // Recipe (BOM) — only for RECIPE items. Looked up by the item's SKU; failures (e.g. an outlet
   // whose use_case can't read recipes) degrade gracefully to no BOM card rather than breaking.
@@ -398,6 +405,40 @@ export default function ItemDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* E-commerce / Marketplace — only when at least one of these optional fields is set */}
+        {hasEcommerceDetails && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <BoxIcon className="h-5 w-5 text-primary" />
+                <h2 className="text-lg font-semibold">E-commerce / Marketplace</h2>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
+                {item.gtin && <Field label="GTIN" value={<span className="font-mono">{item.gtin}</span>} />}
+                {item.mpn && <Field label="MPN" value={item.mpn} />}
+                {item.condition && <Field label="Condition" value={item.condition.replace(/_/g, ' ')} />}
+                {item.country_of_origin && <Field label="Country of Origin" value={item.country_of_origin} />}
+                {item.hs_code && <Field label="HS Code" value={item.hs_code} />}
+                {item.slug && <Field label="Storefront Slug" value={item.slug} />}
+                {item.return_window_days != null && <Field label="Return Window" value={`${item.return_window_days} days`} />}
+                {item.short_description && (
+                  <div className="col-span-2 sm:col-span-3">
+                    <dt className="text-muted-foreground">Short Description</dt>
+                    <dd className="font-medium mt-1 whitespace-pre-wrap">{item.short_description}</dd>
+                  </div>
+                )}
+              </dl>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {item.is_returnable === false && <Badge variant="outline">Non-returnable</Badge>}
+                {item.allow_backorder && <Badge variant="outline">Backorder allowed</Badge>}
+                {item.is_discontinued && <Badge variant="warning">Discontinued</Badge>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Serial units — only for serial-tracked items that have received units */}
         {(serialRows?.length ?? 0) > 0 && (
