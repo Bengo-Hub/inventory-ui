@@ -10,6 +10,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { P } from '@/lib/rbac/permissions';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useSubscription } from '@/hooks/use-subscription';
 import { useVisibleServices, type ServiceKey } from '@bengo-hub/shared-ui-lib/app-switcher';
 
 // Canonical service list (labels/icons/coverage, incl. 'coming-soon' entries) lives in
@@ -46,9 +47,11 @@ export function Header({ onMenuClick }: HeaderProps) {
   const { getServiceTitle } = useBranding();
   const { canAny } = usePermissions();
   const canManageLinks = canAny([P.SETTINGS_MANAGE, P.CONFIG_MANAGE, P.CATALOG_MANAGE]);
-  // activeServiceTags omitted: no browser-safe endpoint returns active subscription SERVICE TAGS
-  // yet (only feature codes) — fails open (shows everything), matching current behavior.
-  const services = useVisibleServices({ orgSlug, urls: SERVICE_URLS, canManageLinks });
+  // activeProducts is undefined while the subscription lookup is in flight/unknown — fails open
+  // (shows everything) until it resolves, matching this codebase's existing "never block the UI
+  // on a subscription-fetch failure" convention.
+  const { activeProducts } = useSubscription();
+  const services = useVisibleServices({ orgSlug, urls: SERVICE_URLS, canManageLinks, activeServiceTags: activeProducts });
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const isAuthenticated = !!user && !!session;
