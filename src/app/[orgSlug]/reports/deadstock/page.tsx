@@ -3,22 +3,18 @@
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useDeadstock } from '@/hooks/useReports';
 import { reportsApi } from '@/lib/api/reports';
+import type { DeadstockItem } from '@/lib/api/reports';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildDeadstockColumns } from './deadstock-columns';
 import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 function fmt(n: number) {
     return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
-}
-function fmtDate(s: string) {
-    try {
-        return new Date(s).toLocaleDateString();
-    } catch {
-        return '—';
-    }
 }
 
 const DAYS_OPTIONS = [30, 60, 90, 180];
@@ -46,6 +42,8 @@ export default function DeadstockPage() {
         { label: 'Non-Moving Items', value: fmt(data?.item_count ?? 0), icon: Boxes },
         { label: 'No Sale In', value: `${days} days`, icon: AlertTriangle },
     ];
+
+    const columns = useMemo(() => buildDeadstockColumns(cur), [cur]);
 
     return (
         <div className="p-6 space-y-6">
@@ -94,45 +92,16 @@ export default function DeadstockPage() {
             <Card>
                 <CardHeader><h2 className="text-lg font-semibold">Non-Moving Items (top by value)</h2></CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Category</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">On hand</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Unit cost</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Last activity</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Value ({cur})</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isError ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-8 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load deadstock report</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.items?.length ?? 0) === 0 && (
-                                    <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No deadstock — everything is moving.'}</td></tr>
-                                )}
-                                {!isError && data?.items?.map((it) => (
-                                    <tr key={it.item_id} className="hover:bg-accent/30 transition-colors">
-                                        <td className="px-6 py-3 font-medium">
-                                            {it.name}
-                                            <span className="block text-xs text-muted-foreground font-mono">{it.sku}</span>
-                                        </td>
-                                        <td className="px-6 py-3 text-muted-foreground hidden md:table-cell">{it.category_name || '—'}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{fmt(it.on_hand)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{it.unit_cost.toLocaleString()}</td>
-                                        <td className="px-6 py-3 text-muted-foreground hidden lg:table-cell">{fmtDate(it.last_activity)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums font-semibold">{fmt(it.value)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<DeadstockItem>
+                            columns={columns}
+                            rows={data?.items ?? []}
+                            rowKey={(it) => it.item_id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No deadstock — everything is moving."
+                        />
                     </div>
                 </CardContent>
             </Card>

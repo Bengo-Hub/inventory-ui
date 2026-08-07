@@ -1,23 +1,18 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useFoodCostVariance } from '@/hooks/useReports';
 import { reportsApi, type VarianceReportItem } from '@/lib/api/reports';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildFoodCostColumns } from './food-cost-columns';
 import { Printer, RefreshCw, TrendingDown, TrendingUp } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 function formatCurrency(v: number): string {
     return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(v);
-}
-
-function varianceBadge(pct: number): { label: string; variant: 'success' | 'warning' | 'error' } {
-    const abs = Math.abs(pct);
-    if (abs < 3) return { label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, variant: 'success' };
-    if (abs < 8) return { label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, variant: 'warning' };
-    return { label: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, variant: 'error' };
 }
 
 function toISO(d: Date): string {
@@ -60,6 +55,8 @@ export default function FoodCostVariancePage() {
             { fileName: `food-cost-variance-${from}_${to}.pdf`, title: 'Food-Cost Variance' },
         );
     }
+
+    const columns = useMemo(() => buildFoodCostColumns(), []);
 
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -138,46 +135,15 @@ export default function FoodCostVariancePage() {
                     <span className="text-sm text-muted-foreground">{rows.length} recipe{rows.length !== 1 ? 's' : ''}</span>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
-                    ) : rows.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                            <p className="text-sm">No variance data for this period. Try &quot;Recalculate&quot; to generate fresh data.</p>
-                        </div>
-                    ) : (
-                        <Table>
-                            <thead>
-                                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    <th className="px-6 py-3">Recipe</th>
-                                    <th className="px-6 py-3 text-right">Theoretical</th>
-                                    <th className="px-6 py-3 text-right">Actual</th>
-                                    <th className="px-6 py-3 text-right">Variance</th>
-                                    <th className="px-6 py-3 text-center">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {rows.map((row: VarianceReportItem) => {
-                                    const { label, variant } = varianceBadge(row.variance_pct);
-                                    return (
-                                        <tr key={row.recipe_sku} className="hover:bg-muted/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium">{row.recipe_name}</div>
-                                                <div className="text-xs text-muted-foreground">{row.recipe_sku}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right text-sm">{formatCurrency(row.theoretical_cost)}</td>
-                                            <td className="px-6 py-4 text-right text-sm">{formatCurrency(row.actual_cost)}</td>
-                                            <td className="px-6 py-4 text-right text-sm font-medium">
-                                                {formatCurrency(row.actual_cost - row.theoretical_cost)}
-                                            </td>
-                                            <td className="px-6 py-4 text-center">
-                                                <Badge variant={variant}>{label}</Badge>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </Table>
-                    )}
+                    <div className="px-2 pb-2">
+                        <DataTable<VarianceReportItem>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(row) => row.recipe_sku}
+                            loading={isLoading}
+                            emptyText='No variance data for this period. Try "Recalculate" to generate fresh data.'
+                        />
+                    </div>
                 </CardContent>
             </Card>
 

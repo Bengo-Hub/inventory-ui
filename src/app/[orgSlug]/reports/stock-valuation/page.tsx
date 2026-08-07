@@ -3,9 +3,13 @@
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useStockValuation } from '@/hooks/useReports';
 import { reportsApi } from '@/lib/api/reports';
-import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Layers, Printer, RefreshCw } from 'lucide-react';
+import type { StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildStockValuationCategoryColumns, buildStockValuationTopItemColumns } from './stock-valuation-columns';
+import { Boxes, DollarSign, ArrowLeft, Layers, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
@@ -35,6 +39,9 @@ export default function StockValuationPage() {
         { label: 'Total Units', value: fmt(data?.total_units ?? 0), icon: Boxes },
         { label: 'Items Valued', value: fmt(data?.item_count ?? 0), icon: Layers },
     ];
+
+    const categoryColumns = useMemo(() => buildStockValuationCategoryColumns(cur), [cur]);
+    const topItemColumns = useMemo(() => buildStockValuationTopItemColumns(cur), [cur]);
 
     return (
         <div className="p-6 space-y-6">
@@ -73,38 +80,16 @@ export default function StockValuationPage() {
             <Card>
                 <CardHeader><h2 className="text-lg font-semibold">Value by Category</h2></CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Category</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Items</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Units</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Value ({cur})</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isError ? (
-                                    <tr>
-                                        <td colSpan={4} className="px-6 py-8 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load stock valuation</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.by_category?.length ?? 0) === 0 && (
-                                    <tr><td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No stock on hand.'}</td></tr>
-                                )}
-                                {!isError && data?.by_category?.map((c) => (
-                                    <tr key={c.category_name} className="hover:bg-accent/30 transition-colors">
-                                        <td className="px-6 py-3 font-medium">{c.category_name}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums">{c.item_count}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{fmt(c.total_units)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums font-semibold">{fmt(c.total_value)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<StockValuationCategory>
+                            columns={categoryColumns}
+                            rows={data?.by_category ?? []}
+                            rowKey={(c) => c.category_name}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No stock on hand."
+                        />
                     </div>
                 </CardContent>
             </Card>
@@ -112,43 +97,16 @@ export default function StockValuationPage() {
             <Card>
                 <CardHeader><h2 className="text-lg font-semibold">Top Items by Value</h2></CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Category</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">On hand</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Unit cost</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Value ({cur})</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isError ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load stock valuation</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.top_items?.length ?? 0) === 0 && (
-                                    <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">{isLoading ? 'Loading…' : 'No valued items.'}</td></tr>
-                                )}
-                                {!isError && data?.top_items?.map((it) => (
-                                    <tr key={it.item_id} className="hover:bg-accent/30 transition-colors">
-                                        <td className="px-6 py-3 font-medium">
-                                            {it.name}
-                                            <span className="block text-xs text-muted-foreground font-mono">{it.sku}</span>
-                                        </td>
-                                        <td className="px-6 py-3 text-muted-foreground hidden md:table-cell">{it.category_name || '—'}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{fmt(it.on_hand)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{it.unit_cost.toLocaleString()}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums font-semibold">{fmt(it.value)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<StockValuationItem>
+                            columns={topItemColumns}
+                            rows={data?.top_items ?? []}
+                            rowKey={(it) => it.item_id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No valued items."
+                        />
                     </div>
                 </CardContent>
             </Card>

@@ -1,60 +1,18 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
+import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useMenuEngineering } from '@/hooks/useReports';
 import { reportsApi, type MenuCategory, type MenuMatrixItem } from '@/lib/api/reports';
-import { Printer, RefreshCw, Star, TrendingDown, TrendingUp, Zap } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { CATEGORY, type CategoryConfig, buildMenuEngineeringColumns } from './menu-engineering-columns';
+import { Printer, RefreshCw } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
-type CategoryConfig = {
-    label: string;
-    description: string;
-    variant: 'default' | 'success' | 'warning' | 'error' | 'outline';
-    action: string;
-};
-
-const CATEGORY: Record<MenuCategory, CategoryConfig> = {
-    STAR: {
-        label: 'Star',
-        description: 'High popularity, high profit',
-        variant: 'success',
-        action: 'Promote and protect — keep quality consistent',
-    },
-    PLOWHORSE: {
-        label: 'Plowhorse',
-        description: 'High popularity, low profit',
-        variant: 'warning',
-        action: 'Reprice or reduce portion cost to improve margin',
-    },
-    PUZZLE: {
-        label: 'Puzzle',
-        description: 'Low popularity, high profit',
-        variant: 'default',
-        action: 'Reposition, rename, or feature in specials',
-    },
-    DOG: {
-        label: 'Dog',
-        description: 'Low popularity, low profit',
-        variant: 'error',
-        action: 'Consider removing from menu or reinventing',
-    },
-};
-
 function toISO(d: Date): string {
     return d.toISOString().split('T')[0];
-}
-
-function formatCurrency(v?: number): string {
-    if (v == null) return '—';
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(v);
-}
-
-function CategoryBadge({ category }: { category: MenuCategory }) {
-    const cfg = CATEGORY[category];
-    return <Badge variant={cfg.variant}>{cfg.label}</Badge>;
 }
 
 export default function MenuEngineeringPage() {
@@ -84,6 +42,8 @@ export default function MenuEngineeringPage() {
             { fileName: `menu-engineering-${from}_${to}.pdf`, title: 'Menu Engineering' },
         );
     }
+
+    const columns = useMemo(() => buildMenuEngineeringColumns(), []);
 
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -155,47 +115,15 @@ export default function MenuEngineeringPage() {
                     <span className="text-sm text-muted-foreground">{rows.length} recipe{rows.length !== 1 ? 's' : ''}</span>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
-                    ) : rows.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-2">
-                            <p className="text-sm">No data for this period. Click &quot;Analyze&quot; to load the matrix.</p>
-                        </div>
-                    ) : (
-                        <Table>
-                            <thead>
-                                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    <th className="px-6 py-3">Recipe</th>
-                                    <th className="px-6 py-3 text-right">Units Sold</th>
-                                    <th className="px-6 py-3 text-right">Contrib. Margin %</th>
-                                    <th className="px-6 py-3 text-right">Suggested Price</th>
-                                    <th className="px-6 py-3 text-center">Category</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {rows.map((row: MenuMatrixItem) => (
-                                    <tr key={row.recipe_sku} className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium">{row.recipe_name}</div>
-                                            <div className="text-xs text-muted-foreground">{row.recipe_sku}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-sm">
-                                            {row.popularity.toFixed(0)}
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-sm font-medium">
-                                            {row.contrib_margin.toFixed(1)}%
-                                        </td>
-                                        <td className="px-6 py-4 text-right text-sm">
-                                            {formatCurrency(row.suggested_price)}
-                                        </td>
-                                        <td className="px-6 py-4 text-center">
-                                            <CategoryBadge category={row.category} />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </Table>
-                    )}
+                    <div className="px-2 pb-2">
+                        <DataTable<MenuMatrixItem>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(row) => row.recipe_sku}
+                            loading={isLoading}
+                            emptyText='No data for this period. Click "Analyze" to load the matrix.'
+                        />
+                    </div>
                 </CardContent>
             </Card>
 

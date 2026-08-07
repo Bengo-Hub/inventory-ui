@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Badge, Button, Card, CardContent, CardHeader, Table } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
@@ -14,7 +14,9 @@ import {
 } from '@/hooks/useReports';
 import { itemsApi } from '@/lib/api/items';
 import { useCatalogScope, useReportNomenclature } from '@/lib/use-case-nomenclature';
-import { reportsApi, type UtilizationGranularity } from '@/lib/api/reports';
+import { reportsApi, type UtilizationGranularity, type RecipeBreakdownRow } from '@/lib/api/reports';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildIngredientUtilizationColumns } from './ingredient-utilization-columns';
 import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
@@ -130,6 +132,11 @@ export default function IngredientUtilizationPage() {
       title: 'Stock Reconciliation',
     });
   }
+
+  const byRecipeColumns = useMemo(
+    () => buildIngredientUtilizationColumns({ sourceCol: rn.sourceCol, directLabel: rn.directLabel, unit: s?.unit }),
+    [rn.sourceCol, rn.directLabel, s?.unit],
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -296,43 +303,19 @@ export default function IngredientUtilizationPage() {
               </span>
             </CardHeader>
             <CardContent className="p-0">
-              {byRecipe.isLoading ? (
-                <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
-              ) : !byRecipe.data || byRecipe.data.length === 0 ? (
-                <div className="flex items-center justify-center py-16 text-sm text-muted-foreground">
-                  {rn.hasRecipes
-                    ? `No recipes consumed this ${rn.subjectLower} in the selected period.`
-                    : `No consumption recorded for this ${rn.subjectLower} in the selected period.`}
-                </div>
-              ) : (
-                <Table>
-                  <thead>
-                    <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      <th className="px-6 py-3">{rn.sourceCol}</th>
-                      <th className="px-6 py-3 text-right">Quantity</th>
-                      <th className="px-6 py-3 text-right">Cost</th>
-                      <th className="px-6 py-3 text-right">Share</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {byRecipe.data.map((row) => (
-                      <tr key={row.recipe_id ?? row.recipe_name} className="hover:bg-muted/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-medium">{row.recipe_name || rn.directLabel}</div>
-                          {row.recipe_sku && <div className="text-xs text-muted-foreground">{row.recipe_sku}</div>}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm tabular-nums">
-                          {formatNumber(row.quantity)} {s?.unit}
-                        </td>
-                        <td className="px-6 py-4 text-right text-sm tabular-nums">{formatCurrency(row.cost)}</td>
-                        <td className="px-6 py-4 text-right">
-                          <Badge variant="outline">{formatNumber(row.pct_of_total, 1)}%</Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              )}
+              <div className="px-2 pb-2">
+                <DataTable<RecipeBreakdownRow>
+                  columns={byRecipeColumns}
+                  rows={byRecipe.data ?? []}
+                  rowKey={(row) => row.recipe_id ?? row.recipe_name}
+                  loading={byRecipe.isLoading}
+                  emptyText={
+                    rn.hasRecipes
+                      ? `No recipes consumed this ${rn.subjectLower} in the selected period.`
+                      : `No consumption recorded for this ${rn.subjectLower} in the selected period.`
+                  }
+                />
+              </div>
             </CardContent>
           </Card>
         </>
