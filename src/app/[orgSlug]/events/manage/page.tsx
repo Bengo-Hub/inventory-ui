@@ -1,15 +1,17 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { SellTicketModal } from '@/components/events/SellTicketModal';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { useCancelEvent, useEvents, useUpdateEventCapacity } from '@/hooks/use-events';
 import { useUpdateItem } from '@/hooks/useItems';
 import type { CreateItemInput, Item } from '@/lib/api/items';
-import { AlertTriangle, Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildEventColumns, availableSeats } from './event-columns';
+import { Ticket } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -27,32 +29,6 @@ function copyEventLink(slug: string, eventId: string) {
             () => toast.error('Could not copy link'),
         );
     }
-}
-
-function formatEventDate(iso?: string | null): string {
-    if (!iso) return '—';
-    return new Intl.DateTimeFormat(undefined, {
-        weekday: 'short',
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    }).format(new Date(iso));
-}
-
-function availableSeats(event: Item): number {
-    return Math.max(0, (event.total_capacity ?? 0) - (event.booked_capacity ?? 0));
-}
-
-function eventStatus(event: Item): { label: string; variant: 'success' | 'warning' | 'error' | 'outline' } {
-    const available = availableSeats(event);
-    const total = event.total_capacity ?? 0;
-    if (total === 0) return { label: 'No Capacity', variant: 'outline' };
-    if (available === 0) return { label: 'Sold Out', variant: 'error' };
-    const pct = (event.booked_capacity ?? 0) / total;
-    if (pct >= 0.8) return { label: 'Almost Full', variant: 'warning' };
-    return { label: 'Available', variant: 'success' };
 }
 
 function filterEvents(events: Item[], tab: Tab, now: Date): Item[] {
@@ -147,6 +123,18 @@ export default function ManageEventsPage() {
         });
     }
 
+    const columns = useMemo(
+        () => buildEventColumns({
+            isUpdatingCapacity: updateCapacity.isPending,
+            onCopyLink: (event) => copyEventLink(orgSlug, event.id),
+            onSell: setSellEvent,
+            onEdit: setEditEvent,
+            onMarkFull: handleMarkFull,
+            onCancel: setCancelTarget,
+        }),
+        [orgSlug, updateCapacity.isPending],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -179,133 +167,22 @@ export default function ManageEventsPage() {
 
             <Card>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Event</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">
-                                        <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Date</span>
-                                    </th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">
-                                        <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Venue</span>
-                                    </th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">
-                                        <span className="flex items-center justify-end gap-1.5"><Users className="h-3.5 w-3.5" /> Total</span>
-                                    </th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Booked</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Available</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading events...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load events</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : filtered.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <Ticket className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
-                                            <p className="text-muted-foreground">No {tab} events</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filtered.map((event) => {
-                                        const available = availableSeats(event);
-                                        const status = eventStatus(event);
-                                        const isSoldOut = available === 0 && (event.total_capacity ?? 0) > 0;
-                                        return (
-                                            <tr key={event.id} className="hover:bg-accent/20 transition-colors">
-                                                <td className="px-6 py-4">
-                                                    <p className="font-medium">{event.name}</p>
-                                                    <p className="text-xs text-muted-foreground font-mono">{event.sku}</p>
-                                                </td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell text-xs">
-                                                    {formatEventDate(event.event_start_at)}
-                                                </td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell max-w-[200px]">
-                                                    <span className="truncate block text-xs">{event.event_venue ?? '—'}</span>
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums font-medium">
-                                                    {event.total_capacity ?? '—'}
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                    {event.booked_capacity ?? 0}
-                                                </td>
-                                                <td className={`px-6 py-4 text-right tabular-nums font-semibold hidden sm:table-cell ${isSoldOut ? 'text-destructive' : available <= (event.total_capacity ?? 0) * 0.2 ? 'text-yellow-600' : 'text-emerald-600'}`}>
-                                                    {available}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge variant={status.variant}>{status.label}</Badge>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            title="Copy public ticket link"
-                                                            onClick={() => copyEventLink(orgSlug, event.id)}
-                                                        >
-                                                            <Share2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        {(event.total_capacity ?? 0) > 0 && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                title="Sell tickets"
-                                                                onClick={() => setSellEvent(event)}
-                                                            >
-                                                                <Ticket className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            title="Edit event"
-                                                            onClick={() => setEditEvent(event)}
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                        {!isSoldOut && (event.total_capacity ?? 0) > 0 && (
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                title="Mark as sold out"
-                                                                onClick={() => handleMarkFull(event)}
-                                                                disabled={updateCapacity.isPending}
-                                                            >
-                                                                Full
-                                                            </Button>
-                                                        )}
-                                                        <Button
-                                                            size="sm"
-                                                            variant="ghost"
-                                                            title="Cancel event"
-                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                            onClick={() => setCancelTarget(event)}
-                                                        >
-                                                            <X className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Item>
+                            columns={columns}
+                            rows={filtered}
+                            rowKey={(event) => event.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <Ticket className="h-10 w-10 mx-auto text-muted-foreground/40 mb-3" />
+                                    <p className="text-muted-foreground">No {tab} events</p>
+                                </>
+                            }
+                            storageKey="manage-events-col-prefs"
+                        />
                     </div>
                 </CardContent>
             </Card>

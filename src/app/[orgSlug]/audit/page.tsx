@@ -1,25 +1,17 @@
 'use client';
 
-import { Badge, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useAuditLogs } from '@/hooks/useAudit';
 import type { AuditLogEntry } from '@/lib/api/audit';
 import { useAuthStore } from '@/store/auth';
 import { userHasPermission } from '@/lib/auth/permissions';
-import { ChevronLeft, ChevronRight, Loader2, ShieldCheck } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildAuditColumns } from './audit-columns';
+import { Loader2, ShieldCheck } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 const PAGE = 50;
-
-// Friendly labels + colour bands for the actions the audit log records.
-const ACTION_META: Record<string, { label: string; cls: string }> = {
-  'stock.adjustment': { label: 'Stock adjustment', cls: 'bg-blue-500/15 text-blue-500' },
-  'stock.writeoff': { label: 'Write-off', cls: 'bg-red-500/15 text-red-500' },
-  'stock.breakdown': { label: 'Breakdown', cls: 'bg-amber-500/15 text-amber-500' },
-  'stock.count_approved': { label: 'Count approved', cls: 'bg-green-500/15 text-green-500' },
-  'user.outlet_assign': { label: 'Outlet assigned', cls: 'bg-purple-500/15 text-purple-500' },
-  'user.outlet_unassign': { label: 'Outlet removed', cls: 'bg-purple-500/15 text-purple-500' },
-};
 
 const ACTION_OPTIONS = [
   { value: '', label: 'All actions' },
@@ -55,6 +47,8 @@ export default function AuditPage() {
   const rows = data?.data ?? [];
   const total = data?.total ?? 0;
 
+  const columns = useMemo(() => buildAuditColumns(), []);
+
   if (!canView) {
     return <div className="p-6 text-sm text-muted-foreground">You don&apos;t have permission to view the audit log.</div>;
   }
@@ -84,55 +78,23 @@ export default function AuditPage() {
           <span className="ml-auto text-xs text-muted-foreground">{total} entries</span>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
-          ) : rows.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground py-12">No audit entries for these filters.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-accent/5 text-xs text-muted-foreground uppercase tracking-wider">
-                    <th className="text-left px-4 py-3">When</th>
-                    <th className="text-left px-4 py-3">Action</th>
-                    <th className="text-left px-4 py-3">Entity</th>
-                    <th className="text-right px-4 py-3">Amount</th>
-                    <th className="text-left px-4 py-3">Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {rows.map((e: AuditLogEntry) => {
-                    const meta = ACTION_META[e.action] ?? { label: e.action, cls: 'bg-muted text-muted-foreground' };
-                    return (
-                      <tr key={e.id} className="hover:bg-accent/5">
-                        <td className="px-4 py-3 whitespace-nowrap text-xs text-muted-foreground">{new Date(e.created_at).toLocaleString()}</td>
-                        <td className="px-4 py-3"><span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${meta.cls}`}>{meta.label}</span></td>
-                        <td className="px-4 py-3 font-mono text-xs">{e.entity_id || '—'}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{e.amount != null ? e.amount.toLocaleString() : '—'}</td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-xs truncate">{e.reason || '—'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <div className="px-2 pb-2">
+            <DataTable<AuditLogEntry>
+              columns={columns}
+              rows={rows}
+              rowKey={(e) => e.id}
+              loading={isLoading}
+              emptyText="No audit entries for these filters."
+              storageKey="audit-col-prefs"
+              page={page + 1}
+              totalPages={Math.max(1, Math.ceil(total / PAGE))}
+              onPageChange={(p) => setPage(p - 1)}
+              total={total}
+              pageSize={PAGE}
+            />
+          </div>
         </CardContent>
       </Card>
-
-      {total > PAGE && (
-        <div className="flex items-center justify-center gap-3">
-          <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-40 hover:bg-accent/10">
-            <ChevronLeft className="h-4 w-4" /> Prev
-          </button>
-          <span className="text-xs text-muted-foreground">Page {page + 1} of {Math.ceil(total / PAGE)}</span>
-          <button disabled={(page + 1) * PAGE >= total} onClick={() => setPage((p) => p + 1)}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-sm disabled:opacity-40 hover:bg-accent/10">
-            Next <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

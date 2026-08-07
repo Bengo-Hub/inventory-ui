@@ -1,17 +1,18 @@
 'use client';
 
-import { Badge, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Button } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { apiClient } from '@/lib/api/client';
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Filter, Package, Search } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildReservationColumns, STATUS_LABEL } from './reservation-columns';
+import { Filter, Package, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
 const ITEMS_PER_PAGE = 20;
 
-interface Reservation {
+export interface Reservation {
     id: string;
     orderId: string;
     orderRef?: string;
@@ -23,18 +24,6 @@ interface Reservation {
     status: 'confirmed' | 'consumed' | 'released';
     createdAt: string;
 }
-
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'outline' | 'warning' | 'error'> = {
-    confirmed: 'default',
-    consumed: 'success',
-    released: 'outline',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-    confirmed: 'Confirmed',
-    consumed: 'Consumed',
-    released: 'Released',
-};
 
 const STATUS_FILTERS = ['All', 'confirmed', 'consumed', 'released'];
 
@@ -60,6 +49,8 @@ export default function ReservationsPage() {
     const paginatedItems = reservations?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
     useMemo(() => { setPage(1); }, [search, statusFilter]);
+
+    const columns = useMemo(() => buildReservationColumns(), []);
 
     return (
         <div className="p-6 space-y-6">
@@ -98,75 +89,28 @@ export default function ReservationsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Order</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty Reserved</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Warehouse</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Created</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading reservations...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load reservations</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (reservations?.length ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No reservations found</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((res) => (
-                                        <tr key={res.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-mono text-xs font-medium">
-                                                {res.orderRef ?? res.orderId.slice(0, 8)}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div>
-                                                    <span className="font-medium">{res.itemName}</span>
-                                                    <span className="block text-xs text-muted-foreground font-mono">{res.itemSku}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-semibold tabular-nums">
-                                                {res.quantityReserved.toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {res.warehouseName}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <Badge variant={STATUS_VARIANT[res.status] ?? 'default'}>
-                                                    {STATUS_LABEL[res.status] ?? res.status}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell">
-                                                {new Date(res.createdAt).toLocaleDateString()}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Reservation>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(res) => res.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <Package className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No reservations found</p>
+                                </>
+                            }
+                            storageKey="reservations-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={reservations?.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (reservations?.length ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
         </div>

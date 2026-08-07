@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Card, CardContent, CardHeader, Table } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   useBackups,
@@ -10,31 +10,22 @@ import {
   useBackupSettings,
   useUpdateBackupSettings,
 } from '@/hooks/useBackups';
-import type { BackupSettings } from '@/lib/api/backups';
+import type { Backup, BackupSettings } from '@/lib/api/backups';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildBackupColumns } from './backup-columns';
 import {
   Clock,
   Database,
-  Download,
   HardDriveDownload,
   Info,
   Loader2,
   Plus,
   Save,
-  Trash2,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-/** "1.5 MB" — base-1024 human-readable size. */
-function humanSize(bytes: number): string {
-  if (!bytes || bytes < 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / Math.pow(1024, i);
-  return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`;
-}
 
 /** 0..23 -> "2:00 AM" / "12:00 PM". */
 function formatHour(h: number): string {
@@ -42,18 +33,6 @@ function formatHour(h: number): string {
   const period = hour < 12 ? 'AM' : 'PM';
   const display = hour % 12 === 0 ? 12 : hour % 12;
   return `${display}:00 ${period}`;
-}
-
-function formatCreatedAt(iso: string): string {
-  const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
-  return d.toLocaleString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 const labelClass = 'text-xs font-bold text-muted-foreground uppercase tracking-wider';
@@ -214,6 +193,15 @@ export default function BackupsPage() {
 
   const backups = data?.backups ?? [];
 
+  const columns = useMemo(
+    () => buildBackupColumns({
+      isDownloading: download.isPending,
+      onDownload: (b) => download.mutate(b.name),
+      onDelete: (b) => setPendingDelete(b.name),
+    }),
+    [download.isPending],
+  );
+
   return (
     <div className="p-4 sm:p-8 space-y-6">
       {/* Page header */}
@@ -253,59 +241,21 @@ export default function BackupsPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          {isLoading ? (
-            <div className="h-32 flex items-center justify-center text-muted-foreground">
-              <Loader2 className="h-6 w-6 animate-spin" />
-            </div>
-          ) : backups.length === 0 ? (
-            <div className="h-40 flex flex-col items-center justify-center gap-2 text-muted-foreground">
-              <HardDriveDownload className="h-8 w-8 opacity-40" />
-              <p className="text-sm">No backups yet. Create one to get started.</p>
-            </div>
-          ) : (
-            <Table>
-              <thead>
-                <tr className="border-b border-border text-left text-xs uppercase tracking-wider text-muted-foreground">
-                  <th className="px-6 py-3 font-bold">File</th>
-                  <th className="px-6 py-3 font-bold">Size</th>
-                  <th className="px-6 py-3 font-bold">Created</th>
-                  <th className="px-6 py-3 font-bold text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {backups.map((b) => (
-                  <tr key={b.name} className="border-b border-border/60 last:border-0 hover:bg-accent/5">
-                    <td className="px-6 py-3 font-medium font-mono text-xs break-all">{b.name}</td>
-                    <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">{humanSize(b.size)}</td>
-                    <td className="px-6 py-3 text-muted-foreground whitespace-nowrap">
-                      {formatCreatedAt(b.created_at)}
-                    </td>
-                    <td className="px-6 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => download.mutate(b.name)}
-                          disabled={download.isPending}
-                          title="Download"
-                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-accent transition-colors disabled:opacity-50"
-                        >
-                          <Download className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingDelete(b.name)}
-                          title="Delete"
-                          className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          )}
+          <div className="px-2 pb-2">
+            <DataTable<Backup>
+              columns={columns}
+              rows={backups}
+              rowKey={(b) => b.name}
+              loading={isLoading}
+              emptyState={
+                <>
+                  <HardDriveDownload className="h-8 w-8 mx-auto opacity-40 mb-2" />
+                  <p className="text-sm text-muted-foreground">No backups yet. Create one to get started.</p>
+                </>
+              }
+              storageKey="backups-col-prefs"
+            />
+          </div>
         </CardContent>
       </Card>
 
