@@ -113,6 +113,10 @@ class ApiClient {
         this.accessToken = token;
     }
 
+    public getAccessToken(): string | null {
+        return this.accessToken;
+    }
+
     public setTenantInfo(id: string | null, slug: string | null) {
         this.tenantId = id;
         this.tenantSlug = slug;

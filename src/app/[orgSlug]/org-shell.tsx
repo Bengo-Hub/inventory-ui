@@ -17,6 +17,16 @@ import { VerifyEmailPrompt } from '@/components/auth/VerifyEmailPrompt';
 import { PWAUpdateBanner } from '@/components/pwa-update-banner';
 import { PWARegistration } from '@/components/pwa-registration';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
+import { useAuthStore } from '@/store/auth';
+import { useNotificationStream } from '@/hooks/use-notification-stream';
+
+// Real-time push (stock changes) — mounted once for the whole tenant session so a POS sale (or
+// any other stock mutation) shows up live on the Stock page instead of only on a manual refresh.
+function NotificationListener() {
+    const tenantID = useAuthStore((s) => s.user?.tenant_id ?? '');
+    useNotificationStream({ tenantID });
+    return null;
+}
 
 /**
  * Client-side belt-and-suspenders for the tenant manifest link. The authoritative
@@ -80,6 +90,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
                 <BrandingProvider>
                     <SubscriptionEntitlementsProvider>
                     <ManifestInjector />
+                    <NotificationListener />
                     <PlatformScopeGuard />
                     <OutletGate />
                     <DashboardScreensaver />
