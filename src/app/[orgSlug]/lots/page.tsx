@@ -8,7 +8,7 @@ import { useWarehouses } from '@/hooks/useWarehouses';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -135,7 +135,7 @@ export default function LotsPage() {
     const [formSupplierRef, setFormSupplierRef] = useState('');
     const [formNotes, setFormNotes] = useState('');
 
-    const { data: lots, isLoading, isError, refetch } = useLots(orgSlug);
+    const { data: lots, isLoading, isError, refetch, isFetching } = useLots(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     useSuppliers(orgSlug); // preload suppliers for combobox
     const createLot = useCreateLot(orgSlug);
@@ -254,10 +254,21 @@ export default function LotsPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Lots & Batches</h1>
                     <p className="text-muted-foreground mt-1">Track lot numbers, batches, and expiry dates</p>
                 </div>
-                <Button onClick={openCreate}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Lot
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        onClick={() => refetch()}
+                        title="Refresh — pulls in lots received/consumed elsewhere"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button onClick={openCreate}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Lot
+                    </Button>
+                </div>
             </div>
 
             {expiringSoonCount > 0 && (

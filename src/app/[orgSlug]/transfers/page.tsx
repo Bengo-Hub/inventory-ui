@@ -21,7 +21,7 @@ import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuic
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { AlertTriangle, ArrowRightLeft, Package, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Package, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -168,7 +168,7 @@ export default function TransfersPage() {
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
-    const { data: transfers, isLoading, isError, refetch } = useTransfers(orgSlug);
+    const { data: transfers, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     const createTransfer = useCreateTransfer(orgSlug);
 
@@ -263,10 +263,21 @@ export default function TransfersPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Stock Transfers</h1>
                     <p className="text-muted-foreground mt-1">Move inventory between warehouses</p>
                 </div>
-                <Button onClick={openCreate}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    New Transfer
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        onClick={() => refetch()}
+                        title="Refresh — pulls in transfers dispatched/received elsewhere"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button onClick={openCreate}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        New Transfer
+                    </Button>
+                </div>
             </div>
 
             <Card>

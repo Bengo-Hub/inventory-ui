@@ -12,7 +12,7 @@ import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, PackageX, Plus, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, PackageX, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
 import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { StockExportDialog } from '@/components/inventory/ExportDialogs';
 import { useParams } from 'next/navigation';
@@ -519,7 +519,7 @@ export default function StockPage() {
         category_id: categoryId || undefined,
         type: typeFilter || undefined,
     };
-    const { data: stock, isLoading, isError, refetch } = useStock(orgSlug, listParams);
+    const { data: stock, isLoading, isError, refetch, isFetching } = useStock(orgSlug, listParams);
 
     const lowStockCount = stock?.filter((s) => s.reorder_point != null && s.available <= s.reorder_point && s.available > 0).length ?? 0;
     const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
@@ -547,9 +547,20 @@ export default function StockPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Stock Levels</h1>
                     <p className="text-muted-foreground mt-1">Real-time stock availability across all warehouses</p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} title="Export stock levels as PDF or CSV">
-                    <FileSpreadsheet className="h-4 w-4 mr-1.5" />Export
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        onClick={() => refetch()}
+                        title="Refresh — pulls in a sale/adjustment made elsewhere if the live update hasn't shown up yet"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setExportOpen(true)} title="Export stock levels as PDF or CSV">
+                        <FileSpreadsheet className="h-4 w-4 mr-1.5" />Export
+                    </Button>
+                </div>
             </div>
 
             {/* View tabs (capsule) — live stock vs the End-of-Life holding area. */}

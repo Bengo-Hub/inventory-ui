@@ -12,7 +12,7 @@ import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useUnits } from '@/hooks/useUnits';
 import { FeatureLockBanner } from '@/components/subscription/feature-lock-banner';
-import { AlertTriangle, ClipboardList, Minus, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, ClipboardList, Minus, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -280,7 +280,7 @@ export default function AdjustmentsPage() {
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
 
-    const { data: adjustments, isLoading, isError, refetch } = useAdjustments(orgSlug);
+    const { data: adjustments, isLoading, isError, refetch, isFetching } = useAdjustments(orgSlug);
 
     const filtered = useMemo(() => {
         if (!search) return adjustments;
@@ -309,12 +309,23 @@ export default function AdjustmentsPage() {
                     <h1 className="text-2xl font-bold tracking-tight">Stock Adjustments</h1>
                     <p className="text-muted-foreground mt-1">Add or remove stock manually</p>
                 </div>
-                {canAdjust && (
-                    <Button onClick={() => openModal()}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        New Adjustment
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        onClick={() => refetch()}
+                        title="Refresh — pulls in adjustments made elsewhere"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
                     </Button>
-                )}
+                    {canAdjust && (
+                        <Button onClick={() => openModal()}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            New Adjustment
+                        </Button>
+                    )}
+                </div>
             </div>
 
             {/* Non-hiding upgrade blocker: keeps the page + button visible, explains the lock. */}

@@ -19,7 +19,7 @@ import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
 import type { StockCount, StockCountStatus, StockCountTemplate } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { ClipboardCheck, ClipboardList, LayoutTemplate, Play, Plus, Trash2, X } from 'lucide-react';
+import { ClipboardCheck, ClipboardList, LayoutTemplate, Play, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -339,7 +339,7 @@ export default function StockTakePage() {
     const params = useParams();
     const router = useRouter();
     const orgSlug = params?.orgSlug as string;
-    const { data: counts, isLoading } = useStockCounts(orgSlug);
+    const { data: counts, isLoading, refetch, isFetching } = useStockCounts(orgSlug);
     const { data: warehouses } = useWarehouses(orgSlug);
     const { data: templates } = useStockCountTemplates(orgSlug);
     const create = useCreateStockCount(orgSlug);
@@ -387,6 +387,15 @@ export default function StockTakePage() {
                         </h1>
                         <p className="text-muted-foreground mt-1">Physical counts with variance classification, review and supervisor sign-off</p>
                     </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isFetching}
+                        onClick={() => refetch()}
+                        title="Refresh — pulls in counts submitted elsewhere"
+                    >
+                        <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+                    </Button>
                     {canAdd && (
                         <Button onClick={() => setCreateOpen(true)}><Plus className="h-4 w-4 mr-2" /> New Stock Take</Button>
                     )}
