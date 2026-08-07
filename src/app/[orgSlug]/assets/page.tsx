@@ -5,6 +5,7 @@ import { Pagination } from '@/components/ui/pagination';
 import { AssetFormDialog } from '@/components/inventory/AssetFormDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { RowActions } from '@/components/inventory/RowActions';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset, useRunDepreciation,
 } from '@/hooks/useAssets';
@@ -41,6 +42,7 @@ export default function AssetsPage() {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Asset | null>(null);
     const [viewing, setViewing] = useState<Asset | null>(null);
+    const [disposeTarget, setDisposeTarget] = useState<Asset | null>(null);
 
     const { data, isLoading, isError, refetch } = useAssets(orgSlug, {
         status: status || undefined, search: search || undefined, page, limit: ITEMS_PER_PAGE,
@@ -82,8 +84,13 @@ export default function AssetsPage() {
     function openNew() { setEditing(null); setDialogOpen(true); }
 
     function handleDelete(a: Asset) {
-        if (!window.confirm(`Dispose/retire asset "${a.name}"?`)) return;
-        act('Deleted', deleteAsset.mutateAsync(a.id));
+        setDisposeTarget(a);
+    }
+
+    function confirmDispose() {
+        if (!disposeTarget) return;
+        act('Deleted', deleteAsset.mutateAsync(disposeTarget.id));
+        setDisposeTarget(null);
     }
 
     return (
@@ -210,6 +217,16 @@ export default function AssetsPage() {
                         {canDelete && <Button variant="outline" size="sm" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={() => { handleDelete(viewing); }}>Dispose</Button>}
                     </>
                 )}
+            />
+
+            <ConfirmDialog
+                open={!!disposeTarget}
+                title={`Dispose/retire asset "${disposeTarget?.name ?? ''}"?`}
+                description="This cannot be undone."
+                variant="danger"
+                confirmLabel="Dispose"
+                onConfirm={confirmDispose}
+                onCancel={() => setDisposeTarget(null)}
             />
         </div>
     );

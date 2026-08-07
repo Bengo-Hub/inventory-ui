@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     useAssetCategories, useCreateAssetCategory, useUpdateAssetCategory, useDeleteAssetCategory,
 } from '@/hooks/useAssets';
@@ -36,6 +37,7 @@ export default function AssetCategoriesPage() {
     const [parentId, setParentId] = useState('');
     const [depRate, setDepRate] = useState('');
     const [life, setLife] = useState('');
+    const [deleteTarget, setDeleteTarget] = useState<AssetCategory | null>(null);
 
     function openNew() {
         setEditing(null); setName(''); setDescription(''); setParentId(''); setDepRate(''); setLife('');
@@ -66,8 +68,15 @@ export default function AssetCategoriesPage() {
     }
 
     function handleDelete(c: AssetCategory) {
-        if (!window.confirm(`Delete category "${c.name}"?`)) return;
-        deleteCat.mutate(c.id, { onSuccess: () => toast.success('Category deleted'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete')) });
+        setDeleteTarget(c);
+    }
+
+    function confirmDelete() {
+        if (!deleteTarget) return;
+        deleteCat.mutate(deleteTarget.id, {
+            onSuccess: () => { toast.success('Category deleted'); setDeleteTarget(null); },
+            onError: async (e) => { toast.error(await apiErrorMessage(e, 'Failed to delete')); setDeleteTarget(null); },
+        });
     }
 
     const nameOf = (id?: string | null) => categories?.find((c) => c.id === id)?.name ?? '—';
@@ -184,6 +193,16 @@ export default function AssetCategoriesPage() {
                     </div>
                 </div>
             )}
+
+            <ConfirmDialog
+                open={!!deleteTarget}
+                title={`Delete category "${deleteTarget?.name ?? ''}"?`}
+                description="This cannot be undone."
+                variant="danger"
+                confirmLabel="Delete"
+                onConfirm={confirmDelete}
+                onCancel={() => setDeleteTarget(null)}
+            />
         </div>
     );
 }

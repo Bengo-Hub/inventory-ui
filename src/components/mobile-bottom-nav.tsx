@@ -1,16 +1,16 @@
 'use client';
 
-import { cn } from '@/lib/utils';
 import { P, usePermissions } from '@/hooks/usePermissions';
 import { useOutletStore } from '@/store/outlet';
 import { nomenclatureFor } from '@/lib/use-case-nomenclature';
 import {
   ArrowRightLeft, BookOpen, ChefHat, ClipboardCheck, ClipboardList, LayoutDashboard,
-  Menu as MenuIcon, Package, Plus, Tag, Truck, X,
+  Package, Plus, Tag, Truck, X,
 } from 'lucide-react';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useEffect, useState, type ComponentType } from 'react';
+import { MobileBottomNav as SharedMobileBottomNav, type MobileNavTab } from '@bengo-hub/shared-ui-lib/navigation';
 
 interface Props {
   /** Opens the full navigation drawer (the sidebar) for the "More" tab. */
@@ -25,10 +25,11 @@ interface QuickAction {
 }
 
 /**
- * MobileBottomNav — app-style bottom navigation for phones/tablets (hidden ≥ lg). Gives one-tap
- * access to the primary destinations and a prominent central "+" that opens a quick-add
- * sheet of the most common create actions (add item, new menu item, adjust stock, …),
- * so the create buttons buried in page toolbars are always reachable on mobile.
+ * MobileBottomNav — app-style bottom navigation for phones/tablets (hidden ≥ lg). Owns
+ * inventory-ui's specific tab list, permission gating, and the quick-add bottom sheet (the
+ * central "+" opens a sheet of the most common create actions rather than navigating directly —
+ * shared-ui-lib's MobileBottomNav's centerAction supports an onClick variant for exactly this),
+ * delegating the tab-bar layout/rendering to shared-ui-lib's MobileBottomNav shell.
  */
 export function MobileBottomNav({ onOpenMenu }: Props) {
   const params = useParams();
@@ -48,12 +49,13 @@ export function MobileBottomNav({ onOpenMenu }: Props) {
   const base = `/${orgSlug}`;
   const allow = (perm: string) => isSuperuser || can(perm);
 
-  const tabs = [
-    { label: 'Home', href: base, Icon: LayoutDashboard, match: (p: string) => p === base },
-    { label: nomenclatureFor(useCase).catalog, href: `${base}/catalog`, Icon: Package, match: (p: string) => p.startsWith(`${base}/catalog`) },
-    { label: 'Stock', href: `${base}/stock`, Icon: BookOpen, match: (p: string) => p.startsWith(`${base}/stock`) && !p.startsWith(`${base}/stock-take`) },
-    { label: 'Adjust', href: `${base}/adjustments`, Icon: ClipboardList, match: (p: string) => p.startsWith(`${base}/adjustments`) },
+  const tabDefs = [
+    { key: 'home', label: 'Home', href: base, icon: LayoutDashboard, match: (p: string) => p === base },
+    { key: 'catalog', label: nomenclatureFor(useCase).catalog, href: `${base}/catalog`, icon: Package, match: (p: string) => p.startsWith(`${base}/catalog`) },
+    { key: 'stock', label: 'Stock', href: `${base}/stock`, icon: BookOpen, match: (p: string) => p.startsWith(`${base}/stock`) && !p.startsWith(`${base}/stock-take`) },
+    { key: 'adjust', label: 'Adjust', href: `${base}/adjustments`, icon: ClipboardList, match: (p: string) => p.startsWith(`${base}/adjustments`) },
   ];
+  const tabs: MobileNavTab[] = tabDefs.map((t) => ({ key: t.key, label: t.label, href: t.href, icon: t.icon, active: t.match(pathname) }));
 
   const actions: QuickAction[] = [
     { label: `Add ${noun}`,      href: `${base}/catalog?create=item`,      Icon: Package,        show: allow(P.CATALOG_ADD) },
@@ -100,48 +102,12 @@ export function MobileBottomNav({ onOpenMenu }: Props) {
         </div>
       )}
 
-      {/* Bottom tab bar */}
-      <nav className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-5 items-end h-16">
-          {tabs.slice(0, 2).map((t) => <Tab key={t.label} {...t} active={t.match(pathname)} />)}
-
-          {/* Center elevated "+" */}
-          <div className="flex items-end justify-center">
-            <button
-              onClick={() => setAddOpen(true)}
-              aria-label="Quick add"
-              className="mb-2 flex h-14 w-14 -translate-y-3 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 active:scale-95 transition-transform"
-            >
-              <Plus className="h-7 w-7" />
-            </button>
-          </div>
-
-          {tabs.slice(2).map((t) => <Tab key={t.label} {...t} active={t.match(pathname)} />)}
-
-          <button
-            onClick={onOpenMenu}
-            className="flex h-full flex-col items-center justify-center gap-1 text-muted-foreground active:text-foreground"
-          >
-            <MenuIcon className="h-5 w-5" />
-            <span className="text-[10px] font-semibold leading-none">More</span>
-          </button>
-        </div>
-      </nav>
+      <SharedMobileBottomNav
+        tabs={tabs}
+        centerAction={{ label: 'Quick add', onClick: () => setAddOpen(true), icon: Plus }}
+        onOpenMore={onOpenMenu}
+        LinkComponent={Link}
+      />
     </>
-  );
-}
-
-function Tab({ label, href, Icon, active }: { label: string; href: string; Icon: ComponentType<{ className?: string }>; active: boolean }) {
-  return (
-    <Link
-      href={href}
-      className={cn(
-        'flex h-full flex-col items-center justify-center gap-1 transition-colors',
-        active ? 'text-primary' : 'text-muted-foreground active:text-foreground',
-      )}
-    >
-      <Icon className="h-5 w-5" />
-      <span className="max-w-full truncate text-[10px] font-semibold leading-none">{label}</span>
-    </Link>
   );
 }
