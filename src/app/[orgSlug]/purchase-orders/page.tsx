@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
@@ -9,7 +8,8 @@ import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuic
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildPurchaseOrderColumns, STATUS_VARIANT, STATUS_LABEL } from './purchase-orders-columns';
 import {
     usePurchaseOrders,
     usePurchaseOrder,
@@ -26,7 +26,7 @@ import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { AlertTriangle, BarChart3, DollarSign, FileText, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
+import { BarChart3, DollarSign, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { useParams } from 'next/navigation';
@@ -128,22 +128,6 @@ function recalcUnitPriceForNewUnit(line: POLine, newUnitId: string, units: Unit[
     return computeUnitPriceForUnit(pseudoItem, unitAbbr(newUnitId, units), units);
 }
 
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline',
-    sent: 'default',
-    partially_received: 'warning',
-    received: 'success',
-    cancelled: 'error',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-    draft: 'Draft',
-    sent: 'Sent',
-    partially_received: 'Partial',
-    received: 'Received',
-    cancelled: 'Cancelled',
-};
-
 export default function PurchaseOrdersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
@@ -205,6 +189,11 @@ export default function PurchaseOrdersPage() {
     const paginatedItems = orders ?? [];
 
     useMemo(() => { setPage(1); }, [search, statusFilter]);
+
+    const columns = useMemo(
+        () => buildPurchaseOrderColumns({ onView: (po) => setSelectedPO(po.id), onPrint: (po) => previewPO(po) }),
+        [],
+    );
 
     function blankPOLine(): POLine {
         return { itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '', newSellingPrice: '', priceScope: 'all_stock' };
@@ -378,75 +367,24 @@ export default function PurchaseOrdersPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">PO Number</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Supplier</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Total</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Date</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading purchase orders...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load purchase orders</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : paginatedItems.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <FileText className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No purchase orders found</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((po) => (
-                                        <tr
-                                            key={po.id}
-                                            className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                            onClick={() => setSelectedPO(po.id)}
-                                        >
-                                            <td className="px-6 py-4 font-mono text-xs font-medium">{po.po_number}</td>
-                                            <td className="px-6 py-4">{po.supplier_name}</td>
-                                            <td className="px-6 py-4">
-                                                <Badge variant={STATUS_VARIANT[po.status] ?? 'default'}>
-                                                    {STATUS_LABEL[po.status] ?? po.status}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right font-semibold tabular-nums hidden sm:table-cell">
-                                                {po.total_amount.toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {new Date(po.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <RowActions
-                                                    onView={() => setSelectedPO(po.id)}
-                                                    onPrint={() => previewPO(po)}
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<PurchaseOrder>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(po) => po.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(po) => setSelectedPO(po.id)}
+                            emptyText="No purchase orders found"
+                            storageKey="purchase-orders-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && paginatedItems.length > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
         </div>

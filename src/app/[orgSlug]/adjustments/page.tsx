@@ -12,7 +12,10 @@ import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useUnits } from '@/hooks/useUnits';
 import { FeatureLockBanner } from '@/components/subscription/feature-lock-banner';
-import { AlertTriangle, ClipboardList, Minus, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildAdjustmentColumns } from './adjustments-columns';
+import type { StockAdjustment } from '@/lib/api/stock';
+import { Minus, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -296,6 +299,8 @@ export default function AdjustmentsPage() {
     const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
     const paginated = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
+    const columns = useMemo(() => buildAdjustmentColumns(), []);
+
     function openModal(sku = '', name = '') {
         setPrefillSku(sku);
         setPrefillName(name);
@@ -344,63 +349,17 @@ export default function AdjustmentsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Date</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Warehouse</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty Change</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Reason</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading history...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load adjustments</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (paginated?.length ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No adjustments recorded yet</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Click "New Adjustment" to record your first stock change</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginated.map((adj) => (
-                                        <tr key={adj.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 text-muted-foreground whitespace-nowrap">
-                                                {new Date(adj.adjusted_at ?? adj.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium">{adj.item_name || '—'}</div>
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {adj.warehouse_name || '—'}
-                                            </td>
-                                            <td className={`px-6 py-4 text-right tabular-nums font-semibold ${adj.quantity_change > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
-                                                {adj.quantity_change > 0 ? '+' : ''}{adj.quantity_change}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell capitalize">
-                                                {adj.reason}
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<StockAdjustment>
+                            columns={columns}
+                            rows={paginated}
+                            rowKey={(a) => a.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No adjustments recorded yet"
+                            storageKey="adjustments-col-prefs"
+                        />
                     </div>
                     {!isLoading && totalPages > 1 && (
                         <div className="px-6 py-3 text-xs text-muted-foreground border-t border-border">

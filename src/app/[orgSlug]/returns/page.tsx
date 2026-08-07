@@ -1,14 +1,14 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { usePurchaseReturns, useCreatePurchaseReturn, useApprovePurchaseReturn } from '@/hooks/usePurchaseReturns';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { type PurchaseReturn, type ReturnPaymentStatus } from '@/lib/api/purchase-returns';
-import { AlertTriangle, Minus, Plus, RotateCcw, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildReturnsColumns, STATUS_VARIANT } from './returns-columns';
+import { Minus, Plus, RotateCcw, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -18,10 +18,6 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
-
-const STATUS_VARIANT: Record<ReturnPaymentStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    pending: 'warning', due: 'warning', partial: 'default', paid: 'success',
-};
 
 interface Line { itemId: string; itemName: string; quantity: string; unitCost: string; subTotal: string }
 const emptyLine = (): Line => ({ itemId: '', itemName: '', quantity: '1', unitCost: '', subTotal: '' });
@@ -64,6 +60,23 @@ export default function PurchaseReturnsPage() {
         return next;
     }));
 
+    function handleApprove(id: string) {
+        approve.mutate(id, {
+            onSuccess: () => toast.success('Return approved — stock adjusted'),
+            onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')),
+        });
+    }
+
+    const columns = useMemo(
+        () => buildReturnsColumns({
+            canChange,
+            nameOf,
+            onView: (r) => setViewing(r),
+            onApprove: (r) => handleApprove(r.id),
+        }),
+        [canChange, suppliers],
+    );
+
     function submit(e: React.FormEvent) {
         e.preventDefault();
         const payloadLines = lines.filter((l) => l.itemId).map((l) => ({ item_id: l.itemId, quantity: parseDecimal(l.quantity, 1), sub_total: parseDecimal(l.subTotal) }));
@@ -92,58 +105,24 @@ export default function PurchaseReturnsPage() {
                     </select>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Return #</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Supplier</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Amount</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Date</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load returns</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <RotateCcw className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No returns yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isError && rows.map((r) => (
-                                    <tr key={r.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(r)}>
-                                        <td className="px-6 py-3 font-medium font-mono text-xs">{r.return_number}</td>
-                                        <td className="px-6 py-3 hidden md:table-cell">{nameOf(r.supplier_id)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums">{r.return_amount.toLocaleString()}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[r.payment_status]}>{r.payment_status}</Badge></td>
-                                        <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{new Date(r.date_returned).toLocaleDateString()}</td>
-                                        <td className="px-6 py-3">
-                                            <RowActions
-                                                onView={() => setViewing(r)}
-                                                extra={canChange && r.payment_status !== 'paid' && (
-                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); approve.mutate(r.id, { onSuccess: () => toast.success('Return approved — stock adjusted'), onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) }); }}>Approve</Button>
-                                                )}
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<PurchaseReturn>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(r) => r.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(r) => setViewing(r)}
+                            emptyText="No returns yet"
+                            storageKey="purchase-returns-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

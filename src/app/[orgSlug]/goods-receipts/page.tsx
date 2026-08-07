@@ -1,14 +1,14 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { GoodsReceiptDialog } from '@/components/inventory/GoodsReceiptDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { useGoodsReceipts, useGoodsReceipt, usePostGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { type GRNStatus } from '@/lib/api/goods-receipts';
-import { AlertTriangle, ClipboardCheck, Plus } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildGoodsReceiptColumns, STATUS_VARIANT } from './goods-receipt-columns';
+import { ClipboardCheck, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -16,9 +16,6 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { usePermissions, P } from '@/hooks/usePermissions';
 
 const ITEMS_PER_PAGE = 20;
-const STATUS_VARIANT: Record<GRNStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'warning', posted: 'success', cancelled: 'error',
-};
 
 export default function GoodsReceiptsPage() {
     const params = useParams();
@@ -45,6 +42,24 @@ export default function GoodsReceiptsPage() {
     useMemo(() => { setPage(1); }, [status]);
     const poNumberOf = (id: string) => (orders ?? []).find((o) => o.id === id)?.po_number ?? id.slice(0, 8);
 
+    function handlePost(id: string) {
+        post.mutate(id, {
+            onSuccess: () => toast.success('GRN posted — stock updated'),
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')),
+        });
+    }
+
+    const columns = useMemo(
+        () => buildGoodsReceiptColumns({
+            canChange,
+            isPosting: post.isPending,
+            poNumberOf,
+            onView: (g) => setViewId(g.id),
+            onPost: (g) => handlePost(g.id),
+        }),
+        [canChange, post.isPending, orders],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -63,56 +78,24 @@ export default function GoodsReceiptsPage() {
                     </select>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">GRN #</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Purchase Order</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Received</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load goods receipts</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <ClipboardCheck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No goods receipts yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {rows.map((g) => (
-                                    <tr key={g.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewId(g.id)}>
-                                        <td className="px-6 py-3 font-medium font-mono text-xs">{g.grn_number}</td>
-                                        <td className="px-6 py-3 hidden md:table-cell font-mono text-xs">{poNumberOf(g.purchase_order_id)}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[g.status]}>{g.status}</Badge></td>
-                                        <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{g.received_date ? new Date(g.received_date).toLocaleDateString() : '—'}</td>
-                                        <td className="px-6 py-3">
-                                            <RowActions
-                                                onView={() => setViewId(g.id)}
-                                                extra={canChange && g.status === 'draft' && (
-                                                    <Button variant="outline" size="sm" disabled={post.isPending} onClick={(e: React.MouseEvent) => { e.stopPropagation(); post.mutate(g.id, { onSuccess: () => toast.success('GRN posted — stock updated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) }); }}>Post</Button>
-                                                )}
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(g) => g.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(g) => setViewId(g.id)}
+                            emptyText="No goods receipts yet"
+                            storageKey="goods-receipts-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

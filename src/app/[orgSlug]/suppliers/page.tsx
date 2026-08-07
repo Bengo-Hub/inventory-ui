@@ -1,11 +1,12 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '@/hooks/useSuppliers';
 import { type Supplier, type CreateSupplierInput } from '@/lib/api/suppliers';
-import { AlertTriangle, Plus, Search, Trash2, Truck } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildSupplierColumns } from './supplier-columns';
+import { Plus, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -13,14 +14,6 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
-
-const PAYMENT_LABEL: Record<string, string> = {
-    mpesa: 'M-Pesa',
-    mpesa_b2b: 'M-Pesa B2B',
-    bank_transfer: 'Bank Transfer',
-    cash: 'Cash',
-    cheque: 'Cheque',
-};
 
 export default function SuppliersPage() {
     const params = useParams();
@@ -70,6 +63,17 @@ export default function SuppliersPage() {
         });
     }
 
+    const columns = useMemo(
+        () => buildSupplierColumns({
+            canChange,
+            canDelete,
+            isDeleting: deleteSupplier.isPending,
+            onEdit: openEdit,
+            onDelete: handleDelete,
+        }),
+        [canChange, canDelete, deleteSupplier.isPending],
+    );
+
     function handleSubmit(data: CreateSupplierInput) {
         if (editing) {
             updateSupplier.mutate({ id: editing.id, data }, {
@@ -112,94 +116,23 @@ export default function SuppliersPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Contact</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Email</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Phone</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden xl:table-cell">Payment</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading suppliers...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load suppliers</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.total ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
-                                            <Truck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No suppliers found</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((supplier) => (
-                                        <tr key={supplier.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="font-medium">{supplier.name}</div>
-                                                {supplier.auto_pay_enabled && (
-                                                    <span className="text-xs text-emerald-600 dark:text-emerald-400">Auto-pay enabled</span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{supplier.contact_person ?? '—'}</td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">{supplier.email ?? '—'}</td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden sm:table-cell">{supplier.phone ?? '—'}</td>
-                                            <td className="px-6 py-4 hidden xl:table-cell">
-                                                {supplier.payment_method_type
-                                                    ? <Badge variant="outline">{PAYMENT_LABEL[supplier.payment_method_type] ?? supplier.payment_method_type}</Badge>
-                                                    : <span className="text-muted-foreground/40">—</span>}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <Badge variant={supplier.is_active ? 'success' : 'outline'}>
-                                                    {supplier.is_active ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    {canChange && (
-                                                        <Button variant="ghost" size="sm" onClick={() => openEdit(supplier)}>
-                                                            Edit
-                                                        </Button>
-                                                    )}
-                                                    {canDelete && (
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-destructive hover:text-destructive"
-                                                            title="Delete supplier"
-                                                            aria-label="Delete supplier"
-                                                            onClick={() => handleDelete(supplier)}
-                                                            disabled={deleteSupplier.isPending}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Supplier>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(s) => s.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No suppliers found"
+                            storageKey="suppliers-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (data?.total ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

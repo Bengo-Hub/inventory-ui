@@ -1,7 +1,6 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import {
     useTransfers,
     useCreateTransfer,
@@ -19,33 +18,16 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { AlertTriangle, ArrowRightLeft, Package, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL } from './transfers-columns';
+import { Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
-
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline',
-    pending: 'outline',
-    in_transit: 'warning',
-    received: 'success',
-    cancelled: 'error',
-};
-
-// UI vocabulary mirrors the standard stock-transfer lifecycle (Pending → In Transit → Completed).
-// The API enum (draft/in_transit/received/cancelled) is unchanged — only the display labels map.
-const STATUS_LABEL: Record<string, string> = {
-    draft: 'Pending',
-    pending: 'Pending',
-    in_transit: 'In Transit',
-    received: 'Completed',
-    cancelled: 'Cancelled',
-};
 
 // Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
 // full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
@@ -185,6 +167,11 @@ export default function TransfersPage() {
 
     useMemo(() => { setPage(1); }, [search]);
 
+    const columns = useMemo(
+        () => buildTransferColumns({ onView: (t) => setViewId(t.id) }),
+        [],
+    );
+
     function openCreate() {
         sourceWarehouse.reset();
         setToWarehouse('');
@@ -293,76 +280,24 @@ export default function TransfersPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Reference</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">From</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">To</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Date</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading transfers...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load transfers</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (filtered?.length ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <ArrowRightLeft className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No transfers found</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((transfer: TransferSummary) => (
-                                        <tr
-                                            key={transfer.id}
-                                            className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                            onClick={() => setViewId(transfer.id)}
-                                        >
-                                            <td className="px-6 py-4 font-mono text-xs">{transfer.transfer_number}</td>
-                                            <td className="px-6 py-4">{transfer.source_warehouse_name || '—'}</td>
-                                            <td className="px-6 py-4">{transfer.destination_warehouse_name || '—'}</td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>
-                                                        {STATUS_LABEL[transfer.status] ?? transfer.status}
-                                                    </Badge>
-                                                    <div className="flex items-center gap-1 text-muted-foreground text-xs">
-                                                        <Package className="h-3 w-3" />
-                                                        {transfer.line_count}
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {new Date(transfer.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="px-6 py-4">
-                                                <RowActions onView={() => setViewId(transfer.id)} />
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<TransferSummary>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(t) => t.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(t) => setViewId(t.id)}
+                            emptyText="No transfers found"
+                            storageKey="transfers-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={filtered?.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (filtered?.length ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 
