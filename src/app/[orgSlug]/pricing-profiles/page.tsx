@@ -1,9 +1,9 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { AlertTriangle, DollarSign, Pencil, Plus, Sparkles, Trash2, X } from 'lucide-react';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { DollarSign, Plus, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -14,6 +14,8 @@ import {
   useUpdatePricingTier,
 } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildPricingProfileColumns } from './pricing-profile-columns';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
@@ -118,6 +120,16 @@ export default function PricingProfilesPage() {
     });
   }
 
+  const columns = useMemo(
+    () => buildPricingProfileColumns({
+      isDeleting: deleteTier.isPending,
+      onGenerate: (t) => { setGenTier(t); setGenSource(t.is_default ? 'cost_margin' : 'default_tier'); },
+      onEdit: openEdit,
+      onDelete: handleDelete,
+    }),
+    [deleteTier.isPending],
+  );
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -135,77 +147,23 @@ export default function PricingProfilesPage() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                  <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Code</th>
-                  <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Description</th>
-                  <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Status</th>
-                  <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading profiles...</td>
-                  </tr>
-                ) : isError ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
-                      <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                      <p className="text-muted-foreground">Couldn&apos;t load pricing profiles</p>
-                      <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                    </td>
-                  </tr>
-                ) : list.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center">
-                      <DollarSign className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                      <p className="text-muted-foreground">No pricing profiles yet</p>
-                      <p className="text-xs text-muted-foreground/70 mt-1">Add Retail / Wholesale profiles to price items per customer type</p>
-                    </td>
-                  </tr>
-                ) : (
-                  list.map((t) => (
-                    <tr key={t.id} className="hover:bg-accent/30 transition-colors">
-                      <td className="px-6 py-4 font-medium">
-                        {t.name}
-                        {t.is_default && <Badge variant="default" className="ml-2">Default</Badge>}
-                      </td>
-                      <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{t.code || '—'}</td>
-                      <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
-                        {t.description || <span className="text-muted-foreground/40">—</span>}
-                      </td>
-                      <td className="px-6 py-4 text-right hidden sm:table-cell">
-                        <Badge variant={t.is_active ? 'success' : 'outline'}>{t.is_active ? 'Active' : 'Inactive'}</Badge>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <Button variant="ghost" size="sm" aria-label="Generate prices" title="Bulk-generate item prices for this profile" onClick={() => { setGenTier(t); setGenSource(t.is_default ? 'cost_margin' : 'default_tier'); }}>
-                            <Sparkles className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" aria-label="Edit profile" onClick={() => openEdit(t)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            aria-label="Deactivate profile"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => handleDelete(t)}
-                            disabled={deleteTier.isPending}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="px-2 pb-2">
+            <DataTable<PricingTier>
+              columns={columns}
+              rows={list}
+              rowKey={(t) => t.id}
+              loading={isLoading}
+              error={isError}
+              onRetry={() => refetch()}
+              emptyState={
+                <>
+                  <DollarSign className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                  <p className="text-muted-foreground">No pricing profiles yet</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Add Retail / Wholesale profiles to price items per customer type</p>
+                </>
+              }
+              storageKey="pricing-profiles-col-prefs"
+            />
           </div>
         </CardContent>
       </Card>

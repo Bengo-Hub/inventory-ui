@@ -6,10 +6,12 @@ import {
     useAssetCategories, useCreateAssetCategory, useUpdateAssetCategory, useDeleteAssetCategory,
 } from '@/hooks/useAssets';
 import { type AssetCategory, type CreateCategoryInput } from '@/lib/api/assets';
-import { AlertTriangle, ArrowLeft, FolderTree, Plus, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildAssetCategoryColumns } from './asset-category-columns';
+import { ArrowLeft, FolderTree, Plus, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -82,6 +84,11 @@ export default function AssetCategoriesPage() {
     const nameOf = (id?: string | null) => categories?.find((c) => c.id === id)?.name ?? '—';
     const isPending = createCat.isPending || updateCat.isPending;
 
+    const columns = useMemo(
+        () => buildAssetCategoryColumns({ canChange, canDelete, nameOf, onEdit: openEdit, onDelete: handleDelete }),
+        [canChange, canDelete, categories],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-wrap items-center gap-4">
@@ -95,52 +102,22 @@ export default function AssetCategoriesPage() {
 
             <Card>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Parent</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Dep. rate %</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Useful life (yrs)</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load categories</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && (categories?.length ?? 0) === 0 && (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <FolderTree className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No categories yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isError && categories?.map((c) => (
-                                    <tr key={c.id} className="border-b border-border hover:bg-muted/20">
-                                        <td className="px-6 py-3 font-medium">{c.name}</td>
-                                        <td className="px-6 py-3 hidden md:table-cell text-muted-foreground">{c.parent_id ? nameOf(c.parent_id) : '—'}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums">{c.depreciation_rate ?? 0}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{c.useful_life_years ?? 0}</td>
-                                        <td className="px-6 py-3">
-                                            <div className="flex gap-2 justify-end">
-                                                {canChange && <Button variant="outline" size="sm" onClick={() => openEdit(c)}>Edit</Button>}
-                                                {canDelete && <Button variant="outline" size="sm" onClick={() => handleDelete(c)}>Delete</Button>}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<AssetCategory>
+                            columns={columns}
+                            rows={categories ?? []}
+                            rowKey={(c) => c.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <FolderTree className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No categories yet</p>
+                                </>
+                            }
+                            storageKey="asset-categories-col-prefs"
+                        />
                     </div>
                 </CardContent>
             </Card>

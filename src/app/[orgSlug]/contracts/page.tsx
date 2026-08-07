@@ -1,15 +1,15 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { useContracts, useCreateContract, useUpdateContract, useActivateContract, useTerminateContract } from '@/hooks/useContracts';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildContractColumns, STATUS_VARIANT } from './contract-columns';
 import { type Contract, type ContractStatus } from '@/lib/api/contracts';
-import { AlertTriangle, FileSignature, Plus, X } from 'lucide-react';
+import { FileSignature, Plus, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -19,10 +19,6 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
-
-const STATUS_VARIANT: Record<ContractStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline', active: 'success', expired: 'warning', terminated: 'error',
-};
 
 const toDateInput = (s?: string) => (s ? s.slice(0, 10) : '');
 
@@ -93,6 +89,18 @@ export default function ContractsPage() {
         else create.mutate(data, { onSuccess: done, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create')) });
     }
 
+    function doActivate(c: Contract) {
+        activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) });
+    }
+    function doTerminate(c: Contract) {
+        terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) });
+    }
+
+    const columns = useMemo(
+        () => buildContractColumns({ nameOf, canChange, onView: setViewing, onEdit: openEdit, onActivate: doActivate, onTerminate: doTerminate }),
+        [nameOf, canChange],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -111,67 +119,29 @@ export default function ContractsPage() {
                     </select>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Title</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Supplier</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Value</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Period</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load contracts</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <FileSignature className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No contracts yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isError && rows.map((c) => (
-                                    <tr key={c.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(c)}>
-                                        <td className="px-6 py-3 font-medium">{c.title}</td>
-                                        <td className="px-6 py-3 hidden md:table-cell">{nameOf(c.supplier_id)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums">{c.value?.toLocaleString() ?? '—'}</td>
-                                        <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{new Date(c.start_date).toLocaleDateString()} – {new Date(c.end_date).toLocaleDateString()}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[c.status]}>{c.status}</Badge></td>
-                                        <td className="px-6 py-3">
-                                            <RowActions
-                                                onView={() => setViewing(c)}
-                                                onEdit={() => openEdit(c)}
-                                                canEdit={canChange}
-                                                extra={
-                                                    <>
-                                                        {canChange && c.status !== 'active' && c.status !== 'terminated' && (
-                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); activate.mutate(c.id, { onSuccess: () => toast.success('Contract activated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }); }}>Activate</Button>
-                                                        )}
-                                                        {canChange && c.status === 'active' && (
-                                                            <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); terminate.mutate(c.id, { onSuccess: () => toast.success('Contract terminated'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }); }}>Terminate</Button>
-                                                        )}
-                                                    </>
-                                                }
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Contract>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(c) => c.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(c) => setViewing(c)}
+                            emptyState={
+                                <>
+                                    <FileSignature className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No contracts yet</p>
+                                </>
+                            }
+                            storageKey="contracts-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

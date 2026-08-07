@@ -1,16 +1,16 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { AssetFormDialog } from '@/components/inventory/AssetFormDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     useAssets, useCreateAsset, useUpdateAsset, useDeleteAsset, useRunDepreciation,
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
-import { AlertTriangle, BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildAssetColumns, STATUS_VARIANT, money } from './asset-columns';
+import { BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -20,17 +20,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 
-const STATUS_VARIANT: Record<AssetStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    active: 'success', inactive: 'outline', maintenance: 'warning',
-    disposed: 'error', lost: 'error', damaged: 'error', retired: 'outline',
-};
-
 const STATUSES: AssetStatus[] = ['active', 'inactive', 'maintenance', 'disposed', 'lost', 'damaged', 'retired'];
-
-function money(v?: number | null) {
-    if (v == null) return '—';
-    return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 export default function AssetsPage() {
     const params = useParams();
@@ -93,6 +83,18 @@ export default function AssetsPage() {
         setDisposeTarget(null);
     }
 
+    const columns = useMemo(
+        () => buildAssetColumns({
+            canChange,
+            canDelete,
+            onView: setViewing,
+            onEdit: openEdit,
+            onDelete: handleDelete,
+            onDepreciate: (a) => act('Depreciation run', runDep.mutateAsync(a.id)),
+        }),
+        [canChange, canDelete, runDep],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -119,63 +121,29 @@ export default function AssetsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Tag</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Cost</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Current Value</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load assets</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <Boxes className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No assets yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isError && rows.map((a) => (
-                                    <tr key={a.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(a)}>
-                                        <td className="px-6 py-3 font-medium">{a.asset_tag}</td>
-                                        <td className="px-6 py-3">{a.name}</td>
-                                        <td className="px-6 py-3 text-right hidden md:table-cell">{money(a.purchase_cost)}</td>
-                                        <td className="px-6 py-3 text-right hidden lg:table-cell">{money(a.current_value)}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[a.status]}>{a.status}</Badge></td>
-                                        <td className="px-6 py-3">
-                                            <RowActions
-                                                onView={() => setViewing(a)}
-                                                onEdit={() => openEdit(a)}
-                                                canEdit={canChange}
-                                                onDelete={() => handleDelete(a)}
-                                                canDelete={canDelete}
-                                                deleteLabel="Dispose / retire"
-                                                extra={canChange && a.status === 'active' && (
-                                                    <Button variant="outline" size="sm" onClick={(e: React.MouseEvent) => { e.stopPropagation(); act('Depreciation run', runDep.mutateAsync(a.id)); }}>Depreciate</Button>
-                                                )}
-                                            />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Asset>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(a) => a.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(a) => setViewing(a)}
+                            emptyState={
+                                <>
+                                    <Boxes className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No assets yet</p>
+                                </>
+                            }
+                            storageKey="assets-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

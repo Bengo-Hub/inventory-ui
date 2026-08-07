@@ -1,37 +1,20 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { useItems } from '@/hooks/useItems';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, Eye, Pencil, Plus, Ruler, Search, Trash2, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildUnitColumns, TYPE_LABELS, type Unit } from './unit-columns';
+import { Plus, Ruler, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 const ITEMS_PER_PAGE = 20;
-
-const TYPE_LABELS: Record<string, string> = {
-    weight: 'Weight',
-    volume: 'Volume',
-    count: 'Count',
-    length: 'Length',
-    area: 'Area',
-    other: 'Other',
-};
-
-interface Unit {
-    id: string;
-    name: string;
-    abbreviation: string;
-    type?: string;
-    item_count?: number;
-    is_active?: boolean;
-}
 
 interface UnitPayload {
     name: string;
@@ -212,6 +195,11 @@ export default function UnitsPage() {
         });
     }
 
+    const columns = useMemo(
+        () => buildUnitColumns({ isDeleting: deleteMutation.isPending, onView: setViewUnit, onEdit: openEdit, onDelete: handleDelete }),
+        [deleteMutation.isPending],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -238,88 +226,29 @@ export default function UnitsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Abbreviation</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Type</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Used by Items</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading units...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load units</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (units?.length ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <Ruler className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No units defined yet</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Add units like kg, litre, piece to use in items and recipes</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((unit) => (
-                                        <tr key={unit.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-medium">{unit.name}</td>
-                                            <td className="px-6 py-4 font-mono text-xs font-semibold text-primary">{unit.abbreviation}</td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell capitalize">
-                                                {TYPE_LABELS[unit.type ?? ''] ?? (unit.type || <span className="text-muted-foreground/40">—</span>)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                {(unit.item_count ?? 0).toLocaleString()}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => setViewUnit(unit)}
-                                                        title="View details"
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() => openEdit(unit)}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDelete(unit)}
-                                                        disabled={deleteMutation.isPending}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Unit>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(u) => u.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <Ruler className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No units defined yet</p>
+                                    <p className="text-xs text-muted-foreground/70 mt-1">Add units like kg, litre, piece to use in items and recipes</p>
+                                </>
+                            }
+                            storageKey="units-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={units?.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (units?.length ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

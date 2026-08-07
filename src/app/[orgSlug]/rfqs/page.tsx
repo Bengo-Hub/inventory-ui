@@ -3,25 +3,18 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { useRFQs, useRFQ, useCreateRFQ, useDeleteRFQ } from '@/hooks/useRFQs';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import type { RFQ, RFQStatus } from '@/lib/api/rfq';
-import { AlertTriangle, FileQuestion, Minus, Plus, Search, X } from 'lucide-react';
+import type { RFQ } from '@/lib/api/rfq';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRfqColumns, STATUS_VARIANT } from './rfq-columns';
+import { FileQuestion, Minus, Plus, Search, X } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
-
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline',
-    sent: 'default',
-    closed: 'warning',
-    awarded: 'success',
-    cancelled: 'error',
-};
 
 interface LineDraft {
     itemId: string;
@@ -69,6 +62,18 @@ export default function RFQListPage() {
               (r.title ?? '').toLowerCase().includes(search.toLowerCase()),
           )
         : rfqs;
+
+    const columns = useMemo(
+        () => buildRfqColumns({
+            canChange,
+            canDelete,
+            isDeleting: deleteRFQ.isPending,
+            onView: (rfq) => setViewId(rfq.id),
+            onOpen: (rfq) => router.push(`/${orgSlug}/rfqs/${rfq.id}`),
+            onDelete: handleDelete,
+        }),
+        [canChange, canDelete, deleteRFQ.isPending, orgSlug, router],
+    );
 
     function resetForm() {
         setTitle('');
@@ -148,62 +153,18 @@ export default function RFQListPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">RFQ</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Title</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Created</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {isLoading ? (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading RFQs...</td></tr>
-                                    ) : isError ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center">
-                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                                <p className="text-muted-foreground">Couldn&apos;t load RFQs</p>
-                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                            </td>
-                                        </tr>
-                                    ) : (filtered?.length ?? 0) === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center">
-                                                <FileQuestion className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                <p className="text-muted-foreground">No RFQs yet</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filtered?.map((rfq) => (
-                                            <tr
-                                                key={rfq.id}
-                                                className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                                onClick={() => setViewId(rfq.id)}
-                                            >
-                                                <td className="px-6 py-4 font-mono text-xs font-medium">{rfq.rfq_number}</td>
-                                                <td className="px-6 py-4">{rfq.title || '—'}</td>
-                                                <td className="px-6 py-4"><Badge variant={STATUS_VARIANT[rfq.status] ?? 'default'}>{rfq.status}</Badge></td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{new Date(rfq.created_at).toLocaleDateString()}</td>
-                                                <td className="px-6 py-4">
-                                                    <RowActions
-                                                        onView={() => setViewId(rfq.id)}
-                                                        onEdit={() => router.push(`/${orgSlug}/rfqs/${rfq.id}`)}
-                                                        canEdit={canChange}
-                                                        editLabel="Open full RFQ"
-                                                        onDelete={() => handleDelete(rfq)}
-                                                        canDelete={canDelete && rfq.status === 'draft'}
-                                                        deleteDisabled={deleteRFQ.isPending}
-                                                    />
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<RFQ>
+                                columns={columns}
+                                rows={filtered ?? []}
+                                rowKey={(rfq) => rfq.id}
+                                loading={isLoading}
+                                error={isError}
+                                onRetry={() => refetch()}
+                                onRowClick={(rfq) => setViewId(rfq.id)}
+                                emptyText="No RFQs yet"
+                                storageKey="rfqs-col-prefs"
+                            />
                         </div>
                     </CardContent>
                 </Card>

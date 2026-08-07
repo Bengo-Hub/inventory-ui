@@ -1,13 +1,14 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { BatchFormDialog } from '@/components/inventory/BatchFormDialog';
 import {
     useProductionBatches, useCreateBatch, useStartBatch, useCompleteBatch, useCancelBatch,
 } from '@/hooks/useProductionBatches';
 import { type CreateBatchInput, type ProductionBatch, type BatchStatus } from '@/lib/api/productionBatches';
-import { AlertTriangle, BarChart3, Factory, Plus } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildBatchColumns } from './batch-columns';
+import { BarChart3, Factory, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -16,10 +17,6 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
-
-const STATUS_VARIANT: Record<BatchStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    planned: 'outline', in_progress: 'warning', completed: 'success', cancelled: 'error', failed: 'error',
-};
 
 const STATUSES: BatchStatus[] = ['planned', 'in_progress', 'completed', 'cancelled', 'failed'];
 
@@ -85,6 +82,8 @@ export default function ProductionBatchesPage() {
         );
     }
 
+    const columns = useMemo(() => buildBatchColumns({ orgSlug, workflowActions }), [orgSlug, canChange]);
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -107,56 +106,28 @@ export default function ProductionBatchesPage() {
                     </select>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Batch #</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Scheduled</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Planned</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Actual</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load production batches</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No production batches yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isError && rows.map((r) => (
-                                    <tr key={r.id} className="border-b border-border hover:bg-muted/20">
-                                        <td className="px-6 py-3 font-medium">{r.batch_number}</td>
-                                        <td className="px-6 py-3 hidden lg:table-cell">{r.scheduled_date ? new Date(r.scheduled_date).toLocaleDateString() : '—'}</td>
-                                        <td className="px-6 py-3 text-right">{r.planned_quantity}</td>
-                                        <td className="px-6 py-3 text-right hidden md:table-cell">{r.actual_quantity ?? '—'}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[r.status]}>{r.status.replace(/_/g, ' ')}</Badge></td>
-                                        <td className="px-6 py-3">
-                                            <div className="flex gap-2 justify-end items-center">
-                                                <Link href={`/${orgSlug}/production-batches/${r.id}`}><Button variant="outline" size="sm">View</Button></Link>
-                                                {workflowActions(r)}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<ProductionBatch>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(r) => r.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No production batches yet</p>
+                                </>
+                            }
+                            storageKey="production-batches-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

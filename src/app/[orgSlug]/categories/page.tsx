@@ -1,22 +1,23 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { apiClient } from '@/lib/api/client';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useCategories } from '@/hooks/useCategories';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, FolderTree, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Plus, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildCategoryColumns, type CategoryRow } from './category-columns';
 
 const ITEMS_PER_PAGE = 20;
 
-interface Category {
+export interface Category {
     id: string;
     name: string;
     code?: string;
@@ -192,6 +193,11 @@ export default function CategoriesPage() {
     // For parent select: exclude the category being edited (can't be its own parent)
     const parentOptions = (categories ?? []).filter((c) => !editing || c.id !== editing.id);
 
+    const columns = useMemo(
+        () => buildCategoryColumns({ isDeleting: deleteMutation.isPending, onEdit: openEdit, onDelete: handleDelete }),
+        [deleteMutation.isPending],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -218,91 +224,23 @@ export default function CategoriesPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Code</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Parent</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading categories...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load categories</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : paginatedItems.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-12 text-center">
-                                            <FolderTree className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No categories defined yet</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Add categories to organise your inventory items</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((cat) => (
-                                        <tr key={cat.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-medium">
-                                                {(cat as Category & { indent?: boolean }).indent && (
-                                                    <span className="text-muted-foreground mr-2">└─</span>
-                                                )}
-                                                {cat.name}
-                                            </td>
-                                            <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">
-                                                {cat.code ?? <span className="text-muted-foreground/40">—</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
-                                                {cat.parent_name ?? <span className="text-muted-foreground/40">Root</span>}
-                                            </td>
-                                            <td className="px-6 py-4 text-right hidden sm:table-cell">
-                                                <Badge variant={cat.is_active ? 'success' : 'outline'}>
-                                                    {cat.is_active ? 'Active' : 'Inactive'}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        aria-label="Edit category"
-                                                        onClick={() => openEdit(cat)}
-                                                    >
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        aria-label="Delete category"
-                                                        className="text-destructive hover:text-destructive"
-                                                        onClick={() => handleDelete(cat)}
-                                                        disabled={deleteMutation.isPending}
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<CategoryRow>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(cat) => cat.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No categories defined yet — add categories to organise your inventory items"
+                            storageKey="categories-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={sorted.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && sorted.length > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

@@ -1,11 +1,12 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ModifierGroupDialog } from '@/components/inventory/ModifierGroupDialog';
 import { useModifierGroups, useCreateModifierGroup, useUpdateModifierGroup, useDeleteModifierGroup } from '@/hooks/use-modifiers';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
-import { AlertTriangle, ChevronDown, ChevronRight, Layers, Plus, Search, Trash2 } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildModifierColumns, ModifierOptionsPanel } from './modifier-columns';
+import { Plus, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -51,7 +52,6 @@ export default function ModifiersPage() {
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ModifierGroup | null>(null);
-    const [expandedId, setExpandedId] = useState<string | null>(null);
     const [pendingDelete, setPendingDelete] = useState<ModifierGroup | null>(null);
 
     const { data, isLoading, isError, refetch } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
@@ -110,13 +110,7 @@ export default function ModifiersPage() {
         });
     }
 
-    function toggleExpand(id: string) {
-        setExpandedId(expandedId === id ? null : id);
-    }
-
-    function formatCurrency(value: number) {
-        return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
-    }
+    const columns = useMemo(() => buildModifierColumns({ onEdit: openEdit, onDelete: confirmDelete }), []);
 
     return (
         <div className="p-6 space-y-6">
@@ -146,145 +140,31 @@ export default function ModifiersPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="w-10 px-3 py-3" />
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Group Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Linked Item</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Min</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Max</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Required</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Options</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading modifier groups...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load modifier groups</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.total ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <Layers className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No modifier groups found</p>
-                                            <p className="text-xs text-muted-foreground mt-1">
-                                                Modifier groups link customisation options to a specific menu or goods item
-                                            </p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((group) => (
-                                        <>
-                                            <tr key={group.id} className="hover:bg-accent/30 transition-colors">
-                                                <td className="px-3 py-4">
-                                                    <button
-                                                        onClick={() => toggleExpand(group.id)}
-                                                        className="p-1 rounded hover:bg-accent transition-colors"
-                                                    >
-                                                        {expandedId === group.id
-                                                            ? <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                                            : <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                                                        }
-                                                    </button>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <div className="font-medium">{group.name}</div>
-                                                </td>
-                                                <td className="px-6 py-4 hidden md:table-cell">
-                                                    {group.item_name ? (
-                                                        <span className="text-sm">
-                                                            {group.item_name}
-                                                            {group.item_sku && (
-                                                                <span className="ml-1.5 text-xs text-muted-foreground font-mono">({group.item_sku})</span>
-                                                            )}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground font-mono">{group.item_id?.slice(0, 8)}…</span>
-                                                    )}
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                    {group.min_selections}
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                    {group.max_selections}
-                                                </td>
-                                                <td className="px-6 py-4 hidden md:table-cell">
-                                                    <Badge variant={group.is_required ? 'warning' : 'outline'}>
-                                                        {group.is_required ? 'Yes' : 'No'}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                    <Badge variant="outline">
-                                                        {group.options?.length ?? 0}
-                                                    </Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => openEdit(group)}>
-                                                            Edit
-                                                        </Button>
-                                                        <button
-                                                            onClick={() => confirmDelete(group)}
-                                                            className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"
-                                                            title="Delete modifier group"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                            {expandedId === group.id && group.options && group.options.length > 0 && (
-                                                <tr key={`${group.id}-options`}>
-                                                    <td colSpan={8} className="bg-accent/10 px-12 py-4">
-                                                        <table className="w-full text-xs">
-                                                            <thead>
-                                                                <tr className="text-muted-foreground">
-                                                                    <th className="text-left pb-2 font-medium">Option</th>
-                                                                    <th className="text-left pb-2 font-medium">Deducts (SKU)</th>
-                                                                    <th className="text-right pb-2 font-medium">Price Adj.</th>
-                                                                    <th className="text-center pb-2 font-medium">Default</th>
-                                                                    <th className="text-center pb-2 font-medium">Active</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody className="divide-y divide-border/50">
-                                                                {group.options.map((opt, idx) => (
-                                                                    <tr key={opt.id ?? idx}>
-                                                                        <td className="py-2">{opt.name}</td>
-                                                                        <td className="py-2 font-mono text-muted-foreground">{opt.sku || '-'}</td>
-                                                                        <td className="py-2 text-right tabular-nums">
-                                                                            {opt.price_adjustment !== 0 ? formatCurrency(opt.price_adjustment) : '-'}
-                                                                        </td>
-                                                                        <td className="py-2 text-center">{opt.is_default ? 'Yes' : '-'}</td>
-                                                                        <td className="py-2 text-center">{opt.is_active ? 'Yes' : 'No'}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<ModifierGroup>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(g) => g.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            renderExpanded={(group) => <ModifierOptionsPanel group={group} />}
+                            emptyState={
+                                <>
+                                    <p className="text-muted-foreground">No modifier groups found</p>
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                        Modifier groups link customisation options to a specific menu or goods item
+                                    </p>
+                                </>
+                            }
+                            storageKey="modifiers-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (data?.total ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

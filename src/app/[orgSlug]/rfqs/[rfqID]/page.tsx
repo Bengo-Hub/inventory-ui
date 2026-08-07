@@ -15,8 +15,10 @@ import {
 } from '@/hooks/useRFQs';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import type { AwardEntry, SupplierResponse } from '@/lib/api/rfq';
+import type { AwardEntry, RFQLine, RFQAward, SupplierResponse } from '@/lib/api/rfq';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRfqLineColumns, buildRfqSupplierColumns, buildRfqAwardColumns } from './rfq-detail-columns';
 import { ArrowLeft, Award, CheckCircle2, FileQuestion, Send, Trash2, Truck, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -25,9 +27,6 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     draft: 'outline', sent: 'default', closed: 'warning', awarded: 'success', cancelled: 'error',
-};
-const RESP_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    invited: 'outline', submitted: 'success', declined: 'error',
 };
 
 interface QuoteRow { unit_price: string; lead_time_days: string; available: boolean; }
@@ -72,6 +71,26 @@ export default function RFQDetailPage() {
     const invitedSupplierIds = useMemo(
         () => new Set((rfq?.responses ?? []).map((r) => r.supplier_id)),
         [rfq],
+    );
+
+    const lineColumns = useMemo(() => buildRfqLineColumns(), []);
+    const awardColumns = useMemo(
+        () => buildRfqAwardColumns({
+            lineLabel: (rfqLineId) => {
+                const line = (rfq?.lines ?? []).find((l) => l.id === rfqLineId);
+                return line?.item_name || line?.description || rfqLineId.slice(0, 8);
+            },
+        }),
+        [rfq],
+    );
+    const supplierColumns = useMemo(
+        () => buildRfqSupplierColumns({
+            canChange,
+            onQuote: openQuote,
+            onDecline: (resp) => decline.mutate(resp.id, { onSuccess: () => toast.success('Marked declined'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }),
+            onRemove: (resp) => removeSupplier.mutate(resp.id, { onSuccess: () => toast.success('Removed'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) }),
+        }),
+        [canChange, decline, removeSupplier],
     );
 
     if (isLoading || !rfq) {
@@ -205,25 +224,13 @@ export default function RFQDetailPage() {
                 <Card>
                     <CardHeader><h2 className="text-lg font-semibold">Requested Items</h2></CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item / Description</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">UoM</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {(rfq.lines ?? []).map((l) => (
-                                        <tr key={l.id}>
-                                            <td className="px-6 py-3">{l.item_name || l.description || '—'}</td>
-                                            <td className="px-6 py-3 text-right tabular-nums">{l.quantity}</td>
-                                            <td className="px-6 py-3 text-muted-foreground">{l.uom || '—'}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<RFQLine>
+                                columns={lineColumns}
+                                rows={rfq.lines ?? []}
+                                rowKey={(l) => l.id}
+                                emptyText="No lines on this RFQ"
+                            />
                         </div>
                     </CardContent>
                 </Card>
@@ -241,50 +248,14 @@ export default function RFQDetailPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        {(rfq.responses ?? []).length === 0 ? (
-                            <p className="px-6 py-8 text-center text-muted-foreground">No suppliers invited yet.</p>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/30">
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Supplier</th>
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Quote Total</th>
-                                            <th className="px-6 py-3"></th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {(rfq.responses ?? []).map((resp) => (
-                                            <tr key={resp.id}>
-                                                <td className="px-6 py-3 font-medium">{resp.supplier_name || resp.supplier_id.slice(0, 8)}</td>
-                                                <td className="px-6 py-3"><Badge variant={RESP_VARIANT[resp.status] ?? 'outline'}>{resp.status}</Badge></td>
-                                                <td className="px-6 py-3 text-right tabular-nums">{resp.status === 'submitted' ? `${resp.currency} ${resp.total.toLocaleString()}` : '—'}</td>
-                                                <td className="px-6 py-3 text-right whitespace-nowrap">
-                                                    {canChange && resp.status !== 'declined' && (
-                                                        <Button size="sm" variant="ghost" onClick={() => openQuote(resp)}>
-                                                            {resp.status === 'submitted' ? 'Edit Quote' : 'Enter Quote'}
-                                                        </Button>
-                                                    )}
-                                                    {canChange && resp.status === 'invited' && (
-                                                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive"
-                                                            onClick={() => decline.mutate(resp.id, { onSuccess: () => toast.success('Marked declined'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>
-                                                            Decline
-                                                        </Button>
-                                                    )}
-                                                    {canChange && resp.status === 'invited' && (
-                                                        <Button size="sm" variant="ghost" className="text-muted-foreground"
-                                                            onClick={() => removeSupplier.mutate(resp.id, { onSuccess: () => toast.success('Removed'), onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed')) })}>
-                                                            <X className="h-4 w-4" />
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                        <div className="px-2 pb-2">
+                            <DataTable<SupplierResponse>
+                                columns={supplierColumns}
+                                rows={rfq.responses ?? []}
+                                rowKey={(r) => r.id}
+                                emptyText="No suppliers invited yet."
+                            />
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -365,32 +336,13 @@ export default function RFQDetailPage() {
                     <Card>
                         <CardHeader><h2 className="text-lg font-semibold">Awards</h2></CardHeader>
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/30">
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Line</th>
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Supplier</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Unit Price</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Qty</th>
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">PO</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {(rfq.awards ?? []).map((a) => {
-                                            const line = (rfq.lines ?? []).find((l) => l.id === a.rfq_line_id);
-                                            return (
-                                                <tr key={a.id}>
-                                                    <td className="px-6 py-3">{line?.item_name || line?.description || a.rfq_line_id.slice(0, 8)}</td>
-                                                    <td className="px-6 py-3">{a.supplier_name || a.supplier_id.slice(0, 8)}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{a.unit_price.toLocaleString()}</td>
-                                                    <td className="px-6 py-3 text-right tabular-nums">{a.quantity}</td>
-                                                    <td className="px-6 py-3">{a.po_id ? <Badge variant="success">ordered</Badge> : <Badge variant="outline">pending</Badge>}</td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
+                            <div className="px-2 pb-2">
+                                <DataTable<RFQAward>
+                                    columns={awardColumns}
+                                    rows={rfq.awards ?? []}
+                                    rowKey={(a) => a.id}
+                                    emptyText="No awards recorded"
+                                />
                             </div>
                         </CardContent>
                     </Card>

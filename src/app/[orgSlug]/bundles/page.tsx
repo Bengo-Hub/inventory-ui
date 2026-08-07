@@ -1,9 +1,11 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input, Table } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildBundleColumns } from './bundle-columns';
 import {
     useBundles,
     useCreateBundle,
@@ -21,9 +23,9 @@ const PRICE_BASES: { value: PriceBasis; label: string }[] = [
     { value: 'per_session', label: 'Per Session' },
 ];
 const bundleSelectCls = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none appearance-none';
-import { AlertTriangle, Minus, Package, Plus, Trash2, X } from 'lucide-react';
+import { Minus, Package, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -398,6 +400,8 @@ export default function BundlesPage() {
         });
     }
 
+    const columns = useMemo(() => buildBundleColumns({ onEdit: openEdit, onDelete: setDeleteTarget }), []);
+
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
             <div className="flex items-center justify-between">
@@ -418,68 +422,24 @@ export default function BundlesPage() {
                     </span>
                 </CardHeader>
                 <CardContent className="p-0">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-16 text-muted-foreground">Loading…</div>
-                    ) : isError ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-                            <AlertTriangle className="h-10 w-10 text-destructive/60" />
-                            <p className="text-sm">Couldn&apos;t load bundles</p>
-                            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
-                        </div>
-                    ) : bundles.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
-                            <Package className="h-10 w-10 opacity-30" />
-                            <p className="text-sm">No bundles yet. Create your first product kit.</p>
-                            <Button variant="outline" size="sm" onClick={openCreate}>Create Bundle</Button>
-                        </div>
-                    ) : (
-                        <Table>
-                            <thead>
-                                <tr className="border-b border-border text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                    <th className="px-6 py-3">Name</th>
-                                    <th className="px-6 py-3">Bundle Item</th>
-                                    <th className="px-6 py-3">Components</th>
-                                    <th className="px-6 py-3">Status</th>
-                                    <th className="px-6 py-3 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {bundles.map(bundle => (
-                                    <tr key={bundle.id} className="hover:bg-muted/30 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <span className="font-medium">{bundle.name}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                                            {bundle.item_name ?? bundle.item_id}
-                                        </td>
-                                        <td className="px-6 py-4 text-sm text-muted-foreground">
-                                            {bundle.components.length} item{bundle.components.length !== 1 ? 's' : ''}
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <Badge variant={bundle.is_active ? 'success' : 'outline'}>
-                                                {bundle.is_active ? 'Active' : 'Inactive'}
-                                            </Badge>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button variant="ghost" size="sm" onClick={() => openEdit(bundle)}>
-                                                    Edit
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    className="text-destructive hover:text-destructive"
-                                                    onClick={() => setDeleteTarget(bundle)}
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </Table>
-                    )}
+                    <div className="px-2 pb-2">
+                        <DataTable<Bundle>
+                            columns={columns}
+                            rows={bundles}
+                            rowKey={(b) => b.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <div className="flex flex-col items-center justify-center gap-3">
+                                    <Package className="h-10 w-10 opacity-30" />
+                                    <p className="text-sm text-muted-foreground">No bundles yet. Create your first product kit.</p>
+                                    <Button variant="outline" size="sm" onClick={openCreate}>Create Bundle</Button>
+                                </div>
+                            }
+                            storageKey="bundles-col-prefs"
+                        />
+                    </div>
                 </CardContent>
             </Card>
 

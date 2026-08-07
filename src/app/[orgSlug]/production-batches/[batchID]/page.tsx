@@ -6,11 +6,13 @@ import {
     useCancelBatch, useAddQC, useMaterialCheck,
 } from '@/hooks/useProductionBatches';
 import { useRecipe } from '@/hooks/use-recipes';
-import { type BatchStatus } from '@/lib/api/productionBatches';
+import { type BatchStatus, type BatchMaterial, type QualityCheckRec } from '@/lib/api/productionBatches';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildBatchMaterialColumns, buildBatchQCColumns } from './batch-detail-columns';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -44,6 +46,9 @@ export default function BatchDetailPage() {
     const [scrapQty, setScrapQty] = useState('');
     const [qcResult, setQcResult] = useState('pass');
     const [qcNotes, setQcNotes] = useState('');
+
+    const materialColumns = useMemo(() => buildBatchMaterialColumns(), []);
+    const qcColumns = useMemo(() => buildBatchQCColumns(), []);
 
     if (isLoading) return <div className="p-6 text-muted-foreground">Loading…</div>;
     if (!batch) return <div className="p-6">Batch not found. <Link href={`/${org}/production-batches`} className="text-primary">Back</Link></div>;
@@ -129,24 +134,13 @@ export default function BatchDetailPage() {
                     <Card>
                         <CardHeader><h2 className="text-lg font-semibold">Raw Materials Consumed</h2></CardHeader>
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead><tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Item</th>
-                                        <th className="text-right px-6 py-2 font-medium text-muted-foreground">Quantity</th>
-                                        <th className="text-right px-6 py-2 font-medium text-muted-foreground">Cost</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        {(materials?.length ?? 0) === 0 && <tr><td colSpan={3} className="px-6 py-6 text-center text-muted-foreground">No materials recorded (batch not started).</td></tr>}
-                                        {materials?.map((m) => (
-                                            <tr key={m.id} className="border-b border-border">
-                                                <td className="px-6 py-2 font-mono text-xs">{m.item_id.slice(0, 8)}</td>
-                                                <td className="px-6 py-2 text-right tabular-nums">{m.quantity}</td>
-                                                <td className="px-6 py-2 text-right tabular-nums">{money(m.cost)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="px-2 pb-2">
+                                <DataTable<BatchMaterial>
+                                    columns={materialColumns}
+                                    rows={materials ?? []}
+                                    rowKey={(m) => m.id}
+                                    emptyText="No materials recorded (batch not started)."
+                                />
                             </div>
                         </CardContent>
                     </Card>
@@ -165,24 +159,13 @@ export default function BatchDetailPage() {
                                     <Button size="sm" disabled={addQC.isPending} onClick={() => addQC.mutate({ result: qcResult, notes: qcNotes.trim() || undefined }, { onSuccess: () => { toast.success('QC recorded'); setQcNotes(''); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to record QC')) })}>Add QC</Button>
                                 </div>
                             )}
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead><tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Date</th>
-                                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Result</th>
-                                        <th className="text-left px-6 py-2 font-medium text-muted-foreground">Notes</th>
-                                    </tr></thead>
-                                    <tbody>
-                                        {(qcs?.length ?? 0) === 0 && <tr><td colSpan={3} className="px-6 py-6 text-center text-muted-foreground">No quality checks yet.</td></tr>}
-                                        {qcs?.map((q) => (
-                                            <tr key={q.id} className="border-b border-border">
-                                                <td className="px-6 py-2">{q.check_date ? new Date(q.check_date).toLocaleDateString() : '—'}</td>
-                                                <td className="px-6 py-2"><Badge variant={q.result === 'pass' ? 'success' : q.result === 'fail' ? 'error' : 'warning'}>{q.result}</Badge></td>
-                                                <td className="px-6 py-2 text-muted-foreground">{q.notes || '—'}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="px-2 pb-2">
+                                <DataTable<QualityCheckRec>
+                                    columns={qcColumns}
+                                    rows={qcs ?? []}
+                                    rowKey={(q) => q.id}
+                                    emptyText="No quality checks yet."
+                                />
                             </div>
                         </CardContent>
                     </Card>

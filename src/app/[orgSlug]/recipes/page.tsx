@@ -1,15 +1,16 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
 import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
 import { useOutletStore } from '@/store/outlet';
-import { AlertTriangle, ChefHat, Factory, FlaskConical, Plus, Search, Trash2, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRecipeColumns } from './recipe-columns';
+import { ChefHat, Factory, Plus, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -22,11 +23,6 @@ const ITEMS_PER_PAGE = 20;
 function generateSKU(name: string): string {
     const slug = name.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
     return `RCP-${slug}-${Date.now().toString(36).toUpperCase()}`;
-}
-
-function formatCurrency(value?: number | null): string {
-    if (value == null || isNaN(value)) return '—';
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES' }).format(value);
 }
 
 export default function RecipesPage() {
@@ -174,6 +170,16 @@ export default function RecipesPage() {
         });
     }
 
+    const columns = useMemo(
+        () => buildRecipeColumns({
+            isMfg,
+            onManageIngredients: (recipe) => router.push(`/${orgSlug}/recipes/${recipe.id}`),
+            onEdit: openEdit,
+            onDelete: setDeleteTarget,
+        }),
+        [isMfg, orgSlug, router],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -202,88 +208,30 @@ export default function RecipesPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Produces</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Ingredients</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">{isMfg ? 'Unit Cost' : 'Cost/Portion'}</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">{isMfg ? 'Material Cost' : 'Suggested Price'}</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading recipes...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load recipes</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (data?.total ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            {isMfg
-                                                ? <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                : <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />}
-                                            <p className="text-muted-foreground">{isMfg ? 'No bills of materials yet' : 'No recipes found'}</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((recipe) => (
-                                        <tr key={recipe.id} className="hover:bg-accent/30 transition-colors">
-                                            <td className="px-6 py-4 font-medium">{recipe.name}</td>
-                                            <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">
-                                                {recipe.item_name || recipe.sku || '—'}
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden sm:table-cell">
-                                                <Badge variant="outline">
-                                                    {recipe.ingredients?.length ?? 0}
-                                                </Badge>
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden lg:table-cell">
-                                                {formatCurrency(recipe.cost_per_portion)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right tabular-nums hidden lg:table-cell">
-                                                {formatCurrency(isMfg ? recipe.total_cost : recipe.suggested_price)}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        title="Manage ingredients"
-                                                        aria-label="Manage ingredients"
-                                                        onClick={() => router.push(`/${orgSlug}/recipes/${recipe.id}`)}
-                                                    >
-                                                        <FlaskConical className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" onClick={() => openEdit(recipe)}>
-                                                        Edit
-                                                    </Button>
-                                                    <Button variant="ghost" size="sm" aria-label="Delete recipe" onClick={() => setDeleteTarget(recipe)}>
-                                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Recipe>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(r) => r.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    {isMfg
+                                        ? <Factory className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                        : <ChefHat className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />}
+                                    <p className="text-muted-foreground">{isMfg ? 'No bills of materials yet' : 'No recipes found'}</p>
+                                </>
+                            }
+                            storageKey="recipes-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (data?.total ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

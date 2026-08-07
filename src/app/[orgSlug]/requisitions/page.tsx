@@ -1,14 +1,15 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { RequisitionFormDialog } from '@/components/inventory/RequisitionFormDialog';
 import {
     useRequisitions, useCreateRequisition, useSubmitRequisition,
     useReviewRequisition, useApproveRequisition, useRejectRequisition,
 } from '@/hooks/useRequisitions';
 import { type CreateRequisitionInput, type Requisition, type RequisitionStatus } from '@/lib/api/requisitions';
-import { AlertTriangle, ClipboardList, Plus } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRequisitionColumns } from './requisition-columns';
+import { ClipboardList, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,11 +18,6 @@ import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
-
-const STATUS_VARIANT: Record<RequisitionStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline', submitted: 'warning', procurement_review: 'warning',
-    approved: 'success', rejected: 'error', ordered: 'default', completed: 'success',
-};
 
 const STATUSES: RequisitionStatus[] = ['draft', 'submitted', 'procurement_review', 'approved', 'rejected', 'ordered', 'completed'];
 
@@ -75,6 +71,8 @@ export default function RequisitionsPage() {
         );
     }
 
+    const columns = useMemo(() => buildRequisitionColumns({ workflowActions }), [canChange]);
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -94,51 +92,28 @@ export default function RequisitionsPage() {
                     </select>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Reference</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Type</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Purpose</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Priority</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                {!isLoading && isError && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load requisitions</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                )}
-                                {!isLoading && !isError && rows.length === 0 && (
-                                    <tr>
-                                        <td colSpan={6} className="px-6 py-12 text-center">
-                                            <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No requisitions yet</p>
-                                        </td>
-                                    </tr>
-                                )}
-                                {rows.map((r) => (
-                                    <tr key={r.id} className="border-b border-border hover:bg-muted/20">
-                                        <td className="px-6 py-3 font-medium">{r.reference_number}</td>
-                                        <td className="px-6 py-3 hidden md:table-cell capitalize">{r.request_type.replace(/_/g, ' ')}</td>
-                                        <td className="px-6 py-3 hidden lg:table-cell max-w-xs truncate">{r.purpose}</td>
-                                        <td className="px-6 py-3 capitalize">{r.priority}</td>
-                                        <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[r.status]}>{r.status.replace(/_/g, ' ')}</Badge></td>
-                                        <td className="px-6 py-3">{workflowActions(r)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Requisition>
+                            columns={columns}
+                            rows={rows}
+                            rowKey={(r) => r.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyState={
+                                <>
+                                    <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No requisitions yet</p>
+                                </>
+                            }
+                            storageKey="requisitions-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={data?.total}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                 </CardContent>
             </Card>
 

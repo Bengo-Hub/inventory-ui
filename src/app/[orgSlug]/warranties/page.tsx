@@ -1,15 +1,15 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
-import { RowActions } from '@/components/inventory/RowActions';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarranties, useCreateWarranty, useUpdateWarranty, useClaimWarranty, useVoidWarranty, useDeleteWarranty, useWarrantyLookup } from '@/hooks/useWarranties';
 import { type Warranty, type WarrantyStatus, type WarrantyWriteInput } from '@/lib/api/warranties';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildWarrantyColumns, STATUS_VARIANT } from './warranty-columns';
 import { AlertTriangle, CheckCircle2, Plus, ScanLine, Search, ShieldCheck, ShieldX, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -21,11 +21,6 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 
 const ITEMS_PER_PAGE = 20;
 const textareaClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none';
-
-// active=green, claimed=blue (primary tint), voided=gray, expired=amber
-const STATUS_VARIANT: Record<WarrantyStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    active: 'success', claimed: 'default', voided: 'outline', expired: 'warning',
-};
 
 type Tab = '' | WarrantyStatus;
 const TABS: { key: Tab; label: string }[] = [
@@ -153,6 +148,18 @@ export default function WarrantiesPage() {
         </>
     );
 
+    const columns = useMemo(
+        () => buildWarrantyColumns({
+            canChange,
+            canDelete,
+            onView: setViewing,
+            onEdit: openEdit,
+            onDelete: (w) => setConfirming({ action: 'delete', w }),
+            rowExtra,
+        }),
+        [canChange, canDelete],
+    );
+
     return (
         <SubscriptionGate feature="warranties">
             <div className="p-6 space-y-6">
@@ -189,63 +196,29 @@ export default function WarrantiesPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Serial</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Purchased</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Coverage</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {isLoading && <tr><td colSpan={6} className="px-6 py-8 text-center text-muted-foreground">Loading…</td></tr>}
-                                    {!isLoading && isError && (
-                                        <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center">
-                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                                <p className="text-muted-foreground">Couldn&apos;t load warranties</p>
-                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {!isLoading && !isError && rows.length === 0 && (
-                                        <tr>
-                                            <td colSpan={6} className="px-6 py-12 text-center">
-                                                <ShieldCheck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                <p className="text-muted-foreground">{search || tab ? 'No warranties match your filters' : 'No warranties yet'}</p>
-                                            </td>
-                                        </tr>
-                                    )}
-                                    {!isError && rows.map((w) => (
-                                        <tr key={w.id} className="border-b border-border hover:bg-muted/20 cursor-pointer" onClick={() => setViewing(w)}>
-                                            <td className="px-6 py-3 font-mono font-medium">{w.serial_number}</td>
-                                            <td className="px-6 py-3">
-                                                <div className="font-medium">{w.item_name || '—'}</div>
-                                                <div className="text-xs text-muted-foreground font-mono">{w.item_sku}</div>
-                                            </td>
-                                            <td className="px-6 py-3 hidden md:table-cell text-muted-foreground">{fmtDate(w.purchase_date)}</td>
-                                            <td className="px-6 py-3 hidden lg:table-cell text-muted-foreground">{fmtDate(w.warranty_start)} – {fmtDate(w.warranty_end)}</td>
-                                            <td className="px-6 py-3"><Badge variant={STATUS_VARIANT[w.status]}>{w.status}</Badge></td>
-                                            <td className="px-6 py-3">
-                                                <RowActions
-                                                    onView={() => setViewing(w)}
-                                                    onEdit={() => openEdit(w)}
-                                                    canEdit={canChange}
-                                                    onDelete={() => setConfirming({ action: 'delete', w })}
-                                                    canDelete={canDelete}
-                                                    extra={rowExtra(w)}
-                                                />
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<Warranty>
+                                columns={columns}
+                                rows={rows}
+                                rowKey={(w) => w.id}
+                                loading={isLoading}
+                                error={isError}
+                                onRetry={() => refetch()}
+                                onRowClick={(w) => setViewing(w)}
+                                emptyState={
+                                    <>
+                                        <ShieldCheck className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                        <p className="text-muted-foreground">{search || tab ? 'No warranties match your filters' : 'No warranties yet'}</p>
+                                    </>
+                                }
+                                storageKey="warranties-col-prefs"
+                                page={page}
+                                totalPages={totalPages}
+                                onPageChange={setPage}
+                                total={filtered.length}
+                                pageSize={ITEMS_PER_PAGE}
+                            />
                         </div>
-                        {totalPages > 1 && <div className="p-4"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} /></div>}
                     </CardContent>
                 </Card>
 
