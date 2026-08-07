@@ -4,9 +4,12 @@ import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { itemsApi } from '@/lib/api/items';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useQuery } from '@tanstack/react-query';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRecipeIngredientColumns } from './recipe-ingredient-columns';
 import { ArrowLeft, ChefHat, Package } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 
 export default function ItemRecipePage() {
     const params = useParams();
@@ -30,6 +33,8 @@ export default function ItemRecipePage() {
     });
 
     const isLoading = itemLoading || (!!item?.sku && recipeLoading);
+
+    const columns = useMemo(() => buildRecipeIngredientColumns(), []);
 
     return (
         <div className="p-6 space-y-6">
@@ -98,33 +103,12 @@ export default function ItemRecipePage() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b border-border bg-muted/30">
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Name</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground">Quantity</th>
-                                            <th className="text-left px-6 py-3 font-medium text-muted-foreground">Unit</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Waste %</th>
-                                            <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Cost</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border">
-                                        {recipe.ingredients.map((ing) => (
-                                            <tr key={ing.id ?? ing.item_id} className="hover:bg-accent/30 transition-colors">
-                                                <td className="px-6 py-4 font-medium">{ing.item_name}</td>
-                                                <td className="px-6 py-4 text-right tabular-nums font-semibold">{ing.quantity}</td>
-                                                <td className="px-6 py-4 text-muted-foreground">{ing.unit_of_measure}</td>
-                                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                    {ing.waste_percent}%
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums hidden md:table-cell">
-                                                    {ing.item_cost_price != null ? ing.item_cost_price.toLocaleString() : '—'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                            <div className="px-2 pb-2">
+                                <DataTable
+                                    columns={columns}
+                                    rows={recipe.ingredients}
+                                    rowKey={(ing) => ing.id ?? ing.item_id}
+                                />
                             </div>
                         </CardContent>
                     </Card>

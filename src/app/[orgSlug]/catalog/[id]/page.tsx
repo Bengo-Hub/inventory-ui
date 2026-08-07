@@ -11,10 +11,12 @@ import type { PricingTier } from '@/lib/api/pricing';
 import { ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useQuery } from '@tanstack/react-query';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildItemPricingColumns, buildSerialColumns } from './catalog-detail-columns';
 import { AlertTriangle, ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, Pencil, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
@@ -24,7 +26,7 @@ const KES = (n?: number | null) =>
 
 const STOCKABLE_TYPES = ['GOODS', 'INGREDIENT', 'EQUIPMENT'];
 
-interface SerialRow {
+export interface SerialRow {
   id: string;
   serial_number: string;
   status: 'available' | 'reserved' | 'sold' | 'returned' | 'defective';
@@ -122,6 +124,9 @@ export default function ItemDetailPage() {
       },
     );
   }
+
+  const pricingColumns = useMemo(() => buildItemPricingColumns(), []);
+  const serialColumns = useMemo(() => buildSerialColumns(), []);
 
   if (isLoading) {
     return (
@@ -381,25 +386,12 @@ export default function ItemDetailPage() {
                   No price profiles set — the selling price above is derived from the item&apos;s {isRecipe ? 'recipe' : 'max/retail'} price.
                 </p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border bg-muted/30">
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground">Pricing Tier</th>
-                        <th className="text-left px-4 py-2 font-medium text-muted-foreground hidden sm:table-cell">Basis</th>
-                        <th className="text-right px-4 py-2 font-medium text-muted-foreground">Price</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {itemPricing?.map((p) => (
-                        <tr key={`${p.pricing_tier_id}-${p.outlet_id ?? 'all'}`}>
-                          <td className="px-4 py-2 font-medium">{p.tier_name ?? p.tier_code ?? p.pricing_tier_id}{p.outlet_id ? ' (outlet)' : ''}</td>
-                          <td className="px-4 py-2 text-muted-foreground hidden sm:table-cell capitalize">{(p.tier_basis ?? 'default').replace(/_/g, ' ')}</td>
-                          <td className="px-4 py-2 text-right font-semibold tabular-nums">{(p.currency ?? 'KES')} {p.price.toLocaleString()}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="px-2 pb-2">
+                  <DataTable
+                    columns={pricingColumns}
+                    rows={itemPricing ?? []}
+                    rowKey={(p) => `${p.pricing_tier_id}-${p.outlet_id ?? 'all'}`}
+                  />
                 </div>
               )}
             </div>
@@ -455,29 +447,12 @@ export default function ItemDetailPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto max-h-96">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/30">
-                      <th className="text-left px-6 py-3 font-medium text-muted-foreground">Serial Number</th>
-                      <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                      <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Received</th>
-                      <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Sold</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {(serialRows ?? []).map((s) => (
-                      <tr key={s.id} className="hover:bg-accent/30 transition-colors">
-                        <td className="px-6 py-3 font-mono">{s.serial_number}</td>
-                        <td className="px-6 py-3">
-                          <Badge variant={s.status === 'available' ? 'success' : 'outline'} className="capitalize">{s.status}</Badge>
-                        </td>
-                        <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{s.received_at ? new Date(s.received_at).toLocaleDateString() : '—'}</td>
-                        <td className="px-6 py-3 text-muted-foreground hidden sm:table-cell">{s.sold_at ? new Date(s.sold_at).toLocaleDateString() : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="px-2 pb-2">
+                <DataTable
+                  columns={serialColumns}
+                  rows={serialRows ?? []}
+                  rowKey={(s) => s.id}
+                />
               </div>
             </CardContent>
           </Card>

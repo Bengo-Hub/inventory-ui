@@ -1,18 +1,21 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
 import { useItems, useMarkItemEOL, useRestoreItemEOL } from '@/hooks/useItems';
+import type { Item } from '@/lib/api/items';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, PackageX, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Split } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildStockColumns, stockStatus, stockLabel } from './stock-columns';
+import { buildEOLColumns } from './eol-columns';
+import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, Plus, RefreshCw, Search, Split } from 'lucide-react';
 import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { StockExportDialog } from '@/components/inventory/ExportDialogs';
 import { useParams } from 'next/navigation';
@@ -41,18 +44,6 @@ const REASON_OPTIONS = [
     { value: 'return', label: 'Customer Return' },
     { value: 'other', label: 'Other' },
 ];
-
-function stockStatus(available: number, reorderPoint?: number): 'success' | 'warning' | 'error' | 'outline' {
-    if (available <= 0) return 'error';
-    if (reorderPoint != null && available <= reorderPoint) return 'warning';
-    return 'success';
-}
-
-function stockLabel(available: number, reorderPoint?: number): string {
-    if (available <= 0) return 'Out of Stock';
-    if (reorderPoint != null && available <= reorderPoint) return 'Low Stock';
-    return 'In Stock';
-}
 
 function StockDrawer({
     item,
@@ -540,6 +531,26 @@ export default function StockPage() {
 
     useMemo(() => { setPage(1); }, [search, statusFilter, categoryId, typeFilter]);
 
+    const stockColumns = useMemo(
+        () => buildStockColumns({
+            canAdjust,
+            canManageEOL,
+            onHistory: (item) => setHistorySku(item.sku),
+            onAdjust: (item) => openItem(item, 'adjust'),
+            onBreakdown: (item) => openItem(item, 'breakdown'),
+            onMarkEOL: (item) => setEolConfirm({ sku: item.sku, name: item.item_name, action: 'mark' }),
+        }),
+        [canAdjust, canManageEOL],
+    );
+
+    const eolColumns = useMemo(
+        () => buildEOLColumns({
+            canManageEOL,
+            onRestore: (it) => setEolConfirm({ sku: it.sku, name: it.name, action: 'restore' }),
+        }),
+        [canManageEOL],
+    );
+
     return (
         <div className="p-6 space-y-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -650,127 +661,37 @@ export default function StockPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">SKU</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Warehouse</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Available</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Reserved</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Reorder At</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading stock levels...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load stock levels</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : filteredStock.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={8} className="px-6 py-12 text-center">
-                                            <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No stock data available</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Add items to warehouses to see stock levels here</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((item) => {
-                                        const status = stockStatus(item.available, item.reorder_point);
-                                        return (
-                                            <tr
-                                                key={item.id}
-                                                className={`hover:bg-accent/30 transition-colors cursor-pointer ${
-                                                    item.available <= 0 ? 'bg-red-500/5' :
-                                                    (item.reorder_point != null && item.available <= item.reorder_point) ? 'bg-yellow-500/5' : ''
-                                                }`}
-                                                onClick={() => openItem(item)}
-                                            >
-                                                <td className="px-6 py-4 font-medium">{item.item_name}</td>
-                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{item.sku}</td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">{item.warehouse_name}</td>
-                                                <td className="px-6 py-4 text-right font-semibold tabular-nums">
-                                                    {item.available.toLocaleString()}
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden sm:table-cell">
-                                                    {item.reserved.toLocaleString()}
-                                                </td>
-                                                <td className="px-6 py-4 text-right tabular-nums text-muted-foreground hidden md:table-cell">
-                                                    {item.reorder_point != null ? item.reorder_point.toLocaleString() : <span className="text-muted-foreground/40">—</span>}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                        <div className="flex items-center justify-end gap-1">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                title="Product stock history"
-                                                                aria-label="Product stock history"
-                                                                onClick={() => setHistorySku(item.sku)}
-                                                            >
-                                                                <History className="h-4 w-4" />
-                                                            </Button>
-                                                            {canAdjust && (
-                                                                <>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        title="Record Adjustment"
-                                                                        aria-label="Record adjustment"
-                                                                        onClick={() => openItem(item, 'adjust')}
-                                                                    >
-                                                                        <SlidersHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        title="Break Down Stock"
-                                                                        aria-label="Break down stock"
-                                                                        onClick={() => openItem(item, 'breakdown')}
-                                                                    >
-                                                                        <Split className="h-4 w-4" />
-                                                                    </Button>
-                                                                </>
-                                                            )}
-                                                            {canManageEOL && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    title="Mark End-of-Life"
-                                                                    aria-label="Mark End-of-Life"
-                                                                    className="text-destructive hover:text-destructive"
-                                                                    onClick={() => setEolConfirm({ sku: item.sku, name: item.item_name, action: 'mark' })}
-                                                                >
-                                                                    <PackageX className="h-4 w-4" />
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<StockLevel>
+                            columns={stockColumns}
+                            rows={paginatedItems}
+                            rowKey={(item) => item.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            onRowClick={(item) => openItem(item)}
+                            rowClassName={(item) =>
+                                item.available <= 0
+                                    ? 'bg-red-500/5'
+                                    : (item.reorder_point != null && item.available <= item.reorder_point)
+                                        ? 'bg-yellow-500/5'
+                                        : undefined
+                            }
+                            emptyState={
+                                <>
+                                    <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                    <p className="text-muted-foreground">No stock data available</p>
+                                    <p className="text-xs text-muted-foreground/70 mt-1">Add items to warehouses to see stock levels here</p>
+                                </>
+                            }
+                            storageKey="stock-levels-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={filteredStock.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && filteredStock.length > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
             </>)}
@@ -787,52 +708,21 @@ export default function StockPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">SKU</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden lg:table-cell">Marked EOL</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {eolLoading ? (
-                                        <tr><td colSpan={4} className="px-6 py-12 text-center text-muted-foreground">Loading…</td></tr>
-                                    ) : (eolItems?.data.length ?? 0) === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center">
-                                                <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                <p className="text-muted-foreground">No End-of-Life items</p>
-                                                <p className="text-xs text-muted-foreground/70 mt-1">Mark an out-of-stock item End-of-Life to move it here</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        eolItems?.data.map((it) => (
-                                            <tr key={it.id} className="hover:bg-accent/30 transition-colors">
-                                                <td className="px-6 py-4 font-medium">{it.name}</td>
-                                                <td className="px-6 py-4 font-mono text-xs text-muted-foreground hidden md:table-cell">{it.sku}</td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden lg:table-cell">
-                                                    {it.end_of_life_at ? new Date(it.end_of_life_at).toLocaleDateString() : '—'}
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    {canManageEOL && (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            title="Restore"
-                                                            onClick={() => setEolConfirm({ sku: it.sku, name: it.name, action: 'restore' })}
-                                                        >
-                                                            <RotateCcw className="h-4 w-4 mr-1" /> Restore
-                                                        </Button>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<Item>
+                                columns={eolColumns}
+                                rows={eolItems?.data ?? []}
+                                rowKey={(it) => it.id}
+                                loading={eolLoading}
+                                emptyState={
+                                    <>
+                                        <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                        <p className="text-muted-foreground">No End-of-Life items</p>
+                                        <p className="text-xs text-muted-foreground/70 mt-1">Mark an out-of-stock item End-of-Life to move it here</p>
+                                    </>
+                                }
+                                storageKey="stock-eol-col-prefs"
+                            />
                         </div>
                     </CardContent>
                 </Card>
