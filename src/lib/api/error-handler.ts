@@ -29,3 +29,46 @@ export function parseLimitInfo(data: any): LimitReachedInfo | undefined {
     upgradeUrl: data.upgrade_url,
   };
 }
+
+/**
+ * Non-metered subscription 403s (feature lock, inactive/expired subscription, plan-upgrade
+ * required). Distinct from the 402 usage_limit_exceeded body above `parseLimitInfo` handles.
+ */
+export type SubscriptionErrorCode =
+  | 'subscription_inactive'
+  | 'subscription_expired'
+  | 'feature_not_available'
+  | 'device_limit_reached'
+  | 'plan_upgrade_required';
+
+const SUBSCRIPTION_CODES = new Set<SubscriptionErrorCode>([
+  'subscription_inactive',
+  'subscription_expired',
+  'feature_not_available',
+  'device_limit_reached',
+  'plan_upgrade_required',
+]);
+
+/** Mirrors pos-ui's isSubscriptionError — matches the canonical WriteFeatureLocked body (code +
+ *  upgrade:true) shared across every service's authclient-based feature gate. */
+export function isSubscriptionError(data: any): boolean {
+  if (!data) return false;
+  if (data.upgrade === true) return true;
+  return SUBSCRIPTION_CODES.has(data?.code as SubscriptionErrorCode);
+}
+
+const SUBSCRIPTION_MESSAGES: Record<SubscriptionErrorCode, string> = {
+  subscription_inactive: 'Your subscription is inactive. Please renew to continue.',
+  subscription_expired: 'Your subscription has expired. Renew now to restore access.',
+  feature_not_available: 'This feature is not available on your current plan.',
+  device_limit_reached: 'Device limit reached. Upgrade your plan to add more devices.',
+  plan_upgrade_required: 'An upgrade is required to access this feature.',
+};
+
+export function subscriptionErrorMessage(data: any): string {
+  const code = data?.code as SubscriptionErrorCode;
+  if (code && SUBSCRIPTION_MESSAGES[code]) {
+    return data.message || SUBSCRIPTION_MESSAGES[code];
+  }
+  return data?.message || SUBSCRIPTION_MESSAGES.subscription_inactive;
+}

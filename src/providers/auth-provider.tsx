@@ -1,7 +1,7 @@
 'use client';
 
 import { apiClient } from '@/lib/api/client';
-import { parseLimitInfo } from '@/lib/api/error-handler';
+import { parseLimitInfo, subscriptionErrorMessage } from '@/lib/api/error-handler';
 import { LimitReachedModal } from '@/components/subscription/limit-reached-modal';
 import { OfflineBar } from '@bengo-hub/shared-ui-lib/offline';
 import { useLimitModal } from '@/store/limit-modal';
@@ -10,6 +10,10 @@ import { useAuthStore } from '@/store/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
 import { ReactNode, useEffect } from 'react';
+import { toast } from 'sonner';
+
+const SUBSCRIBE_URL =
+    process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexafrica.com';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const { status, initialize } = useAuthStore();
@@ -52,6 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (info) useLimitModal.getState().show(info);
         });
         return () => apiClient.setOnLimitReached(null);
+    }, []);
+
+    // Wire subscription 403 (feature lock / inactive plan) → toast with an upgrade action.
+    // Previously unwired: inventory-api already returns the canonical structured 403 body, but
+    // nothing surfaced it — a gated action just failed silently with no visible feedback.
+    useEffect(() => {
+        apiClient.setOnSubscription403((data) => {
+            const message = subscriptionErrorMessage(data);
+            // Mirrors LimitReachedModal's target: inventory-ui has no local billing page, so
+            // "Upgrade plan" opens the subscriptions-ui subscribe flow in a new tab.
+            const upgradeUrl = data?.upgrade_url || `${SUBSCRIBE_URL}/subscribe`;
+            toast.error('Subscription limit reached', {
+                description: message,
+                duration: 8000,
+                action: {
+                    label: 'Upgrade plan',
+                    onClick: () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer'),
+                },
+            });
+        });
+        return () => apiClient.setOnSubscription403(null);
     }, []);
 
     // Default landing for unauthenticated users = the PIN login page (the warehouse/desk
