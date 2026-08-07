@@ -1,25 +1,23 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useManufacturingDashboard } from '@/hooks/useProductionBatches';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildRecentBatchColumns, STATUS_LABEL, type RecentBatch } from './recent-batch-columns';
 import { ArrowLeft, Factory, Boxes, CheckCircle2, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 
-const STATUS_LABEL: Record<string, string> = {
-    planned: 'Planned', in_progress: 'In progress', completed: 'Completed', cancelled: 'Cancelled', failed: 'Failed',
-};
 const STATUS_COLOR: Record<string, string> = {
     planned: 'bg-muted-foreground/40', in_progress: 'bg-amber-500', completed: 'bg-emerald-500', cancelled: 'bg-red-500', failed: 'bg-red-600',
-};
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    planned: 'outline', in_progress: 'warning', completed: 'success', cancelled: 'error', failed: 'error',
 };
 
 export default function ManufacturingAnalyticsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const { data: dash, isLoading } = useManufacturingDashboard(org);
+    const columns = useMemo(() => buildRecentBatchColumns(), []);
 
     const byStatus = dash?.batches_by_status ?? {};
     const statusTotal = Object.values(byStatus).reduce((a, b) => a + b, 0) || 1;
@@ -75,28 +73,13 @@ export default function ManufacturingAnalyticsPage() {
             <Card>
                 <CardHeader><h2 className="text-lg font-semibold">Recent Batches</h2></CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-2 font-medium text-muted-foreground">Batch #</th>
-                                    <th className="text-right px-6 py-2 font-medium text-muted-foreground">Planned</th>
-                                    <th className="text-right px-6 py-2 font-medium text-muted-foreground">Actual</th>
-                                    <th className="text-left px-6 py-2 font-medium text-muted-foreground">Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(dash?.recent_batches?.length ?? 0) === 0 && <tr><td colSpan={4} className="px-6 py-6 text-center text-muted-foreground">No batches yet.</td></tr>}
-                                {dash?.recent_batches?.map((b) => (
-                                    <tr key={b.id} className="border-b border-border">
-                                        <td className="px-6 py-2 font-mono text-xs">{b.batch_number}</td>
-                                        <td className="px-6 py-2 text-right tabular-nums">{b.planned_quantity}</td>
-                                        <td className="px-6 py-2 text-right tabular-nums">{b.actual_quantity ?? '—'}</td>
-                                        <td className="px-6 py-2"><Badge variant={STATUS_VARIANT[b.status] ?? 'outline'}>{STATUS_LABEL[b.status] ?? b.status}</Badge></td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<RecentBatch>
+                            columns={columns}
+                            rows={dash?.recent_batches ?? []}
+                            rowKey={(b) => b.id}
+                            emptyText="No batches yet."
+                        />
                     </div>
                 </CardContent>
             </Card>

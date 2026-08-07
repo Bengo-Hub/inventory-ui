@@ -7,18 +7,13 @@ import {
     useRejectRequest,
 } from '@/hooks/useApprovals';
 import { APPROVAL_MODULE_LABELS, type ApprovalRequest, type ApprovalRequestStatus } from '@/lib/api/approvals';
-import { AlertTriangle, CheckCircle2, ClipboardList, Inbox, ShieldCheck, X, XCircle } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildApprovalColumns, STATUS_VARIANT } from './approval-columns';
+import { CheckCircle2, ClipboardList, ShieldCheck, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'error',
-    cancelled: 'outline',
-};
 
 const ROLE_LABEL: Record<string, string> = {
     inventory_admin: 'Inventory Admin',
@@ -87,6 +82,11 @@ export default function ApprovalsInboxPage() {
 
     const rows = requests ?? [];
 
+    const columns = useMemo(
+        () => buildApprovalColumns({ moduleLabel: (m) => MODULE_LABEL[m] ?? m, roleLabel }),
+        [],
+    );
+
     return (
         <>
             <div className="p-6 space-y-6">
@@ -123,60 +123,18 @@ export default function ApprovalsInboxPage() {
 
                 <Card>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30">
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Document</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Type</th>
-                                        <th className="text-right px-6 py-3 font-medium text-muted-foreground">Amount</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Awaiting</th>
-                                        <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {isLoading ? (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading approvals...</td></tr>
-                                    ) : isError ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center">
-                                                <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                                <p className="text-muted-foreground">Couldn&apos;t load approvals</p>
-                                                <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                            </td>
-                                        </tr>
-                                    ) : rows.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center">
-                                                <Inbox className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                <p className="text-muted-foreground">
-                                                    {tab === 'inbox' ? 'Nothing awaiting your approval' : 'No approval requests'}
-                                                </p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        rows.map((req) => (
-                                            <tr
-                                                key={req.id}
-                                                className="hover:bg-accent/30 transition-colors cursor-pointer"
-                                                onClick={() => { setSelected(req); setComment(''); }}
-                                            >
-                                                <td className="px-6 py-4 font-mono text-xs font-medium">{req.object_reference || req.object_id.slice(0, 8)}</td>
-                                                <td className="px-6 py-4">{MODULE_LABEL[req.module] ?? req.module}</td>
-                                                <td className="px-6 py-4 text-right tabular-nums">{req.amount.toLocaleString()}</td>
-                                                <td className="px-6 py-4 text-muted-foreground">
-                                                    {req.status === 'pending' && req.current_step
-                                                        ? `${req.current_step.name} · ${roleLabel(req.current_step.approver_role)}`
-                                                        : '—'}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge variant={STATUS_VARIANT[req.status] ?? 'default'}>{req.status}</Badge>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<ApprovalRequest>
+                                columns={columns}
+                                rows={rows}
+                                rowKey={(req) => req.id}
+                                loading={isLoading}
+                                error={isError}
+                                onRetry={() => refetch()}
+                                onRowClick={(req) => { setSelected(req); setComment(''); }}
+                                emptyText={tab === 'inbox' ? 'Nothing awaiting your approval' : 'No approval requests'}
+                                storageKey="approvals-col-prefs"
+                            />
                         </div>
                     </CardContent>
                 </Card>

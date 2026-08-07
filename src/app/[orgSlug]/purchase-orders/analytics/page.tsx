@@ -1,11 +1,15 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { useProcurementDashboard, useSupplierPerformance, useRecomputeSupplierPerformance } from '@/hooks/useProcurement';
 import { useSuppliers } from '@/hooks/useSuppliers';
+import type { SupplierPerformance } from '@/lib/api/procurement';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildSupplierPerformanceColumns } from './supplier-performance-columns';
 import { ArrowLeft, ClipboardList, DollarSign, RefreshCw, ShoppingCart, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -16,8 +20,6 @@ const PO_STATUS_COLOR: Record<string, string> = {
     draft: 'bg-muted-foreground/40', sent: 'bg-blue-500', partially_received: 'bg-amber-500', received: 'bg-emerald-500', cancelled: 'bg-red-500',
 };
 
-function pct(n: number) { return `${(n * 100).toFixed(0)}%`; }
-
 export default function ProcurementAnalyticsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
@@ -27,6 +29,8 @@ export default function ProcurementAnalyticsPage() {
     const { data: suppliersPage } = useSuppliers(org);
     const suppliers = suppliersPage?.data ?? [];
     const nameOf = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id.slice(0, 8);
+
+    const columns = useMemo(() => buildSupplierPerformanceColumns({ nameOf }), [suppliers]);
 
     const byStatus = dash?.purchase_orders_by_status ?? {};
     const statusTotal = Object.values(byStatus).reduce((a, b) => a + b, 0) || 1;
@@ -91,30 +95,13 @@ export default function ProcurementAnalyticsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Supplier</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">On-time</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Defect rate</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Avg lead (days)</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Spend</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {(perf?.data?.length ?? 0) === 0 && <tr><td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No supplier performance records yet.</td></tr>}
-                                {perf?.data?.map((p) => (
-                                    <tr key={p.id} className="border-b border-border hover:bg-muted/20">
-                                        <td className="px-6 py-3 font-medium">{nameOf(p.supplier_id)}</td>
-                                        <td className="px-6 py-3 text-right"><Badge variant={p.on_time_delivery_rate >= 0.9 ? 'success' : p.on_time_delivery_rate >= 0.7 ? 'warning' : 'error'}>{pct(p.on_time_delivery_rate)}</Badge></td>
-                                        <td className="px-6 py-3 text-right tabular-nums">{pct(p.defect_rate)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden sm:table-cell">{p.average_lead_time_days.toFixed(1)}</td>
-                                        <td className="px-6 py-3 text-right tabular-nums hidden md:table-cell">{p.total_spend.toLocaleString()}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<SupplierPerformance>
+                            columns={columns}
+                            rows={perf?.data ?? []}
+                            rowKey={(p) => p.id}
+                            emptyText="No supplier performance records yet."
+                        />
                     </div>
                 </CardContent>
             </Card>
