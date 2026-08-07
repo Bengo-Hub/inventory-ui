@@ -1,0 +1,71 @@
+'use client';
+
+// DataTable column definitions for the Stock Take list — split out of page.tsx to
+// mirror the platform's <page>-columns.tsx convention.
+
+import { Badge, Button } from '@/components/ui/base';
+import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
+import type { StockCount, StockCountStatus } from '@/lib/api/stock-counts';
+
+export const STATUS_VARIANT: Record<StockCountStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
+  draft: 'outline',
+  counting: 'warning',
+  review: 'default',
+  approved: 'success',
+  cancelled: 'error',
+};
+
+export const STATUS_LABEL: Record<StockCountStatus, string> = {
+  draft: 'Draft',
+  counting: 'Counting',
+  review: 'In Review',
+  approved: 'Approved',
+  cancelled: 'Cancelled',
+};
+
+export interface StockTakeColumnCallbacks {
+  whName: (id?: string | null) => string;
+}
+
+export function buildStockTakeColumns(cb: StockTakeColumnCallbacks): DataTableColumn<StockCount>[] {
+  return [
+    {
+      key: 'reference',
+      header: 'Reference',
+      primary: true,
+      sortable: true,
+      accessor: (c) => c.reference || 'Untitled count',
+      render: (c) => (c.reference ? <span className="font-medium">{c.reference}</span> : <span className="text-muted-foreground">Untitled count</span>),
+    },
+    {
+      key: 'warehouse',
+      header: 'Location',
+      accessor: (c) => cb.whName(c.warehouse_id),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortable: true,
+      filterable: true,
+      accessor: (c) => STATUS_LABEL[c.status],
+      render: (c) => <Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge>,
+    },
+    {
+      key: 'created_at',
+      header: 'Started',
+      sortable: true,
+      hideBelow: 'sm',
+      accessor: (c) => c.created_at,
+      cellClassName: 'text-muted-foreground',
+      render: (c) => new Date(c.created_at).toLocaleDateString(),
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      exportable: false,
+      mobileAction: true,
+      render: () => <Button variant="ghost" size="sm">Open</Button>,
+    },
+  ];
+}

@@ -1,14 +1,15 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { Pagination } from '@/components/ui/pagination';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLots';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { AlertTriangle, ChevronDown, Layers, Pencil, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildLotColumns, isExpired, isExpiringSoon } from './lot-columns';
+import { AlertTriangle, ChevronDown, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,6 +18,7 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
+// isExpiringSoon / isExpired live in ./lot-columns (shared with column render logic).
 
 function SupplierRefCombobox({
     orgSlug,
@@ -95,19 +97,6 @@ function SupplierRefCombobox({
     );
 }
 
-function isExpiringSoon(expiryDate?: string): boolean {
-    if (!expiryDate) return false;
-    const expiry = new Date(expiryDate);
-    const threshold = new Date();
-    threshold.setDate(threshold.getDate() + EXPIRY_WARNING_DAYS);
-    return expiry <= threshold && expiry > new Date();
-}
-
-function isExpired(expiryDate?: string): boolean {
-    if (!expiryDate) return false;
-    return new Date(expiryDate) <= new Date();
-}
-
 function generateLotNumber(): string {
     const d = new Date();
     const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
@@ -155,6 +144,11 @@ export default function LotsPage() {
     const expiringSoonCount = lots?.filter((l) => isExpiringSoon(l.expiry_date)).length ?? 0;
 
     useMemo(() => { setPage(1); }, [search]);
+
+    const columns = useMemo(
+        () => buildLotColumns({ isDeleting: deleteLot.isPending, onEdit: openEdit, onDelete: handleDelete }),
+        [deleteLot.isPending],
+    );
 
     function openCreate() {
         setEditing(null);
@@ -293,109 +287,24 @@ export default function LotsPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-border bg-muted/30">
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Lot Number</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Item</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground hidden md:table-cell">Warehouse</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Expiry Date</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground hidden sm:table-cell">Quantity</th>
-                                    <th className="text-left px-6 py-3 font-medium text-muted-foreground">Status</th>
-                                    <th className="text-right px-6 py-3 font-medium text-muted-foreground">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-border">
-                                {isLoading ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground">
-                                            Loading lots...
-                                        </td>
-                                    </tr>
-                                ) : isError ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
-                                            <AlertTriangle className="h-10 w-10 mx-auto text-destructive/60 mb-3" />
-                                            <p className="text-muted-foreground">Couldn&apos;t load lots</p>
-                                            <Button variant="outline" size="sm" className="mt-3" onClick={() => refetch()}>Retry</Button>
-                                        </td>
-                                    </tr>
-                                ) : (filtered?.length ?? 0) === 0 ? (
-                                    <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
-                                            <Layers className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No lots found</p>
-                                            <p className="text-xs text-muted-foreground/70 mt-1">Lots are created on PO receive or manually here</p>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    paginatedItems.map((lot) => {
-                                        const expiring = isExpiringSoon(lot.expiry_date);
-                                        const expired = isExpired(lot.expiry_date);
-                                        const statusVariant: 'success' | 'warning' | 'error' | 'default' = expired ? 'error' : expiring ? 'warning' : 'success';
-                                        const statusLabel = expired ? 'Expired' : expiring ? 'Expiring Soon' : 'Active';
-                                        return (
-                                            <tr
-                                                key={lot.id}
-                                                className={`hover:bg-accent/30 transition-colors ${
-                                                    expiring ? 'bg-yellow-500/5' : expired ? 'bg-red-500/5' : ''
-                                                }`}
-                                            >
-                                                <td className="px-6 py-4 font-mono text-xs font-medium">{lot.lot_number}</td>
-                                                <td className="px-6 py-4">
-                                                    <div>{lot.item_name ?? '—'}</div>
-                                                    {lot.item_sku && <div className="text-xs text-muted-foreground font-mono">{lot.item_sku}</div>}
-                                                </td>
-                                                <td className="px-6 py-4 text-muted-foreground hidden md:table-cell">{lot.warehouse_name ?? '—'}</td>
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        {lot.expiry_date ? (
-                                                            <>
-                                                                <span className={expired ? 'text-red-500 font-medium' : expiring ? 'text-yellow-500 font-medium' : ''}>
-                                                                    {new Date(lot.expiry_date).toLocaleDateString()}
-                                                                </span>
-                                                                {(expiring || expired) && (
-                                                                    <AlertTriangle className={`h-3.5 w-3.5 ${expired ? 'text-red-500' : 'text-yellow-500'}`} />
-                                                                )}
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-muted-foreground">N/A</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right font-semibold tabular-nums hidden sm:table-cell">
-                                                    {lot.quantity.toLocaleString()}
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <Badge variant={statusVariant}>{statusLabel}</Badge>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <Button variant="ghost" size="sm" onClick={() => openEdit(lot)}>
-                                                            <Pencil className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="sm"
-                                                            className="text-destructive hover:text-destructive"
-                                                            onClick={() => handleDelete(lot)}
-                                                            disabled={deleteLot.isPending}
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="px-2 pb-2">
+                        <DataTable<Lot>
+                            columns={columns}
+                            rows={paginatedItems}
+                            rowKey={(l) => l.id}
+                            loading={isLoading}
+                            error={isError}
+                            onRetry={() => refetch()}
+                            emptyText="No lots found — lots are created on PO receive or manually here"
+                            storageKey="lots-col-prefs"
+                            rowClassName={(lot) => (isExpired(lot.expiry_date) ? 'bg-red-500/5' : isExpiringSoon(lot.expiry_date) ? 'bg-yellow-500/5' : undefined)}
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={filtered?.length}
+                            pageSize={ITEMS_PER_PAGE}
+                        />
                     </div>
-                    {!isLoading && (filtered?.length ?? 0) > 0 && (
-                        <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
-                    )}
                 </CardContent>
             </Card>
 

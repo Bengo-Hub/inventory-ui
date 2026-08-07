@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
@@ -17,29 +17,15 @@ import {
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
-import type { StockCount, StockCountStatus, StockCountTemplate } from '@/lib/api/stock-counts';
+import type { StockCount, StockCountTemplate } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { ClipboardCheck, ClipboardList, LayoutTemplate, Play, Plus, RefreshCw, Trash2, X } from 'lucide-react';
+import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { buildStockTakeColumns } from './stock-take-columns';
+import { ClipboardCheck, LayoutTemplate, Play, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
-
-const STATUS_VARIANT: Record<StockCountStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
-    draft: 'outline',
-    counting: 'warning',
-    review: 'default',
-    approved: 'success',
-    cancelled: 'error',
-};
-
-const STATUS_LABEL: Record<StockCountStatus, string> = {
-    draft: 'Draft',
-    counting: 'Counting',
-    review: 'In Review',
-    approved: 'Approved',
-    cancelled: 'Cancelled',
-};
 
 interface Category { id: string; name: string }
 
@@ -358,6 +344,8 @@ export default function StockTakePage() {
         return (id?: string | null) => (id ? map.get(id) ?? '—' : '—');
     }, [warehouses]);
 
+    const columns = useMemo(() => buildStockTakeColumns({ whName }), [whName]);
+
     function openCount(id: string) {
         router.push(`/${orgSlug}/stock-take/${id}`);
     }
@@ -474,40 +462,16 @@ export default function StockTakePage() {
 
                 <Card>
                     <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border bg-muted/30 text-xs text-muted-foreground">
-                                        <th className="px-6 py-3 text-left font-medium">Reference</th>
-                                        <th className="px-6 py-3 text-left font-medium">Location</th>
-                                        <th className="px-6 py-3 text-left font-medium">Status</th>
-                                        <th className="px-6 py-3 text-left font-medium">Started</th>
-                                        <th className="px-6 py-3" />
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-border">
-                                    {isLoading ? (
-                                        <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">Loading…</td></tr>
-                                    ) : (counts ?? []).length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center">
-                                                <ClipboardList className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                                <p className="text-muted-foreground">No stock takes yet. Start one to count physical stock and post variances.</p>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        (counts as StockCount[]).map((c) => (
-                                            <tr key={c.id} className="hover:bg-accent/30 cursor-pointer transition-colors" onClick={() => openCount(c.id)}>
-                                                <td className="px-6 py-4 font-medium">{c.reference || <span className="text-muted-foreground">Untitled count</span>}</td>
-                                                <td className="px-6 py-4">{whName(c.warehouse_id)}</td>
-                                                <td className="px-6 py-4"><Badge variant={STATUS_VARIANT[c.status]}>{STATUS_LABEL[c.status]}</Badge></td>
-                                                <td className="px-6 py-4 text-muted-foreground">{new Date(c.created_at).toLocaleDateString()}</td>
-                                                <td className="px-6 py-4 text-right"><Button variant="ghost" size="sm">Open</Button></td>
-                                            </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
+                        <div className="px-2 pb-2">
+                            <DataTable<StockCount>
+                                columns={columns}
+                                rows={counts ?? []}
+                                rowKey={(c) => c.id}
+                                loading={isLoading}
+                                onRowClick={(c) => openCount(c.id)}
+                                emptyText="No stock takes yet. Start one to count physical stock and post variances."
+                                storageKey="stock-take-col-prefs"
+                            />
                         </div>
                     </CardContent>
                 </Card>
