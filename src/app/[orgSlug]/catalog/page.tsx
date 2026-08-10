@@ -10,6 +10,8 @@ import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDra
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
 import { useBulkItemStatus, useCreateItem, useHardDeleteItemAdmin, useItems, useMarkItemEOL, useRestoreItemEOL, useSetItemPrice, useUpdateItem } from '@/hooks/useItems';
 import { useStock, useItemStockHistory } from '@/hooks/useStock';
+import type { StockLevel } from '@/lib/api/stock';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
@@ -149,11 +151,13 @@ function PriceCell({ value, editable, saving, onSave }: {
   );
 }
 
-// ItemLocationsPanel — per-warehouse balance breakdown for one item, via the same GET
-// /inventory/stock endpoint the Stock page uses, now scoped with the new ?item_id= filter
-// (extras_stock.go) instead of a bespoke per-item balances endpoint.
-function ItemLocationsPanel({ orgSlug, itemId }: { orgSlug: string; itemId: string }) {
-  const { data: locations = [], isLoading } = useStock(orgSlug, { item_id: itemId });
+// ItemLocationsPanel — per-warehouse balance breakdown for one item. Takes the already-fetched
+// locations/isLoading from ItemDrawer (one GET /inventory/stock?item_id= call shared with the
+// Stock panel above it) rather than fetching its own copy, so the two panels can never disagree
+// about what's where. activeWarehouseId (when resolved) highlights "here" — the same warehouse
+// Move Stock and Adjust Stock default to — so it's obvious which row the Stock panel's headline
+// number came from.
+function ItemLocationsPanel({ locations, isLoading, activeWarehouseId }: { locations: StockLevel[]; isLoading: boolean; activeWarehouseId?: string }) {
   const sorted = [...locations].sort((a, b) => b.available - a.available);
   return (
     <div className="rounded-xl border border-border p-4">
@@ -170,7 +174,10 @@ function ItemLocationsPanel({ orgSlug, itemId }: { orgSlug: string; itemId: stri
         <ul className="space-y-1.5">
           {sorted.map((loc) => (
             <li key={loc.id} className="flex items-center justify-between text-sm">
-              <span>{loc.warehouse_name}</span>
+              <span className="flex items-center gap-1.5">
+                {loc.warehouse_name}
+                {loc.warehouse_id === activeWarehouseId && <Badge variant="outline" className="text-[10px]">Here</Badge>}
+              </span>
               <span className="font-mono font-semibold tabular-nums">
                 {loc.available.toLocaleString()}
                 {loc.reserved > 0 && (
@@ -236,6 +243,15 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
   const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
   const canMoveStock = can(P.CATALOG_CHANGE);
   const isStockable = STOCKABLE_TYPES.includes(item.type as typeof STOCKABLE_TYPES[number]);
+
+  // The warehouse Move Stock / Adjust Stock would default to — resolved the same way those
+  // actions resolve it, so the Stock panel's headline number always matches what a move from
+  // here would actually see (fixes a live-reported mismatch: the item list's aggregate is a
+  // cross-outlet total for HQ/admin sessions, which silently disagreed with "available here").
+  const activeWH = useActiveWarehouse(orgSlug);
+  const { data: locations = [], isLoading: locationsLoading } = useStock(orgSlug, { item_id: item.id });
+  const hereBalance = locations.find((l) => l.warehouse_id === activeWH.warehouseId);
+  const hereName = activeWH.allWarehouses.find((w) => w.id === activeWH.warehouseId)?.name;
 
   const { data: pricing = [], isLoading: pricingLoading } = useItemPricing(orgSlug, item.id);
   const { data: tiers = [] } = usePricingTiers(orgSlug);
@@ -364,31 +380,53 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
         </div>
       </div>
 
-      {/* Stock — on-hand / available (stockable item types only). */}
+      {/* Stock — on-hand / available AT THE CURRENT LOCATION (the warehouse Move/Adjust Stock
+          would default to), not a cross-outlet aggregate — so this always agrees with what
+          those actions can actually see. Falls back to the item's own (cross-outlet) totals
+          only when no specific warehouse is resolved (e.g. an HQ session on "All Outlets"
+          with nothing selected yet). */}
       {isStockable && (
         <div className="rounded-xl border border-border p-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Stock</p>
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div>
-              <p className="text-xl font-black text-foreground tabular-nums">{item.on_hand ?? '—'}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">On hand</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">
+            Stock{hereName ? ` at ${hereName}` : ' (all outlets)'}
+          </p>
+          {locationsLoading ? (
+            <div className="grid grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-8 rounded bg-muted/50 animate-pulse" />
+              ))}
             </div>
-            <div>
-              <p className="text-xl font-black text-foreground tabular-nums">{item.available ?? '—'}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Available</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-3 text-center">
+              <div>
+                <p className="text-xl font-black text-foreground tabular-nums">
+                  {hereName ? (hereBalance?.on_hand ?? 0) : item.on_hand ?? '—'}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">On hand</p>
+              </div>
+              <div>
+                <p className="text-xl font-black text-foreground tabular-nums">
+                  {hereName ? (hereBalance?.available ?? 0) : item.available ?? '—'}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Available</p>
+              </div>
+              <div>
+                <p className="text-xl font-black text-foreground tabular-nums">
+                  {(hereName ? hereBalance?.reorder_point : undefined) ?? item.reorder_level ?? '—'}
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Reorder at</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xl font-black text-foreground tabular-nums">{item.reorder_level ?? '—'}</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">Reorder at</p>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
       {/* Locations — every warehouse/outlet this item currently has a balance in. An item
           moved out of a location via a stock transfer stops appearing here the instant the
           transfer ships (see MoveStockDialog / transfers.Service.adjustBalance). */}
-      {isStockable && <ItemLocationsPanel orgSlug={orgSlug} itemId={item.id} />}
+      {isStockable && (
+        <ItemLocationsPanel locations={locations} isLoading={locationsLoading} activeWarehouseId={activeWH.warehouseId || undefined} />
+      )}
 
       {/* Movement history — a compact preview of the same per-item ledger (sales, transfers,
           purchases, adjustments) ProductStockHistoryModal shows in full, reused rather than

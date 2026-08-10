@@ -11,7 +11,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
 import { parseDecimal, DECIMAL_STEP } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 export interface MoveStockItem {
@@ -45,6 +45,9 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
   const [destWarehouseId, setDestWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  // Items whose quantity the user has manually edited — auto-fill (below) never overwrites
+  // these, even if the source warehouse changes again.
+  const [touchedQty, setTouchedQty] = useState<Set<string>>(new Set());
 
   // Live "available at the currently-selected source" hint, keyed by SKU — refetches whenever
   // the user changes "From" so the number shown always matches the warehouse a submit would
@@ -53,6 +56,29 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
   // which is exactly the "what am I supposed to type here?" gap this was built to close).
   const { data: sourceStock = [] } = useStock(orgSlug, { warehouse_id: source.warehouseId || undefined });
   const availableBySku = new Map(sourceStock.map((s) => [s.sku, s.available]));
+
+  // Default: moving an item empties it out of the source, so the qty starts at "everything
+  // available here" — editable down for a partial move. Re-applies whenever the resolved
+  // available figure changes (e.g. the user switches "From"), but only for items not yet
+  // manually touched.
+  useEffect(() => {
+    setQuantities((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const item of items) {
+        if (touchedQty.has(item.itemId)) continue;
+        const avail = availableBySku.get(item.sku);
+        if (avail == null) continue;
+        const str = String(avail);
+        if (next[item.itemId] !== str) {
+          next[item.itemId] = str;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceStock]);
 
   const createTransfer = useCreateTransfer(orgSlug);
   const shipTransfer = useShipTransfer(orgSlug);
@@ -185,7 +211,10 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
                           min="0"
                           step={DECIMAL_STEP}
                           value={quantities[item.itemId] ?? ''}
-                          onChange={(e) => setQuantities((q) => ({ ...q, [item.itemId]: e.target.value }))}
+                          onChange={(e) => {
+                            setTouchedQty((t) => new Set(t).add(item.itemId));
+                            setQuantities((q) => ({ ...q, [item.itemId]: e.target.value }));
+                          }}
                         />
                         <p className={`text-[11px] ${avail === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                           {avail != null ? `Available: ${avail.toLocaleString()}` : source.warehouseId ? 'Not stocked here' : 'Select a source'}

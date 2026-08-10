@@ -6,6 +6,7 @@ export interface StockLevel {
   sku: string;
   warehouse_id: string;
   warehouse_name: string;
+  on_hand: number;
   available: number;
   reserved: number;
   reorder_point?: number;
