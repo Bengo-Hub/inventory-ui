@@ -1116,7 +1116,7 @@ export default function CatalogPage() {
           onClose={() => setViewItem(null)}
           onEdit={() => { setEditItem(viewItem); setViewItem(null); }}
           canEdit={canChange}
-          onMoveStock={() => setMoveStockItems([{ itemId: viewItem.id, name: viewItem.name, sku: viewItem.sku, availableQty: viewItem.available ?? undefined }])}
+          onMoveStock={() => setMoveStockItems([{ itemId: viewItem.id, name: viewItem.name, sku: viewItem.sku }])}
           onViewHistory={() => setHistorySku(viewItem.sku)}
         />
       )}

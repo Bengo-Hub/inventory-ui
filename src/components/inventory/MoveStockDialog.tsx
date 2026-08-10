@@ -3,7 +3,8 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useWarehouses } from '@/hooks/useWarehouses';
-import { useCreateTransfer, useShipTransfer, useReceiveTransfer } from '@/hooks/useTransfers';
+import { useStock } from '@/hooks/useStock';
+import { useCreateTransfer, useShipTransfer, useReceiveTransfer, useCancelTransfer } from '@/hooks/useTransfers';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -17,8 +18,6 @@ export interface MoveStockItem {
   itemId: string;
   name: string;
   sku: string;
-  /** Available qty at the currently-resolved source warehouse, if known — prefills the qty input. */
-  availableQty?: number;
 }
 
 interface MoveStockDialogProps {
@@ -45,13 +44,20 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
   const { data: warehouses } = useWarehouses(orgSlug);
   const [destWarehouseId, setDestWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
-  const [quantities, setQuantities] = useState<Record<string, string>>(
-    () => Object.fromEntries(items.map((i) => [i.itemId, i.availableQty != null ? String(i.availableQty) : ''])),
-  );
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+
+  // Live "available at the currently-selected source" hint, keyed by SKU — refetches whenever
+  // the user changes "From" so the number shown always matches the warehouse a submit would
+  // actually ship from (a static/frozen figure captured at open-time would go stale the moment
+  // the picker changes, and gave no signal at all when opened from the Catalog row/bulk actions,
+  // which is exactly the "what am I supposed to type here?" gap this was built to close).
+  const { data: sourceStock = [] } = useStock(orgSlug, { warehouse_id: source.warehouseId || undefined });
+  const availableBySku = new Map(sourceStock.map((s) => [s.sku, s.available]));
 
   const createTransfer = useCreateTransfer(orgSlug);
   const shipTransfer = useShipTransfer(orgSlug);
   const receiveTransfer = useReceiveTransfer(orgSlug);
+  const cancelTransfer = useCancelTransfer(orgSlug);
   const isBusy = createTransfer.isPending || shipTransfer.isPending || receiveTransfer.isPending;
 
   const destOptions = (warehouses ?? []).filter((w) => w.id !== source.warehouseId);
@@ -100,9 +106,16 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
           onClose();
           return;
         }
-        toast.error(await apiErrorMessage(shipErr, 'The move was created but could not ship'), {
-          description: 'Open the Transfers page to retry shipping it.',
-        });
+        // A real failure (not an approval gate) — e.g. insufficient stock at the source,
+        // confirmed live: shipping a zero-stock source returns this instead of an approval
+        // gate. Cancel the draft so it doesn't sit orphaned in the Transfers list; the user
+        // just retries the move with a valid quantity/source instead of hunting it down.
+        try {
+          await cancelTransfer.mutateAsync(transfer.id);
+        } catch {
+          // Best-effort cleanup — surfacing the original ship error below matters more.
+        }
+        toast.error(await apiErrorMessage(shipErr, 'Failed to move stock — the source may not have enough available'));
         onDone?.();
         onClose();
         return;
@@ -156,27 +169,31 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
               </div>
 
               <div className="space-y-2">
-                {items.map((item) => (
-                  <div key={item.itemId} className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
+                <p className="text-xs font-medium text-muted-foreground">Quantity to move</p>
+                {items.map((item) => {
+                  const avail = availableBySku.get(item.sku);
+                  return (
+                    <div key={item.itemId} className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
+                      </div>
+                      <div className="w-32 shrink-0 space-y-1">
+                        <Input
+                          type="number"
+                          placeholder="Qty"
+                          min="0"
+                          step={DECIMAL_STEP}
+                          value={quantities[item.itemId] ?? ''}
+                          onChange={(e) => setQuantities((q) => ({ ...q, [item.itemId]: e.target.value }))}
+                        />
+                        <p className={`text-[11px] ${avail === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                          {avail != null ? `Available: ${avail.toLocaleString()}` : source.warehouseId ? 'Not stocked here' : 'Select a source'}
+                        </p>
+                      </div>
                     </div>
-                    <div className="w-28 shrink-0 space-y-1">
-                      <Input
-                        type="number"
-                        placeholder="0"
-                        min="0"
-                        step={DECIMAL_STEP}
-                        value={quantities[item.itemId] ?? ''}
-                        onChange={(e) => setQuantities((q) => ({ ...q, [item.itemId]: e.target.value }))}
-                      />
-                      {item.availableQty != null && (
-                        <p className="text-[11px] text-muted-foreground">Avail: {item.availableQty.toLocaleString()}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="space-y-2">
