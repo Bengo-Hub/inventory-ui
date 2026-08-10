@@ -394,6 +394,13 @@ export const itemsApi = {
   restoreEOL: (orgSlug: string, sku: string) =>
     apiClient.post<Item>(`${itemsBase(orgSlug)}/${sku}/eol/restore`, {}),
 
+  // Permanent hard-delete — platform-owner-only (gated server-side by RequirePlatformOwner()
+  // on the /admin tree, not by orgSlug/tenant permission), bypassing the EOL retention window.
+  // Refuses (409) when the item carries transactional history that must be preserved for the
+  // audit trail — mark it End-of-Life instead and let the retention purge run.
+  hardDeleteAdmin: (tenantId: string, sku: string) =>
+    apiClient.delete<{ status: string }>(`/api/v1/admin/inventory/tenants/${tenantId}/items/${encodeURIComponent(sku)}`),
+
   // setPrice is the targeted selling-price correction endpoint (PATCH /items/{sku}/price →
   // SetSellingPriceBySKU) — the platform's single price-adjustment choke point: it updates
   // guardrails + RETAIL/WHOLESALE tier rows, cascades to the linked recipe's selling_price for

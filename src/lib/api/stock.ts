@@ -72,6 +72,9 @@ export interface StockListParams {
   out_of_stock?: boolean;
   category_id?: string;
   type?: string;
+  /** Scope to a single item's balances across every warehouse — the item drawer's Locations
+   *  panel and the Move Stock dialog's "available at source" lookup both use this. */
+  item_id?: string;
 }
 
 export interface StockExportParams extends StockListParams {

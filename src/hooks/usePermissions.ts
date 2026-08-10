@@ -20,10 +20,16 @@ import { useMemo } from 'react';
 import { useAuthStore } from '@/store/auth';
 import { P } from '@/lib/rbac/permissions';
 import { ADMIN_ROLE_ALIASES } from '@/lib/auth/api';
+import { isPlatformOwner as checkIsPlatformOwner } from '@/lib/auth/permissions';
 import type { Permission } from '@/lib/auth/types';
 
 export function usePermissions() {
   const user = useAuthStore((s) => s.user);
+
+  // Platform-owner-ONLY gate (the codevertex platform operator) — distinct from isSuperuser
+  // below, which also passes tenant admins/owners. Use this (not isSuperuser) for any action
+  // that must never be reachable by a tenant, however privileged (e.g. permanent hard-delete).
+  const isPlatformOwner = useMemo(() => checkIsPlatformOwner(user), [user]);
 
   const isSuperuser = useMemo(() => {
     if (!user) return false;
@@ -55,7 +61,7 @@ export function usePermissions() {
     return permissions.every((p) => granted.has(p));
   }
 
-  return { can, canAny, canAll, isSuperuser, permissions: granted };
+  return { can, canAny, canAll, isSuperuser, isPlatformOwner, permissions: granted };
 }
 
 // Re-export P + Permission so consumers import everything from one place.

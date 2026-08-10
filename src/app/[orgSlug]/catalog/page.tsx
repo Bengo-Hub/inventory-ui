@@ -8,7 +8,8 @@ import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { ProductsExportDialog } from '@/components/inventory/ExportDialogs';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
-import { useBulkDeleteItems, useBulkItemStatus, useCreateItem, useDeleteItem, useItems, useSetItemPrice, useUpdateItem } from '@/hooks/useItems';
+import { useBulkItemStatus, useCreateItem, useHardDeleteItemAdmin, useItems, useMarkItemEOL, useRestoreItemEOL, useSetItemPrice, useUpdateItem } from '@/hooks/useItems';
+import { useStock, useItemStockHistory } from '@/hooks/useStock';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
@@ -18,8 +19,9 @@ import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, BadgeCheck, Ban, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
 import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
+import { MoveStockDialog, type MoveStockItem } from '@/components/inventory/MoveStockDialog';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -31,6 +33,11 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal } from '@/lib/utils';
 
+
+// Item types that hold physical on-hand stock — mirrors the backend's stockableTypes filter
+// (extras_stock.go) and stock/page.tsx's STOCKABLE_TYPES. Gates the Move-stock action, the
+// drawer's Locations panel, and the EOL-while-in-stock warning.
+const STOCKABLE_TYPES = ['GOODS', 'INGREDIENT', 'EQUIPMENT'] as const;
 
 const KES = (n?: number | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
@@ -142,13 +149,93 @@ function PriceCell({ value, editable, saving, onSave }: {
   );
 }
 
-function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: () => void; onEdit: () => void; canEdit: boolean }) {
+// ItemLocationsPanel — per-warehouse balance breakdown for one item, via the same GET
+// /inventory/stock endpoint the Stock page uses, now scoped with the new ?item_id= filter
+// (extras_stock.go) instead of a bespoke per-item balances endpoint.
+function ItemLocationsPanel({ orgSlug, itemId }: { orgSlug: string; itemId: string }) {
+  const { data: locations = [], isLoading } = useStock(orgSlug, { item_id: itemId });
+  const sorted = [...locations].sort((a, b) => b.available - a.available);
+  return (
+    <div className="rounded-xl border border-border p-4">
+      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Locations</p>
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-4 rounded bg-muted/50 animate-pulse" style={{ width: `${70 - i * 15}%` }} />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
+        <p className="text-sm text-muted-foreground">Not stocked at any location yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {sorted.map((loc) => (
+            <li key={loc.id} className="flex items-center justify-between text-sm">
+              <span>{loc.warehouse_name}</span>
+              <span className="font-mono font-semibold tabular-nums">
+                {loc.available.toLocaleString()}
+                {loc.reserved > 0 && (
+                  <span className="text-muted-foreground font-normal"> ({loc.reserved.toLocaleString()} reserved)</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ItemHistoryPreview — a compact last-5-movements preview of the exact same ledger
+// ProductStockHistoryModal renders in full (same hook, same data), so the drawer shows
+// movement history inline without duplicating the ledger-building logic.
+function ItemHistoryPreview({ orgSlug, sku, onViewFull }: { orgSlug: string; sku: string; onViewFull: () => void }) {
+  const { data, isLoading } = useItemStockHistory(orgSlug, sku, { limit: 5 });
+  const rows = data?.data ?? [];
+  return (
+    <div className="rounded-xl border border-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Movement History</p>
+        <button type="button" onClick={onViewFull} className="text-xs font-medium text-primary hover:underline">
+          View full history
+        </button>
+      </div>
+      {isLoading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-4 rounded bg-muted/50 animate-pulse" />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No stock movements recorded yet.</p>
+      ) : (
+        <ul className="space-y-1.5">
+          {rows.map((r, i) => (
+            <li key={`${r.type}-${r.occurred_at}-${i}`} className="flex items-center justify-between gap-2 text-xs">
+              <span className="text-muted-foreground truncate">
+                {r.label}{r.warehouse_name ? ` · ${r.warehouse_name}` : ''}
+              </span>
+              <span className={`shrink-0 font-mono font-semibold ${r.quantity_change >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                {r.quantity_change >= 0 ? '+' : ''}{r.quantity_change.toLocaleString()}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory }: {
+  item: Item; onClose: () => void; onEdit: () => void; canEdit: boolean;
+  onMoveStock: () => void; onViewHistory: () => void;
+}) {
   const params = useParams();
   const orgSlug = (params?.orgSlug as string) ?? '';
   const router = useRouter();
-  const { canAny } = usePermissions();
+  const { can, canAny } = usePermissions();
   const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
-  const isStockable = ['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(item.type);
+  const canMoveStock = can(P.CATALOG_CHANGE);
+  const isStockable = STOCKABLE_TYPES.includes(item.type as typeof STOCKABLE_TYPES[number]);
 
   const { data: pricing = [], isLoading: pricingLoading } = useItemPricing(orgSlug, item.id);
   const { data: tiers = [] } = usePricingTiers(orgSlug);
@@ -210,6 +297,11 @@ function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: (
           {isStockable && canAdjust && (
             <Button size="sm" variant="outline" onClick={goAdjust}>
               <ClipboardList className="h-3.5 w-3.5 mr-1" />Adjust Stock
+            </Button>
+          )}
+          {isStockable && canMoveStock && (
+            <Button size="sm" variant="outline" onClick={onMoveStock}>
+              <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Move Stock
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={() => router.push(`/${orgSlug}/catalog/${item.id}`)}>
@@ -293,6 +385,16 @@ function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: (
         </div>
       )}
 
+      {/* Locations — every warehouse/outlet this item currently has a balance in. An item
+          moved out of a location via a stock transfer stops appearing here the instant the
+          transfer ships (see MoveStockDialog / transfers.Service.adjustBalance). */}
+      {isStockable && <ItemLocationsPanel orgSlug={orgSlug} itemId={item.id} />}
+
+      {/* Movement history — a compact preview of the same per-item ledger (sales, transfers,
+          purchases, adjustments) ProductStockHistoryModal shows in full, reused rather than
+          duplicated; "View full history" opens that exact modal. */}
+      {isStockable && <ItemHistoryPreview orgSlug={orgSlug} sku={item.sku} onViewFull={onViewHistory} />}
+
       {/* Compliance flags + tags. */}
       {(item.is_perishable || item.requires_age_verification || item.track_lots || item.is_controlled_substance || item.track_serial_numbers) && (
         <div className="flex flex-wrap gap-2">
@@ -315,39 +417,6 @@ function ItemDrawer({ item, onClose, onEdit, canEdit }: { item: Item; onClose: (
         </div>
       )}
     </DetailDrawer>
-  );
-}
-
-function DeleteConfirm({
-  itemName,
-  onConfirm,
-  onCancel,
-  isPending,
-}: {
-  itemName: string;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative z-50 bg-background rounded-xl shadow-2xl p-6 max-w-sm w-full mx-4 space-y-4">
-        <h3 className="font-semibold text-lg">Delete Item</h3>
-        <p className="text-sm text-muted-foreground">
-          Are you sure you want to delete{' '}
-          <span className="font-medium text-foreground">{itemName}</span>? This action cannot be undone.
-        </p>
-        <div className="flex gap-3 pt-2">
-          <Button variant="outline" className="flex-1" onClick={onCancel} disabled={isPending}>
-            Cancel
-          </Button>
-          <Button variant="destructive" className="flex-1" onClick={onConfirm} disabled={isPending}>
-            {isPending ? 'Deleting...' : 'Delete'}
-          </Button>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -376,7 +445,7 @@ export default function CatalogPage() {
     });
     return false;
   }
-  const { can, canAny } = usePermissions();
+  const { can, canAny, isPlatformOwner } = usePermissions();
   const canAdd = can(P.CATALOG_ADD);
   const canChange = can(P.CATALOG_CHANGE);
   const canDelete = can(P.CATALOG_DELETE);
@@ -402,12 +471,17 @@ export default function CatalogPage() {
   const [page, setPage] = useState(1);
   // Row selection for bulk multi-select actions (keyed by item id).
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [bulkConfirm, setBulkConfirm] = useState<{ action: 'delete' | 'deactivate' | 'activate' | 'not_for_sale_on' | 'not_for_sale_off'; ids: string[] } | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState<{ action: 'mark_eol' | 'deactivate' | 'activate' | 'not_for_sale_on' | 'not_for_sale_off'; ids: string[] } | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   useCreateFromQuery(() => setCreateOpen(true), 'item'); // mobile quick-add → open Add Item
   const [viewItem, setViewItem] = useState<Item | null>(null);
   const [editItem, setEditItem] = useState<Item | null>(null);
-  const [deleteItem, setDeleteItem] = useState<Item | null>(null);
+  // EOL mark/restore confirm — replaces the old hard-delete-by-default flow (tenant-facing
+  // off-boarding path). availableQty (when known) drives the "still has stock" warning.
+  const [eolConfirm, setEolConfirm] = useState<{ sku: string; name: string; action: 'mark' | 'restore'; availableQty?: number } | null>(null);
+  // Permanent hard-delete — platform-owner-only, kept fully separate from the EOL confirm above.
+  const [hardDeleteConfirm, setHardDeleteConfirm] = useState<Item | null>(null);
+  const [moveStockItems, setMoveStockItems] = useState<MoveStockItem[] | null>(null);
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
   const [historySku, setHistorySku] = useState<string | null>(null);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
@@ -416,8 +490,9 @@ export default function CatalogPage() {
   const createItem = useCreateItem(orgSlug);
   const updateItem = useUpdateItem(orgSlug);
   const setItemPrice = useSetItemPrice(orgSlug);
-  const deleteItemMut = useDeleteItem(orgSlug);
-  const bulkDelete = useBulkDeleteItems(orgSlug);
+  const markEOL = useMarkItemEOL(orgSlug);
+  const restoreEOL = useRestoreItemEOL(orgSlug);
+  const hardDeleteAdmin = useHardDeleteItemAdmin(orgSlug);
   const bulkStatus = useBulkItemStatus(orgSlug);
   const { data: categories } = useCategories(orgSlug);
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
@@ -460,15 +535,29 @@ export default function CatalogPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
-  function handleDelete() {
-    if (!deleteItem) return;
-    deleteItemMut.mutate(deleteItem.sku, {
+  function runEOLConfirm() {
+    if (!eolConfirm) return;
+    const { sku, name, action } = eolConfirm;
+    const mut = action === 'mark' ? markEOL : restoreEOL;
+    mut.mutate(sku, {
       onSuccess: () => {
-        toast.success('Item deleted');
-        setDeleteItem(null);
-        if (viewItem?.id === deleteItem.id) setViewItem(null);
+        toast.success(action === 'mark' ? `${name} marked End-of-Life` : `${name} restored`);
+        setEolConfirm(null);
       },
-      onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete item')),
+      onError: async (e) => toast.error(await apiErrorMessage(e, 'Action failed')),
+    });
+  }
+
+  function handleHardDelete() {
+    if (!hardDeleteConfirm) return;
+    hardDeleteAdmin.mutate(hardDeleteConfirm.sku, {
+      onSuccess: () => {
+        toast.success(`${hardDeleteConfirm.name} permanently deleted`);
+        setHardDeleteConfirm(null);
+        if (viewItem?.id === hardDeleteConfirm.id) setViewItem(null);
+      },
+      onError: async (e) =>
+        toast.error(await apiErrorMessage(e, 'Failed to permanently delete — it may have transaction history; mark it End-of-Life instead')),
     });
   }
 
@@ -490,10 +579,26 @@ export default function CatalogPage() {
   // Bulk multi-select actions — idempotent server-side; the skipped[] breakdown
   // is surfaced in the toast so users see e.g. "2 updated, 1 skipped (in use)".
   const bulkLabel: Record<string, string> = {
-    delete: 'delete', deactivate: 'deactivate', activate: 'activate',
+    deactivate: 'deactivate', activate: 'activate',
     not_for_sale_on: 'mark not-for-sale', not_for_sale_off: 'mark for sale',
   };
+  // Bulk EOL has no single backend batch endpoint (MarkItemEOL is SKU-scoped, one call each) —
+  // loop with allSettled so one failure doesn't abort the rest, matching the idempotent-bulk UX
+  // every other bulk action here already has.
+  async function runBulkEOL(ids: string[]) {
+    const targets = items.filter((i) => ids.includes(i.id));
+    const results = await Promise.allSettled(targets.map((i) => markEOL.mutateAsync(i.sku)));
+    const succeeded = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - succeeded;
+    toast.success(`${succeeded} marked End-of-Life${failed ? `, ${failed} failed` : ''}`);
+    setSelected(new Set());
+    setBulkConfirm(null);
+  }
   function runBulk(action: NonNullable<typeof bulkConfirm>['action'], ids: string[]) {
+    if (action === 'mark_eol') {
+      void runBulkEOL(ids);
+      return;
+    }
     const done = (res: { processed: number; skipped: { reason: string }[] }) => {
       const parts = [`${res.processed} ${bulkLabel[action]}${res.processed === 1 ? '' : 'd'}`];
       if (res.skipped.length) parts.push(`${res.skipped.length} skipped`);
@@ -502,8 +607,7 @@ export default function CatalogPage() {
       setBulkConfirm(null);
     };
     const onError = async (e: unknown) => toast.error(await apiErrorMessage(e, 'Bulk action failed'));
-    if (action === 'delete') bulkDelete.mutate(ids, { onSuccess: done, onError });
-    else bulkStatus.mutate({ ids, action }, { onSuccess: done, onError });
+    bulkStatus.mutate({ ids, action }, { onSuccess: done, onError });
   }
 
   // Selection may reference items no longer on the current page (filter/page change);
@@ -629,24 +733,44 @@ export default function CatalogPage() {
     },
     {
       key: 'actions', header: '', align: 'right', exportable: false,
-      render: (item) => (
-        <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
-          <button title="View details" aria-label="View item details" onClick={() => setViewItem(item)}
-            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Eye className="h-4 w-4" /></button>
-          <button title="Product stock history" aria-label="Product stock history" onClick={() => setHistorySku(item.sku)}
-            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><History className="h-4 w-4" /></button>
-          <button title="Show / print barcode" aria-label="Show item barcode" onClick={() => setBarcodeItem(item)}
-            className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Barcode className="h-4 w-4" /></button>
-          {canChange && (
-            <button title="Edit item" aria-label="Edit item" onClick={() => setEditItem(item)}
-              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Edit2 className="h-4 w-4" /></button>
-          )}
-          {canDelete && (
-            <button title="Delete item" aria-label="Delete item" onClick={() => setDeleteItem(item)}
-              className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
-          )}
-        </div>
-      ),
+      render: (item) => {
+        const isStockable = STOCKABLE_TYPES.includes(item.type as typeof STOCKABLE_TYPES[number]);
+        const isEOL = !!item.end_of_life_at;
+        return (
+          <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
+            <button title="View details" aria-label="View item details" onClick={() => setViewItem(item)}
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Eye className="h-4 w-4" /></button>
+            <button title="Product stock history" aria-label="Product stock history" onClick={() => setHistorySku(item.sku)}
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><History className="h-4 w-4" /></button>
+            <button title="Show / print barcode" aria-label="Show item barcode" onClick={() => setBarcodeItem(item)}
+              className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Barcode className="h-4 w-4" /></button>
+            {isStockable && canChange && (
+              <button title="Move stock to another outlet/warehouse" aria-label="Move stock" onClick={() => setMoveStockItems([{ itemId: item.id, name: item.name, sku: item.sku }])}
+                className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><ArrowRightLeft className="h-4 w-4" /></button>
+            )}
+            {canChange && (
+              <button title="Edit item" aria-label="Edit item" onClick={() => setEditItem(item)}
+                className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Edit2 className="h-4 w-4" /></button>
+            )}
+            {canDelete && (
+              isEOL ? (
+                <button title="Restore item" aria-label="Restore item" onClick={() => setEolConfirm({ sku: item.sku, name: item.name, action: 'restore' })}
+                  className="p-1.5 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-950/30 text-muted-foreground hover:text-emerald-600 transition-colors"><RotateCcw className="h-4 w-4" /></button>
+              ) : (
+                <button title="Mark End-of-Life" aria-label="Mark item End-of-Life" onClick={() => setEolConfirm({
+                  sku: item.sku, name: item.name, action: 'mark',
+                  availableQty: isStockable ? (item.available ?? 0) : undefined,
+                })}
+                  className="p-1.5 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-950/30 text-muted-foreground hover:text-amber-600 transition-colors"><PackageX className="h-4 w-4" /></button>
+              )
+            )}
+            {isPlatformOwner && (
+              <button title="Permanently delete (platform admin)" aria-label="Permanently delete item" onClick={() => setHardDeleteConfirm(item)}
+                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 text-muted-foreground hover:text-red-500 transition-colors"><Trash2 className="h-4 w-4" /></button>
+            )}
+          </div>
+        );
+      },
     },
   ];
 
@@ -658,10 +782,21 @@ export default function CatalogPage() {
       { key: 'deactivate', label: 'Deactivate', icon: <PackageX className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'deactivate', ids }) },
       { key: 'nfs_on', label: 'Mark not-for-sale', icon: <Ban className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'not_for_sale_on', ids }) },
       { key: 'nfs_off', label: 'Mark for sale', icon: <ShoppingCart className="h-3.5 w-3.5" />, onClick: (ids) => setBulkConfirm({ action: 'not_for_sale_off', ids }) },
+      {
+        key: 'move', label: 'Move to location', icon: <ArrowRightLeft className="h-3.5 w-3.5" />,
+        onClick: (ids) => {
+          const targets = items.filter((i) => ids.includes(i.id) && STOCKABLE_TYPES.includes(i.type as typeof STOCKABLE_TYPES[number]));
+          if (targets.length === 0) {
+            toast.error('None of the selected items can hold stock');
+            return;
+          }
+          setMoveStockItems(targets.map((i) => ({ itemId: i.id, name: i.name, sku: i.sku })));
+        },
+      },
     );
   }
   if (canDelete) {
-    bulkActions.push({ key: 'delete', label: 'Delete', icon: <Trash2 className="h-3.5 w-3.5" />, variant: 'destructive', onClick: (ids) => setBulkConfirm({ action: 'delete', ids }) });
+    bulkActions.push({ key: 'mark_eol', label: 'Mark End-of-Life', icon: <PackageX className="h-3.5 w-3.5" />, variant: 'destructive', onClick: (ids) => setBulkConfirm({ action: 'mark_eol', ids }) });
   }
 
   return (
@@ -981,16 +1116,48 @@ export default function CatalogPage() {
           onClose={() => setViewItem(null)}
           onEdit={() => { setEditItem(viewItem); setViewItem(null); }}
           canEdit={canChange}
+          onMoveStock={() => setMoveStockItems([{ itemId: viewItem.id, name: viewItem.name, sku: viewItem.sku, availableQty: viewItem.available ?? undefined }])}
+          onViewHistory={() => setHistorySku(viewItem.sku)}
         />
       )}
 
-      {/* Delete confirmation */}
-      {deleteItem && (
-        <DeleteConfirm
-          itemName={deleteItem.name}
-          onConfirm={handleDelete}
-          onCancel={() => setDeleteItem(null)}
-          isPending={deleteItemMut.isPending}
+      {/* EOL mark/restore confirmation — the tenant-facing off-boarding path (replaces hard delete). */}
+      <ConfirmDialog
+        open={!!eolConfirm}
+        variant={eolConfirm?.action === 'mark' ? 'danger' : 'info'}
+        title={eolConfirm?.action === 'mark' ? 'Mark End-of-Life?' : 'Restore item?'}
+        description={
+          eolConfirm?.action === 'mark'
+            ? (eolConfirm.availableQty && eolConfirm.availableQty > 0
+                ? `"${eolConfirm.name}" still has ${eolConfirm.availableQty.toLocaleString()} unit(s) in stock. An item should ideally only be marked End-of-Life once it's out of stock — proceeding will still hide it from the POS, catalog, and ordering immediately, and permanently delete it after the retention window. You can restore it before then from Stock → End of Life.`
+                : `"${eolConfirm?.name}" will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore it before then from Stock → End of Life.`)
+            : `"${eolConfirm?.name}" will be re-activated and reappear in the catalog and POS.`
+        }
+        confirmLabel={eolConfirm?.action === 'mark' ? 'Mark End-of-Life' : 'Restore'}
+        onConfirm={runEOLConfirm}
+        onCancel={() => setEolConfirm(null)}
+      />
+
+      {/* Permanent hard-delete — platform admin only. */}
+      {hardDeleteConfirm && (
+        <ConfirmDialog
+          open
+          variant="danger"
+          title="Permanently delete this item?"
+          description={`"${hardDeleteConfirm.name}" and all its pricing, stock, and lot records will be permanently deleted. This cannot be undone. If it has any transaction history (purchases, sales, adjustments), the deletion will be refused — mark it End-of-Life instead.`}
+          confirmLabel={hardDeleteAdmin.isPending ? 'Deleting...' : 'Permanently delete'}
+          onConfirm={handleHardDelete}
+          onCancel={() => setHardDeleteConfirm(null)}
+        />
+      )}
+
+      {/* Move stock between outlets/warehouses — single item or batch. */}
+      {moveStockItems && moveStockItems.length > 0 && (
+        <MoveStockDialog
+          orgSlug={orgSlug}
+          items={moveStockItems}
+          onClose={() => setMoveStockItems(null)}
+          onDone={() => refetch()}
         />
       )}
 
@@ -1028,18 +1195,26 @@ export default function CatalogPage() {
       {bulkConfirm && (
         <ConfirmDialog
           open
-          title={`${bulkConfirm.action === 'delete' ? 'Delete' : bulkConfirm.action === 'activate' ? 'Activate' : bulkConfirm.action === 'deactivate' ? 'Deactivate' : bulkConfirm.action === 'not_for_sale_on' ? 'Mark not-for-sale' : 'Mark for sale'} ${bulkConfirm.ids.length} item${bulkConfirm.ids.length === 1 ? '' : 's'}?`}
+          title={`${bulkConfirm.action === 'mark_eol' ? 'Mark End-of-Life' : bulkConfirm.action === 'activate' ? 'Activate' : bulkConfirm.action === 'deactivate' ? 'Deactivate' : bulkConfirm.action === 'not_for_sale_on' ? 'Mark not-for-sale' : 'Mark for sale'} ${bulkConfirm.ids.length} item${bulkConfirm.ids.length === 1 ? '' : 's'}?`}
           description={
-            bulkConfirm.action === 'delete'
-              ? 'The selected items will be deactivated (soft-deleted). Items already inactive are skipped.'
+            bulkConfirm.action === 'mark_eol'
+              ? (() => {
+                  const withStock = items.filter(
+                    (i) => bulkConfirm.ids.includes(i.id) && STOCKABLE_TYPES.includes(i.type as typeof STOCKABLE_TYPES[number]) && (i.available ?? 0) > 0,
+                  ).length;
+                  const base = 'The selected items will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore any of them before then from Stock → End of Life.';
+                  return withStock > 0
+                    ? `${withStock} of the ${bulkConfirm.ids.length} selected item(s) still have stock. An item should ideally only be marked End-of-Life once it's out of stock. ${base}`
+                    : base;
+                })()
               : bulkConfirm.action === 'not_for_sale_on'
                 ? 'The selected items will be hidden from every sales interface (POS, ordering). They stay stockable and purchasable.'
                 : bulkConfirm.action === 'not_for_sale_off'
                   ? 'The selected items will become sellable again on the POS and ordering surfaces.'
                   : `The selected items will be ${bulkConfirm.action}d. Items already in that state are skipped.`
           }
-          variant={bulkConfirm.action === 'delete' ? 'danger' : 'info'}
-          confirmLabel={bulkConfirm.action === 'delete' ? 'Delete' : 'Confirm'}
+          variant={bulkConfirm.action === 'mark_eol' ? 'danger' : 'info'}
+          confirmLabel={bulkConfirm.action === 'mark_eol' ? 'Mark End-of-Life' : 'Confirm'}
           onCancel={() => setBulkConfirm(null)}
           onConfirm={() => runBulk(bulkConfirm.action, bulkConfirm.ids)}
         />

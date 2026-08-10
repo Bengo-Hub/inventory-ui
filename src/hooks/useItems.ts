@@ -9,6 +9,7 @@ import {
   type UpdateItemInput,
   type PaginatedItems,
 } from '@/lib/api/items';
+import { useAuthStore } from '@/store/auth';
 
 const ITEMS_KEY = 'items';
 
@@ -116,6 +117,21 @@ export function useRestoreItemEOL(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (sku: string) => itemsApi.restoreEOL(orgSlug, sku),
+    onSuccess: () => invalidateItemViews(queryClient, orgSlug),
+  });
+}
+
+// Platform-owner-only permanent hard-delete. tenant_id (not orgSlug) is required because the
+// endpoint lives under /admin, outside the {tenant} URL scope — read from the auth store rather
+// than threaded through every caller.
+export function useHardDeleteItemAdmin(orgSlug: string) {
+  const queryClient = useQueryClient();
+  const tenantId = useAuthStore((s) => s.user?.tenant_id);
+  return useMutation({
+    mutationFn: (sku: string) => {
+      if (!tenantId) throw new Error('Missing tenant id');
+      return itemsApi.hardDeleteAdmin(tenantId, sku);
+    },
     onSuccess: () => invalidateItemViews(queryClient, orgSlug),
   });
 }
