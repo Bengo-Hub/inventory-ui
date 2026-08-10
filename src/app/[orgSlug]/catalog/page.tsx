@@ -504,7 +504,9 @@ export default function CatalogPage() {
   // flagged not_for_sale (ingredients, supplies).
   const [notForSaleOnly, setNotForSaleOnly] = useState(false);
   // Server-driven DataTable sort (whitelisted columns on inventory-api).
-  const [sort, setSort] = useState<SortState | null>(null);
+  // Defaults to lowest-stock-first so low/out-of-stock items surface immediately for triage;
+  // still a normal server-driven sort the user can change/clear like any other column.
+  const [sort, setSort] = useState<SortState | null>({ key: 'on_hand', dir: 'asc' });
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
   // Row selection for bulk multi-select actions (keyed by item id).
@@ -752,6 +754,21 @@ export default function CatalogPage() {
     {
       key: 'type', header: 'Type', accessor: (i) => i.type, sortable: true, filterable: true, hideBelow: 'sm',
       render: (i) => <Badge variant="outline" className="capitalize">{i.type?.toLowerCase() ?? '—'}</Badge>,
+    },
+    {
+      key: 'on_hand', header: 'In Stock', align: 'right', sortable: true, hideBelow: 'sm',
+      accessor: (i) => i.on_hand,
+      cellClassName: 'font-mono text-xs tabular-nums',
+      render: (i) => {
+        if (i.on_hand == null) return <span className="text-muted-foreground">—</span>;
+        const out = i.on_hand <= 0;
+        const low = !out && i.reorder_level != null && i.on_hand <= i.reorder_level;
+        return (
+          <span className={out ? 'font-semibold text-destructive' : low ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-foreground'}>
+            {i.on_hand.toLocaleString()}
+          </span>
+        );
+      },
     },
     {
       key: 'cost_price', header: 'Cost', align: 'right', sortable: true, hideBelow: 'md',
