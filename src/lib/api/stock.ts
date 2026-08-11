@@ -105,6 +105,19 @@ export interface RelocateItemLocationResult {
   skipped: { item_id: string; reason: string }[];
 }
 
+export interface BulkAdjustStockInput {
+  lines: { sku: string; adjustment: number }[];
+  reason: string;
+  reference?: string;
+  notes?: string;
+  warehouse_id?: string;
+}
+
+export interface BulkAdjustStockResult {
+  processed: number;
+  skipped: { sku: string; reason: string }[];
+}
+
 export const stockApi = {
   list: (orgSlug: string, params?: StockListParams) =>
     apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params),
@@ -132,6 +145,9 @@ export const stockApi = {
   // no ship/receive steps, no "insufficient stock" failure mode — see MoveStockDialog.tsx.
   relocate: (orgSlug: string, data: RelocateItemLocationInput) =>
     apiClient.post<RelocateItemLocationResult>(`/api/v1/${orgSlug}/inventory/stock/relocate`, data),
+
+  bulkAdjust: (orgSlug: string, data: BulkAdjustStockInput) =>
+    apiClient.post<BulkAdjustStockResult>(`/api/v1/${orgSlug}/inventory/stock/bulk-adjust`, data),
 
   getSummary: (orgSlug: string) =>
     apiClient.get<{

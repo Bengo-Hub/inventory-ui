@@ -2,7 +2,9 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
-import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
+import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
+import { ADJUSTMENT_REASON_OPTIONS } from '@/lib/adjustment-reasons';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
@@ -44,19 +46,7 @@ function handleApprovalGate(e: unknown): boolean {
     return true;
 }
 
-const REASON_OPTIONS = [
-    { value: 'correction', label: 'Count Correction' },
-    { value: 'damaged', label: 'Damaged Goods' },
-    { value: 'expired', label: 'Expired / Spoiled' },
-    { value: 'shrinkage', label: 'Theft / Unexplained Loss' },
-    // Floor-stock issue of consumables (serviettes, tissues, handwashing supplies) not
-    // tied to any sale — treasury posts the value as an Operating Supplies expense.
-    { value: 'internal_consumption', label: 'Internal Use / Issue to Floor' },
-    { value: 'found', label: 'Found / Surplus Discovered' },
-    { value: 'initial_count', label: 'Initial Stock Count' },
-    { value: 'return', label: 'Customer Return' },
-    { value: 'other', label: 'Other' },
-];
+const REASON_OPTIONS = ADJUSTMENT_REASON_OPTIONS;
 
 interface AdjustmentModalProps {
     orgSlug: string;
@@ -273,6 +263,13 @@ export default function AdjustmentsPage() {
     const [showModal, setShowModal] = useState(false);
     const [prefillSku, setPrefillSku] = useState('');
     const [prefillName, setPrefillName] = useState('');
+    // Bulk adjust: search-and-add items into a working list, then hand it to the shared
+    // BulkAdjustStockDialog (same component the Products and Stock Levels pages open from their
+    // own row selection — this page has no item list of its own to select from, only a history
+    // of past adjustments, so it builds the list via search instead).
+    const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
+    const [bulkItems, setBulkItems] = useState<BulkAdjustStockItem[]>([]);
+    const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
     // Mobile quick-add + "Adjust Stock" deep-links from the catalog drawer land here with
     // ?create=1 (+ optional &sku=&name= to prefill the item).
     useCreateFromQuery(() => {
@@ -325,10 +322,16 @@ export default function AdjustmentsPage() {
                         <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
                     </Button>
                     {canAdjust && (
-                        <Button onClick={() => openModal()}>
-                            <Plus className="h-4 w-4 mr-2" />
-                            New Adjustment
-                        </Button>
+                        <>
+                            <Button variant="outline" onClick={() => { setBulkItems([]); setBulkPickerOpen(true); }}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Bulk Adjust
+                            </Button>
+                            <Button onClick={() => openModal()}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                New Adjustment
+                            </Button>
+                        </>
                     )}
                 </div>
             </div>
@@ -375,6 +378,72 @@ export default function AdjustmentsPage() {
                     onClose={() => setShowModal(false)}
                     prefillSku={prefillSku}
                     prefillName={prefillName}
+                />
+            )}
+
+            {bulkPickerOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setBulkPickerOpen(false)} />
+                    <Card className="relative z-50 w-full max-w-md">
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold">Bulk Adjust — pick items</h2>
+                                <button onClick={() => setBulkPickerOpen(false)} className="p-1 rounded-lg hover:bg-accent transition-colors">
+                                    <X className="h-5 w-5 text-muted-foreground" />
+                                </button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <ItemSearchInput
+                                orgSlug={orgSlug}
+                                value=""
+                                allowCreate={false}
+                                onSelect={(item: ItemResult) => {
+                                    if (bulkItems.some((i) => i.sku === item.sku)) return;
+                                    setBulkItems((prev) => [...prev, { sku: item.sku, name: item.name }]);
+                                }}
+                                placeholder="Search items to add..."
+                            />
+                            {bulkItems.length > 0 && (
+                                <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                                    {bulkItems.map((item) => (
+                                        <div key={item.sku} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-1.5 text-sm">
+                                            <span className="truncate">{item.name}</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setBulkItems((prev) => prev.filter((i) => i.sku !== item.sku))}
+                                                className="p-0.5 rounded hover:bg-muted-foreground/20 shrink-0"
+                                            >
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            <div className="flex gap-3 pt-2">
+                                <Button type="button" variant="outline" className="flex-1" onClick={() => setBulkPickerOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="button"
+                                    className="flex-1"
+                                    disabled={bulkItems.length === 0}
+                                    onClick={() => { setBulkPickerOpen(false); setBulkDialogOpen(true); }}
+                                >
+                                    Continue ({bulkItems.length})
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {bulkDialogOpen && (
+                <BulkAdjustStockDialog
+                    orgSlug={orgSlug}
+                    items={bulkItems}
+                    onClose={() => setBulkDialogOpen(false)}
+                    onDone={() => setBulkItems([])}
                 />
             )}
         </div>

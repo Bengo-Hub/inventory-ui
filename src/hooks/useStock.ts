@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type RelocateItemLocationInput } from '@/lib/api/stock';
+import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type RelocateItemLocationInput, type BulkAdjustStockInput } from '@/lib/api/stock';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
@@ -61,6 +61,22 @@ export function useRelocateItemLocation(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: RelocateItemLocationInput) => stockApi.relocate(orgSlug, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+    },
+  });
+}
+
+// Bulk stock adjustment — one shared warehouse/reason, a per-item delta. Reused by
+// BulkAdjustStockDialog across the Products, Stock Levels, and Adjustments pages (see that
+// component for the single centralized UI all three open).
+export function useBulkAdjustStock(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: BulkAdjustStockInput) => stockApi.bulkAdjust(orgSlug, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });

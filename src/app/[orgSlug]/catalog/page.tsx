@@ -21,9 +21,10 @@ import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardEdit, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
 import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { MoveStockDialog, type MoveStockItem } from '@/components/inventory/MoveStockDialog';
+import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { useOutletStore } from '@/store/outlet';
 import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
@@ -522,6 +523,7 @@ export default function CatalogPage() {
   // Permanent hard-delete — platform-owner-only, kept fully separate from the EOL confirm above.
   const [hardDeleteConfirm, setHardDeleteConfirm] = useState<Item | null>(null);
   const [moveStockItems, setMoveStockItems] = useState<MoveStockItem[] | null>(null);
+  const [bulkAdjustItems, setBulkAdjustItems] = useState<BulkAdjustStockItem[] | null>(null);
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
   const [historySku, setHistorySku] = useState<string | null>(null);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
@@ -855,6 +857,17 @@ export default function CatalogPage() {
             return;
           }
           setMoveStockItems(targets.map((i) => ({ itemId: i.id, name: i.name, sku: i.sku })));
+        },
+      },
+      {
+        key: 'bulk_adjust', label: 'Adjust stock', icon: <ClipboardEdit className="h-3.5 w-3.5" />,
+        onClick: (ids) => {
+          const targets = items.filter((i) => ids.includes(i.id) && STOCKABLE_TYPES.includes(i.type as typeof STOCKABLE_TYPES[number]));
+          if (targets.length === 0) {
+            toast.error('None of the selected items can hold stock');
+            return;
+          }
+          setBulkAdjustItems(targets.map((i) => ({ sku: i.sku, name: i.name })));
         },
       },
     );
@@ -1221,6 +1234,17 @@ export default function CatalogPage() {
           orgSlug={orgSlug}
           items={moveStockItems}
           onClose={() => setMoveStockItems(null)}
+          onDone={() => refetch()}
+        />
+      )}
+
+      {/* Bulk stock adjustment — the same shared dialog the Stock Levels and Adjustments
+          pages open. */}
+      {bulkAdjustItems && bulkAdjustItems.length > 0 && (
+        <BulkAdjustStockDialog
+          orgSlug={orgSlug}
+          items={bulkAdjustItems}
+          onClose={() => setBulkAdjustItems(null)}
           onDone={() => refetch()}
         />
       )}

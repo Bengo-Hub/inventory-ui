@@ -13,7 +13,8 @@ import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
-import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { DataTable, type BulkAction } from '@bengo-hub/shared-ui-lib/data-table';
+import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { buildStockColumns, stockStatus, stockLabel } from './stock-columns';
 import { buildEOLColumns } from './eol-columns';
 import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, Plus, RefreshCw, Search, Split } from 'lucide-react';
@@ -466,6 +467,8 @@ export default function StockPage() {
     // Centralized per-item stock ledger modal (Go-Digital "Product stock history").
     const [historySku, setHistorySku] = useState<string | null>(null);
     const [exportOpen, setExportOpen] = useState(false);
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [bulkAdjustItems, setBulkAdjustItems] = useState<BulkAdjustStockItem[] | null>(null);
 
     function openItem(item: StockLevel, action?: 'adjust' | 'breakdown') {
         setSelectedItem(item);
@@ -529,6 +532,17 @@ export default function StockPage() {
 
     const totalPages = Math.max(1, Math.ceil(filteredStock.length / ITEMS_PER_PAGE));
     const paginatedItems = filteredStock.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+    // Bulk stock adjustment — the same shared dialog the Products and Adjustments pages open.
+    const stockBulkActions: BulkAction[] = canAdjust ? [
+        {
+            key: 'bulk_adjust', label: 'Adjust stock',
+            onClick: (ids) => {
+                const targets = filteredStock.filter((s) => ids.includes(s.id));
+                setBulkAdjustItems(targets.map((s) => ({ sku: s.sku, name: s.item_name })));
+            },
+        },
+    ] : [];
 
     useMemo(() => { setPage(1); }, [search, statusFilter, categoryId, typeFilter]);
 
@@ -671,6 +685,10 @@ export default function StockPage() {
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(item) => openItem(item)}
+                            selectable={canAdjust}
+                            selected={selected}
+                            onSelectedChange={setSelected}
+                            bulkActions={stockBulkActions}
                             rowClassName={(item) =>
                                 item.available <= 0
                                     ? 'bg-red-500/5'
@@ -772,6 +790,17 @@ export default function StockPage() {
                         ...(statusFilter === 'out' ? { out_of_stock: true } : {}),
                     }}
                     onClose={() => setExportOpen(false)}
+                />
+            )}
+
+            {/* Bulk stock adjustment — the same shared dialog the Products and Adjustments
+                pages open. */}
+            {bulkAdjustItems && bulkAdjustItems.length > 0 && (
+                <BulkAdjustStockDialog
+                    orgSlug={orgSlug}
+                    items={bulkAdjustItems}
+                    onClose={() => setBulkAdjustItems(null)}
+                    onDone={() => { setSelected(new Set()); refetch(); }}
                 />
             )}
         </div>
