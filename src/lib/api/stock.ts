@@ -117,6 +117,12 @@ export interface SetItemOutletMembershipInput {
   item_ids: string[];
   target_warehouse_ids: string[];
   notes?: string;
+  /** Only applies to a clean 1-dropped+1-added pair: moves exactly this amount, leaving the
+   * remainder active at the source, instead of the default full move. */
+  move_quantity?: number;
+  /** Opt-in for the general many-to-many case: dropped outlets' stock is discarded rather than
+   * pooled, newly-added outlets start at zero. Confirm with the user before sending this. */
+  zero_stock_mode?: boolean;
 }
 
 /** Returned by any endpoint that queues a background bulk job — see BulkJob below. */

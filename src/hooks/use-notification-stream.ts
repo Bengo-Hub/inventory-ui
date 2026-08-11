@@ -31,6 +31,9 @@ export type NotificationStreamMessage =
 
 interface UseNotificationStreamOptions {
   tenantID: string;
+  /** Scopes the connection to one outlet's pushes (plus tenant-wide ones) — null/undefined for an
+   * HQ "All Outlets" session, which keeps seeing everything for the tenant. */
+  outletID?: string | null;
   onMessage?: (msg: NotificationStreamMessage) => void;
 }
 
@@ -47,7 +50,7 @@ const PING_INTERVAL_MS = 25_000;
  * (silently, with reconnect backoff) if the socket is unavailable — the existing 30s staleTime
  * polling-free reads still work, just without the live push.
  */
-export function useNotificationStream({ tenantID, onMessage }: UseNotificationStreamOptions) {
+export function useNotificationStream({ tenantID, outletID, onMessage }: UseNotificationStreamOptions) {
   const qc = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,6 +68,9 @@ export function useNotificationStream({ tenantID, onMessage }: UseNotificationSt
     const params = new URLSearchParams();
     const token = apiClient.getAccessToken();
     if (token) params.set('access_token', token);
+    // Auth header can't be set on a browser WS either, so outlet scoping rides as a query param
+    // too — the server's usual X-Outlet-ID header path never reaches a WS handshake.
+    if (outletID) params.set('outlet_id', outletID);
     const qs = params.toString();
     const url = `${wsBase}/api/v1/${tenantID}/inventory/notifications/stream${qs ? `?${qs}` : ''}`;
 
@@ -106,7 +112,7 @@ export function useNotificationStream({ tenantID, onMessage }: UseNotificationSt
       attemptRef.current += 1;
       reconnectTimer.current = setTimeout(connect, delay);
     };
-  }, [tenantID, onMessage, qc]);
+  }, [tenantID, outletID, onMessage, qc]);
 
   useEffect(() => {
     unmountedRef.current = false;

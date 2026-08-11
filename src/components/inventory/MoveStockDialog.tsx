@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useStock, useSetItemOutletMembership } from '@/hooks/useStock';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -47,6 +48,9 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
   const [touched, setTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
+  const [zeroStockMode, setZeroStockMode] = useState(false);
+  const [moveQuantity, setMoveQuantity] = useState('');
+  const [confirmingZeroStock, setConfirmingZeroStock] = useState(false);
 
   const isBatch = items.length > 1;
 
@@ -58,6 +62,28 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
     if (isBatch || touched) return;
     setChecked(new Set(currentStock.map((s) => s.warehouse_id)));
   }, [isBatch, touched, currentStock]);
+
+  // A clean 1-dropped+1-added pair (single-item mode only — bulk has no per-item "current" set
+  // to diff against) is the one shape a chosen quantity means anything for: move exactly this
+  // much, leave the remainder at the source, instead of carrying everything to the destination.
+  const originalIds = useMemo(() => new Set(currentStock.map((s) => s.warehouse_id)), [currentStock]);
+  const droppedIds = useMemo(
+    () => (isBatch ? [] : Array.from(originalIds).filter((id) => !checked.has(id))),
+    [isBatch, originalIds, checked],
+  );
+  const addedIds = useMemo(
+    () => (isBatch ? [] : Array.from(checked).filter((id) => !originalIds.has(id))),
+    [isBatch, checked],
+  );
+  const isPartialPairEligible = !zeroStockMode && droppedIds.length === 1 && addedIds.length === 1;
+  const sourceStock = isPartialPairEligible ? currentStock.find((s) => s.warehouse_id === droppedIds[0]) : undefined;
+  const sourceOnHand = sourceStock?.on_hand ?? 0;
+
+  useEffect(() => {
+    // Reset any stale quantity the moment the pair shape changes (a different pair, or no
+    // longer a pair at all) so a leftover value can't silently apply to an unrelated move.
+    setMoveQuantity('');
+  }, [droppedIds[0], addedIds[0]]);
 
   const setMembership = useSetItemOutletMembership(orgSlug);
   const isBusy = setMembership.isPending;
@@ -78,13 +104,15 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function doSubmit() {
+    const qty = isPartialPairEligible ? Number(moveQuantity) : NaN;
     try {
       const job = await setMembership.mutateAsync({
         item_ids: items.map((i) => i.itemId),
         target_warehouse_ids: Array.from(checked),
         notes: notes.trim() || undefined,
+        move_quantity: Number.isFinite(qty) && qty > 0 ? qty : undefined,
+        zero_stock_mode: zeroStockMode || undefined,
       });
       toast.info(
         isBatch
@@ -96,7 +124,20 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
       onClose();
     } catch (err) {
       toast.error(await apiErrorMessage(err, 'Failed to queue the outlet change'));
+    } finally {
+      setConfirmingZeroStock(false);
     }
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    // Zero-stock mode discards real on-hand rather than carrying it anywhere — confirm with an
+    // explicit warning before it ever reaches the API, same as any other destructive action.
+    if (zeroStockMode) {
+      setConfirmingZeroStock(true);
+      return;
+    }
+    void doSubmit();
   }
 
   return (
@@ -155,6 +196,42 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
 
               <p className="text-[11px] text-muted-foreground">{checked.size} outlet{checked.size === 1 ? '' : 's'} selected</p>
 
+              {isPartialPairEligible && (
+                <div className="space-y-2 rounded-lg border border-border p-3">
+                  <label className="text-sm font-medium">Quantity to move</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={sourceOnHand}
+                    step="any"
+                    placeholder={`All (${sourceOnHand}) — leave blank to move everything`}
+                    value={moveQuantity}
+                    onChange={(e) => setMoveQuantity(e.target.value)}
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    {moveQuantity && Number(moveQuantity) < sourceOnHand
+                      ? `Moves ${moveQuantity} of ${sourceOnHand} — the remaining ${sourceOnHand - Number(moveQuantity)} stays at the current outlet.`
+                      : `Moving all ${sourceOnHand} — the item will stop appearing at the current outlet (today's default behaviour).`}
+                  </p>
+                </div>
+              )}
+
+              <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={zeroStockMode}
+                  onChange={(e) => setZeroStockMode(e.target.checked)}
+                  className="h-4 w-4 rounded border-input mt-0.5"
+                />
+                <span className="text-sm">
+                  <span className="font-medium">Move with zero stock</span>
+                  <span className="block text-[11px] text-muted-foreground mt-0.5">
+                    Drop the current stock instead of carrying it over — unchecked outlets lose their
+                    stock entirely, and newly-checked outlets start at zero.
+                  </span>
+                </span>
+              </label>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Note</label>
                 <Input
@@ -176,6 +253,19 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
           </CardContent>
         </Card>
       </div>
+      <ConfirmDialog
+        open={confirmingZeroStock}
+        title="Move with zero stock?"
+        description={
+          isBatch
+            ? `This drops the current stock of every unchecked outlet for all ${items.length} selected items — that stock is discarded, not moved. Newly-checked outlets start at zero. This cannot be undone.`
+            : `This drops ${items[0]?.name ?? 'this item'}'s current stock at every unchecked outlet — that stock is discarded, not moved. Newly-checked outlets start at zero. This cannot be undone.`
+        }
+        variant="warning"
+        confirmLabel={isBusy ? 'Applying...' : 'Move with zero stock'}
+        onConfirm={() => void doSubmit()}
+        onCancel={() => setConfirmingZeroStock(false)}
+      />
     </div>
   );
 }

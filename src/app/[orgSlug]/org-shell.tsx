@@ -62,6 +62,7 @@ const BULK_JOB_LABELS: Record<string, string> = {
 function NotificationListener() {
     const tenantID = useAuthStore((s) => s.user?.tenant_id ?? '');
     const userID = useAuthStore((s) => s.user?.id ?? '');
+    const outletId = useOutletStore((s) => s.outlet?.id ?? null);
     const orgSlug = (useParams()?.orgSlug as string) || '';
     const queryClient = useQueryClient();
 
@@ -86,7 +87,7 @@ function NotificationListener() {
         }
     };
 
-    useNotificationStream({ tenantID, onMessage });
+    useNotificationStream({ tenantID, outletID: outletId, onMessage });
     return null;
 }
 
