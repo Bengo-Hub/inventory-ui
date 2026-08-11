@@ -86,6 +86,8 @@ interface Unit {
   id: string;
   name: string;
   abbreviation: string;
+  /** "count" (PIECE, BOX, TABLET, ...) vs weight/volume/length/area — see units.IsWholeUnitOnly. */
+  type?: string;
 }
 
 interface TicketTier {
@@ -386,7 +388,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
   // Abbreviation of the selected base unit (e.g. "L", "kg"), shown as a suffix on
   // quantity fields so opening stock / reorder values read in the right unit.
-  const unitAbbr = (units ?? []).find((u) => u.id === unitId)?.abbreviation ?? '';
+  const selectedUnit = (units ?? []).find((u) => u.id === unitId);
+  const unitAbbr = selectedUnit?.abbreviation ?? '';
+  // "count"-type units (PIECE, BOX, TABLET, ...) are discrete — a phone/box/tablet can never be
+  // a fraction, unlike weight/volume/length units where decimals are normal. Matches the
+  // backend's own whole-unit validation (units.IsWholeUnitOnly) so the form can't submit
+  // something the API will now reject anyway.
+  const unitIsWholeOnly = selectedUnit?.type === 'count';
 
   // Editing a RECIPE: load its recipe so the Selling Price, Servings, and ingredient rows
   // hydrate from the saved BOM instead of showing an empty section (the recipe's fields live
@@ -509,6 +517,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     if (!name.trim()) return;
     if (minSellingPrice !== '' && maxSellingPrice !== '' && parseFloat(minSellingPrice) > parseFloat(maxSellingPrice)) {
       toast.error('Min selling price cannot exceed max selling price.');
+      return;
+    }
+    if (unitIsWholeOnly && initialQty !== '' && parseDecimal(initialQty) !== Math.trunc(parseDecimal(initialQty))) {
+      toast.error(`Initial stock must be a whole number for ${selectedUnit?.name ?? 'this unit'} — it's a count-based unit.`);
       return;
     }
 
@@ -1136,19 +1148,30 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       <label className="text-sm font-medium inline-flex items-center gap-1">
                         Initial Stock on Hand{unitAbbr ? <span className="text-muted-foreground font-normal"> (in {unitAbbr})</span> : <span className="text-muted-foreground font-normal"> (optional)</span>}
                         <InfoHint title="Opening balance — enter it in the base unit">
-                          Enter how much you have right now measured in this item&apos;s <strong>base unit</strong>
-                          {unitAbbr ? <> ({unitAbbr})</> : null}, not in packs. Decimals are allowed. Example: two 3&nbsp;L
-                          bottles of oil with one half-used = 3 + 1.5 = <strong>4.5</strong> (base unit&nbsp;L). If you&apos;d
-                          rather count whole bottles, set the item&apos;s unit to &ldquo;bottle&rdquo; instead and enter the
-                          bottle count. It seeds on-hand in your default warehouse as an <em>opening balance</em> adjustment;
-                          change it afterwards only via <strong>Adjustments</strong> or a <strong>Stock Take</strong>.
+                          {unitIsWholeOnly ? (
+                            <>
+                              Enter how many whole {unitAbbr || 'units'} you have right now — {selectedUnit?.name?.toLowerCase() ?? 'this unit'} is
+                              a count-based unit, so fractions (e.g. 4427.67) aren&apos;t allowed. It seeds on-hand in your
+                              default warehouse as an <em>opening balance</em> adjustment; change it afterwards only via{' '}
+                              <strong>Adjustments</strong> or a <strong>Stock Take</strong>.
+                            </>
+                          ) : (
+                            <>
+                              Enter how much you have right now measured in this item&apos;s <strong>base unit</strong>
+                              {unitAbbr ? <> ({unitAbbr})</> : null}, not in packs. Decimals are allowed. Example: two 3&nbsp;L
+                              bottles of oil with one half-used = 3 + 1.5 = <strong>4.5</strong> (base unit&nbsp;L). If you&apos;d
+                              rather count whole bottles, set the item&apos;s unit to &ldquo;bottle&rdquo; instead and enter the
+                              bottle count. It seeds on-hand in your default warehouse as an <em>opening balance</em> adjustment;
+                              change it afterwards only via <strong>Adjustments</strong> or a <strong>Stock Take</strong>.
+                            </>
+                          )}
                         </InfoHint>
                       </label>
                       <div className="relative">
                         <Input
                           type="number"
                           min="0"
-                          step={DECIMAL_STEP}
+                          step={unitIsWholeOnly ? '1' : DECIMAL_STEP}
                           placeholder="0"
                           value={initialQty}
                           onChange={(e) => setInitialQty(e.target.value)}
@@ -1159,8 +1182,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                         )}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Amount in the item&apos;s base unit{unitAbbr ? <> ({unitAbbr})</> : null}, added to the default warehouse.
-                        Convert packs to the base unit first (e.g. 2 × 3&nbsp;L = 6&nbsp;L). Decimals allowed.
+                        {unitIsWholeOnly
+                          ? `Whole ${unitAbbr || 'unit'} count, added to the default warehouse. This unit doesn't allow fractional quantities.`
+                          : <>Amount in the item&apos;s base unit{unitAbbr ? <> ({unitAbbr})</> : null}, added to the default warehouse.
+                             Convert packs to the base unit first (e.g. 2 × 3&nbsp;L = 6&nbsp;L). Decimals allowed.</>}
                       </p>
                     </div>
                   ) : (
