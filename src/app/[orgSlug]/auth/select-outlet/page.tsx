@@ -4,6 +4,7 @@ import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore, type OutletInfo, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
 import { isInventoryApplicableUseCase } from '@/lib/use-case-nomenclature';
+import { sanitizedReturnTo } from '@/lib/auth/return-to';
 import { BrandedAuthShell } from '@/components/auth/branded-auth-shell';
 import { AllOutletsCard, OutletCard } from '@/components/auth/outlet-card';
 import { IdleScreensaver } from '@/components/idle-screensaver';
@@ -43,7 +44,7 @@ function SelectOutletContent() {
 
   const tenantRef = orgSlug; // always use slug — inventory-api routes use /{slug}/, not /{uuid}/
 
-  const destination = returnTo ? decodeURIComponent(returnTo) : `/${orgSlug}`;
+  const destination = sanitizedReturnTo(returnTo ? decodeURIComponent(returnTo) : null, orgSlug) ?? `/${orgSlug}`;
 
   useEffect(() => {
     if (!tenantRef) return;

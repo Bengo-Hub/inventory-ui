@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth';
 import { isInventoryApplicableUseCase } from '@/lib/use-case-nomenclature';
@@ -51,6 +52,15 @@ export function useAllOutlets(enabled = true) {
     staleTime: 5 * 60_000,
   });
 
-  const outlets = (query.data ?? []).filter((o) => isInventoryApplicableUseCase(o.use_case));
+  // Memoized on query.data identity — react-query already keeps that reference stable across
+  // re-renders when the underlying data hasn't changed, so this must too. An unmemoized .filter()
+  // here returns a NEW array every render; a consumer effect keyed on that array (OutletFilter's
+  // sync-to-store effect) then re-fires every render, calls setOutlets, which re-renders this
+  // hook's caller (subscribed to the whole outlet-filter store) — an infinite render loop that
+  // crashed the header live in production (React error #185, "Maximum update depth exceeded").
+  const outlets = useMemo(
+    () => (query.data ?? []).filter((o) => isInventoryApplicableUseCase(o.use_case)),
+    [query.data],
+  );
   return { ...query, data: outlets };
 }

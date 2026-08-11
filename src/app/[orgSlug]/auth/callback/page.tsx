@@ -2,26 +2,11 @@
 
 import { useBiometric } from '@/hooks/use-biometric';
 import { useAuthStore } from '@/store/auth';
+import { sanitizedReturnTo } from '@/lib/auth/return-to';
 import { SSOCallbackError } from '@bengo-hub/shared-ui-lib/auth';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef, useState } from 'react';
-
-// The stored return URL was captured BEFORE the SSO hop. If the user switched
-// organisation mid-login, its slug is stale — re-point the first path segment
-// at the org the token was actually issued for. Cross-origin values are dropped.
-function sanitizedReturnTo(raw: string | null, orgSlug: string): string | null {
-    if (!raw) return null;
-    try {
-        const url = raw.startsWith('http') ? new URL(raw) : new URL(raw, window.location.origin);
-        if (url.origin !== window.location.origin) return null;
-        const segments = url.pathname.split('/');
-        if (segments[1] && segments[1] !== orgSlug) segments[1] = orgSlug;
-        return segments.join('/') + url.search + url.hash;
-    } catch {
-        return null;
-    }
-}
 
 function AuthCallbackContent() {
     const router = useRouter();

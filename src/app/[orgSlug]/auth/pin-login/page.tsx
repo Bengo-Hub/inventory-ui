@@ -14,6 +14,7 @@ import { pinApi, type PinOutlet } from '@/lib/api/pin';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
 import { useBranding } from '@/providers/branding-provider';
+import { sanitizedReturnTo } from '@/lib/auth/return-to';
 import { cn } from '@/lib/utils';
 
 const PIN_LENGTH = 4; // numeric PINs auto-submit at 4; alphanumeric PINs submit via Enter/Login
@@ -35,6 +36,9 @@ function PinLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnTo = searchParams?.get('returnTo') || undefined;
+  // A returnTo carried across a stale bookmark/link can name a different tenant's slug —
+  // re-point it at THIS page's org before ever navigating to it (see lib/auth/return-to.ts).
+  const destination = sanitizedReturnTo(returnTo ?? null, orgSlug) ?? `/${orgSlug}`;
   const { tenant } = useBranding();
   const status = useAuthStore((s) => s.status);
   const hydrate = useAuthStore((s) => s.hydrateFromWebAuthn);
@@ -63,9 +67,9 @@ function PinLoginContent() {
   useEffect(() => {
     if (status === 'authenticated' && !forwarded) {
       setForwarded(true);
-      router.replace(returnTo || `/${orgSlug}`);
+      router.replace(destination);
     }
-  }, [status, forwarded, orgSlug, returnTo, router]);
+  }, [status, forwarded, orgSlug, destination, router]);
 
   const tenantDisplayName = useMemo(() => (tenant as { orgName?: string })?.orgName ?? tenant?.name ?? 'Inventory', [tenant]);
 
@@ -82,7 +86,7 @@ function PinLoginContent() {
         setOutlet({ id: oid, code: outlet?.code ?? '', name: res.outlet_name ?? outlet?.name ?? '', use_case: res.outlet_use_case ?? outlet?.use_case, is_hq: !!res.is_admin });
       }
       toast.success(`Welcome, ${res.name || 'staff'}`);
-      router.replace(returnTo || `/${orgSlug}`);
+      router.replace(destination);
     } catch (e) {
       setError(true);
       setShake(true);
