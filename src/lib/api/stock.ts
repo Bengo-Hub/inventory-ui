@@ -93,6 +93,18 @@ export interface AdjustmentListParams {
   limit?: number;
 }
 
+export interface RelocateItemLocationInput {
+  item_ids: string[];
+  source_warehouse_id: string;
+  destination_warehouse_id: string;
+  notes?: string;
+}
+
+export interface RelocateItemLocationResult {
+  processed: number;
+  skipped: { item_id: string; reason: string }[];
+}
+
 export const stockApi = {
   list: (orgSlug: string, params?: StockListParams) =>
     apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params),
@@ -114,6 +126,12 @@ export const stockApi = {
 
   createBreakdown: (orgSlug: string, data: CreateBreakdownInput) =>
     apiClient.post<StockBreakdown>(`/api/v1/${orgSlug}/inventory/breakdowns`, data),
+
+  // Item location relocation — NOT a stock transfer: moves each item's entire current balance
+  // (including zero) from one warehouse to another in one atomic call. No quantity to choose,
+  // no ship/receive steps, no "insufficient stock" failure mode — see MoveStockDialog.tsx.
+  relocate: (orgSlug: string, data: RelocateItemLocationInput) =>
+    apiClient.post<RelocateItemLocationResult>(`/api/v1/${orgSlug}/inventory/stock/relocate`, data),
 
   getSummary: (orgSlug: string) =>
     apiClient.get<{

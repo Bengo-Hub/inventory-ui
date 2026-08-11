@@ -3,15 +3,12 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useWarehouses } from '@/hooks/useWarehouses';
-import { useStock } from '@/hooks/useStock';
-import { useCreateTransfer, useShipTransfer, useReceiveTransfer, useCancelTransfer } from '@/hooks/useTransfers';
+import { useStock, useRelocateItemLocation } from '@/hooks/useStock';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { approvalGateFromError } from '@/lib/api/approvals';
-import { parseDecimal, DECIMAL_STEP } from '@/lib/utils';
 import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 export interface MoveStockItem {
@@ -25,66 +22,36 @@ interface MoveStockDialogProps {
   /** One entry = single-item move; many = batch move (one shared source→destination pair). */
   items: MoveStockItem[];
   onClose: () => void;
-  /** Called after the move completes (fully, or submitted for approval) so callers can refetch. */
+  /** Called after the move completes so callers can refetch. */
   onDone?: () => void;
 }
 
 /**
- * MoveStockDialog — the "add to location" / "remove from location" quick action: moves one or
- * many items from one outlet/warehouse to another in a single submit. Under the hood this is
- * the existing StockTransfer document flow (create → ship → receive), chained automatically so
- * the user doesn't have to visit the Transfers page and click Ship then Receive separately — the
- * atomic balance move (and the real-time POS/ordering/catalog sync it triggers) is 100% the
- * existing transfer machinery, not reimplemented here. If a stock_transfer approval rule gates
- * shipping, the chain stops after create and the transfer sits as a normal pending approval,
- * actionable from the Transfers page like any other.
+ * MoveStockDialog — the "add to location" / "remove from location" quick action: relocates one
+ * or many items' ENTIRE current balance — whatever it is right now, including zero — from one
+ * outlet/warehouse to another in a single submit.
+ *
+ * NOT a stock transfer: a transfer moves a chosen quantity between two balances that both
+ * continue to exist, and requires the source to have enough available to ship. A relocation has
+ * no chosen quantity — it carries the item's whole presence at the source to the destination and
+ * unlinks it from the source outright (InventoryBalance.removed_from_location), so it stops
+ * appearing there at all rather than lingering as a zero row. This is why an item sitting at 0
+ * stock can still be moved: there's nothing to be "insufficient" for. See
+ * stock.RelocateItemLocation's doc comment (backend) for the full design.
  */
 export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDialogProps) {
   const source = useActiveWarehouse(orgSlug);
   const { data: warehouses } = useWarehouses(orgSlug);
   const [destWarehouseId, setDestWarehouseId] = useState('');
   const [notes, setNotes] = useState('');
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
-  // Items whose quantity the user has manually edited — auto-fill (below) never overwrites
-  // these, even if the source warehouse changes again.
-  const [touchedQty, setTouchedQty] = useState<Set<string>>(new Set());
 
-  // Live "available at the currently-selected source" hint, keyed by SKU — refetches whenever
-  // the user changes "From" so the number shown always matches the warehouse a submit would
-  // actually ship from (a static/frozen figure captured at open-time would go stale the moment
-  // the picker changes, and gave no signal at all when opened from the Catalog row/bulk actions,
-  // which is exactly the "what am I supposed to type here?" gap this was built to close).
+  // Informational only — shows what's currently at the source per item so the user knows what
+  // they're about to relocate. Refetches whenever "From" changes.
   const { data: sourceStock = [] } = useStock(orgSlug, { warehouse_id: source.warehouseId || undefined });
   const availableBySku = new Map(sourceStock.map((s) => [s.sku, s.available]));
 
-  // Default: moving an item empties it out of the source, so the qty starts at "everything
-  // available here" — editable down for a partial move. Re-applies whenever the resolved
-  // available figure changes (e.g. the user switches "From"), but only for items not yet
-  // manually touched.
-  useEffect(() => {
-    setQuantities((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const item of items) {
-        if (touchedQty.has(item.itemId)) continue;
-        const avail = availableBySku.get(item.sku);
-        if (avail == null) continue;
-        const str = String(avail);
-        if (next[item.itemId] !== str) {
-          next[item.itemId] = str;
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceStock]);
-
-  const createTransfer = useCreateTransfer(orgSlug);
-  const shipTransfer = useShipTransfer(orgSlug);
-  const receiveTransfer = useReceiveTransfer(orgSlug);
-  const cancelTransfer = useCancelTransfer(orgSlug);
-  const isBusy = createTransfer.isPending || shipTransfer.isPending || receiveTransfer.isPending;
+  const relocate = useRelocateItemLocation(orgSlug);
+  const isBusy = relocate.isPending;
 
   const destOptions = (warehouses ?? []).filter((w) => w.id !== source.warehouseId);
   const isBatch = items.length > 1;
@@ -103,57 +70,32 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
       toast.error('Source and destination must be different');
       return;
     }
-    const lines = items
-      .map((i) => ({ item_id: i.itemId, quantity: parseDecimal(quantities[i.itemId] ?? '') }))
-      .filter((l) => l.quantity > 0);
-    if (lines.length === 0) {
-      toast.error('Enter a quantity greater than zero for at least one item');
-      return;
-    }
 
     try {
-      const transfer = await createTransfer.mutateAsync({
+      const result = await relocate.mutateAsync({
+        item_ids: items.map((i) => i.itemId),
         source_warehouse_id: source.warehouseId,
         destination_warehouse_id: destWarehouseId,
         notes: notes.trim() || undefined,
-        items: lines,
       });
-
-      try {
-        await shipTransfer.mutateAsync(transfer.id);
-      } catch (shipErr) {
-        const gate = approvalGateFromError(shipErr);
-        if (gate) {
-          toast.info('Move submitted for approval — it will complete once approved.', {
-            description: 'Find it on the Transfers page to track its status.',
-            duration: 6000,
-          });
-          onDone?.();
-          onClose();
-          return;
-        }
-        // A real failure (not an approval gate) — e.g. insufficient stock at the source,
-        // confirmed live: shipping a zero-stock source returns this instead of an approval
-        // gate. Cancel the draft so it doesn't sit orphaned in the Transfers list; the user
-        // just retries the move with a valid quantity/source instead of hunting it down.
-        try {
-          await cancelTransfer.mutateAsync(transfer.id);
-        } catch {
-          // Best-effort cleanup — surfacing the original ship error below matters more.
-        }
-        toast.error(await apiErrorMessage(shipErr, 'Failed to move stock — the source may not have enough available'));
-        onDone?.();
-        onClose();
-        return;
-      }
-
-      await receiveTransfer.mutateAsync({ id: transfer.id });
       const destName = destOptions.find((w) => w.id === destWarehouseId)?.name ?? 'the destination';
-      toast.success(
-        lines.length === 1
-          ? `Moved ${items[0]?.name ?? 'item'} to ${destName}`
-          : `Moved ${lines.length} items to ${destName}`,
-      );
+      if (result.processed > 0) {
+        toast.success(
+          result.processed === 1
+            ? `Moved ${items.find((i) => !result.skipped.some((s) => s.item_id === i.itemId))?.name ?? 'item'} to ${destName}`
+            : `Moved ${result.processed} item${result.processed === 1 ? '' : 's'} to ${destName}`,
+        );
+      }
+      if (result.skipped.length > 0) {
+        const names = result.skipped
+          .map((s) => items.find((i) => i.itemId === s.item_id)?.name ?? s.item_id)
+          .join(', ');
+        toast.warning(
+          result.processed > 0
+            ? `Skipped ${result.skipped.length}: ${names} (not present at the source)`
+            : `Nothing moved — none of the selected items are present at ${source.allWarehouses.find((w) => w.id === source.warehouseId)?.name ?? 'the source'}`,
+        );
+      }
       onDone?.();
       onClose();
     } catch (err) {
@@ -174,8 +116,8 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              Ships from the source and receives at the destination in one step — the item stops
-              showing as available at the source the moment this completes.
+              Moves each item&apos;s entire current stock to the destination — whatever it is right
+              now, even zero — and unlinks it from the source outlet entirely.
             </p>
           </CardHeader>
           <CardContent className="overflow-y-auto flex-1">
@@ -195,7 +137,7 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
               </div>
 
               <div className="space-y-2">
-                <p className="text-xs font-medium text-muted-foreground">Quantity to move</p>
+                <p className="text-xs font-medium text-muted-foreground">Items to move</p>
                 {items.map((item) => {
                   const avail = availableBySku.get(item.sku);
                   return (
@@ -204,22 +146,9 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
                         <p className="text-sm font-medium truncate">{item.name}</p>
                         <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
                       </div>
-                      <div className="w-32 shrink-0 space-y-1">
-                        <Input
-                          type="number"
-                          placeholder="Qty"
-                          min="0"
-                          step={DECIMAL_STEP}
-                          value={quantities[item.itemId] ?? ''}
-                          onChange={(e) => {
-                            setTouchedQty((t) => new Set(t).add(item.itemId));
-                            setQuantities((q) => ({ ...q, [item.itemId]: e.target.value }));
-                          }}
-                        />
-                        <p className={`text-[11px] ${avail === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                          {avail != null ? `Available: ${avail.toLocaleString()}` : source.warehouseId ? 'Not stocked here' : 'Select a source'}
-                        </p>
-                      </div>
+                      <p className={`text-[11px] shrink-0 ${avail === 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                        {avail != null ? `${avail.toLocaleString()} here` : source.warehouseId ? 'Not stocked here' : 'Select a source'}
+                      </p>
                     </div>
                   );
                 })}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams } from '@/lib/api/stock';
+import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type RelocateItemLocationInput } from '@/lib/api/stock';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
@@ -49,6 +49,23 @@ export function useCreateBreakdown(orgSlug: string) {
       queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
+    },
+  });
+}
+
+// Item location relocation — NOT a stock transfer (see MoveStockDialog.tsx): moves an item's
+// entire balance to another warehouse in one atomic call. Invalidates the item list too (not just
+// stock/adjustments) since a relocated item's presence at the source outlet disappears entirely —
+// it isn't just a quantity change other outlet-scoped list queries would otherwise miss.
+export function useRelocateItemLocation(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: RelocateItemLocationInput) => stockApi.relocate(orgSlug, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
     },
   });
 }
