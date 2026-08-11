@@ -10,8 +10,23 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.codeve
 // stock_changed is pushed by inventory-api the instant a stock level changes (POS sale
 // consumption, manual adjustment, stock-take) — see inventory-api's
 // internal/modules/consumers/stock_notify_events.go. Payload is a thin invalidation nudge only.
+// bulk_job.completed is pushed by inventory-api's bulkjobs.Service the instant a background
+// bulk operation (item outlet-membership change, bulk stock adjustment) finishes — see
+// internal/modules/bulkjobs/service.go.
 export type NotificationStreamMessage =
   | { type: 'stock_changed'; payload: { tenant_id: string; item_id?: string; sku?: string } }
+  | {
+      type: 'bulk_job.completed';
+      payload: {
+        job_id: string;
+        job_type: string;
+        status: 'completed' | 'failed';
+        total: number;
+        processed: number;
+        failed: number;
+        created_by?: string;
+      };
+    }
   | { type: 'ping' | 'pong'; payload?: { ts: number } };
 
 interface UseNotificationStreamOptions {

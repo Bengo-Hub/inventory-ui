@@ -1,17 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type RelocateItemLocationInput, type BulkAdjustStockInput } from '@/lib/api/stock';
+import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type BulkAdjustStockInput, type SetItemOutletMembershipInput } from '@/lib/api/stock';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
 const SUMMARY_KEY = 'inventory-summary';
 
-export function useStock(orgSlug: string, params?: StockListParams) {
+export function useStock(orgSlug: string, params?: StockListParams, enabled = true) {
   return useQuery({
     queryKey: [STOCK_KEY, orgSlug, params],
     queryFn: () => stockApi.list(orgSlug, params),
-    enabled: !!orgSlug,
+    enabled: !!orgSlug && enabled,
     placeholderData: [],
     staleTime: 30_000,
   });
@@ -53,35 +53,50 @@ export function useCreateBreakdown(orgSlug: string) {
   });
 }
 
-// Item location relocation — NOT a stock transfer (see MoveStockDialog.tsx): moves an item's
-// entire balance to another warehouse in one atomic call. Invalidates the item list too (not just
-// stock/adjustments) since a relocated item's presence at the source outlet disappears entirely —
-// it isn't just a quantity change other outlet-scoped list queries would otherwise miss.
-export function useRelocateItemLocation(orgSlug: string) {
+/** Invalidates every query a bulk stock job (relocation/membership, bulk-adjust) can affect —
+ *  called once up front when a job is QUEUED (so a re-render doesn't show stale loading state
+ *  forever) and again by the org-shell notification listener when it COMPLETES (so the eventual
+ *  real result replaces whatever the pre-completion refetch happened to catch mid-flight). */
+export function invalidateBulkStockQueries(queryClient: ReturnType<typeof useQueryClient>, orgSlug: string) {
+  queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
+  queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
+  queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
+  queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+}
+
+// The checkbox catalog-movement UX (see OutletMembershipDialog.tsx) — queues a background job
+// and returns immediately; the actual balance changes land once the job completes (see
+// invalidateBulkStockQueries / the org-shell bulk_job.completed listener), not on this response.
+export function useSetItemOutletMembership(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: RelocateItemLocationInput) => stockApi.relocate(orgSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
-    },
+    mutationFn: (data: SetItemOutletMembershipInput) => stockApi.setMembership(orgSlug, data),
+    onSuccess: () => invalidateBulkStockQueries(queryClient, orgSlug),
   });
 }
 
 // Bulk stock adjustment — one shared warehouse/reason, a per-item delta. Reused by
 // BulkAdjustStockDialog across the Products, Stock Levels, and Adjustments pages (see that
-// component for the single centralized UI all three open).
+// component for the single centralized UI all three open). Queues a background job; see
+// useSetItemOutletMembership's note on when the real result actually lands.
 export function useBulkAdjustStock(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: BulkAdjustStockInput) => stockApi.bulkAdjust(orgSlug, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [STOCK_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: [ADJ_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: [SUMMARY_KEY, orgSlug] });
-      queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+    onSuccess: () => invalidateBulkStockQueries(queryClient, orgSlug),
+  });
+}
+
+// Polling fallback for a bulk job's status when the notification WebSocket isn't connected —
+// see org-shell.tsx's NotificationListener for the primary (push-based) completion path.
+export function useBulkJobStatus(orgSlug: string, jobId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['bulk-job', orgSlug, jobId],
+    queryFn: () => stockApi.getBulkJob(orgSlug, jobId as string),
+    enabled: !!orgSlug && !!jobId && enabled,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === 'completed' || status === 'failed' ? false : 2_000;
     },
   });
 }

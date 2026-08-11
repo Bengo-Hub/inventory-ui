@@ -19,8 +19,10 @@ import { PWARegistration } from '@/components/pwa-registration';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
-import { useNotificationStream } from '@/hooks/use-notification-stream';
+import { useNotificationStream, type NotificationStreamMessage } from '@/hooks/use-notification-stream';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateBulkStockQueries } from '@/hooks/useStock';
+import { toast } from 'sonner';
 
 // BUG FIX (live-reported): switching outlets — via the header's HQ-only OutletFilter, the
 // select-outlet gate, PIN login, or the SSO callback's JWT-carried outlet — updates the
@@ -47,11 +49,44 @@ function OutletQuerySync() {
     return null;
 }
 
-// Real-time push (stock changes) — mounted once for the whole tenant session so a POS sale (or
-// any other stock mutation) shows up live on the Stock page instead of only on a manual refresh.
+const BULK_JOB_LABELS: Record<string, string> = {
+    item_relocation: 'Outlet update',
+    bulk_stock_adjust: 'Bulk stock adjustment',
+};
+
+// Real-time push (stock changes + background bulk-job completion) — mounted once for the whole
+// tenant session so a POS sale (or any other stock mutation) shows up live on the Stock page
+// instead of only on a manual refresh, and a background bulk job (item outlet-membership change,
+// bulk stock adjustment — see MoveStockDialog/BulkAdjustStockDialog) reports its real result the
+// moment it finishes instead of the user having to guess or manually refresh to find out.
 function NotificationListener() {
     const tenantID = useAuthStore((s) => s.user?.tenant_id ?? '');
-    useNotificationStream({ tenantID });
+    const userID = useAuthStore((s) => s.user?.id ?? '');
+    const orgSlug = (useParams()?.orgSlug as string) || '';
+    const queryClient = useQueryClient();
+
+    const onMessage = (msg: NotificationStreamMessage) => {
+        if (msg.type !== 'bulk_job.completed') return;
+        // Broadcast is tenant-wide (no per-user WebSocket targeting) — only toast for the user
+        // who actually started this job; other sessions just get the silent query invalidation
+        // below (their lists still refresh to reflect the change, just no toast noise for a job
+        // they didn't run).
+        invalidateBulkStockQueries(queryClient, orgSlug);
+        if (msg.payload.created_by && userID && msg.payload.created_by !== userID) return;
+        const label = BULK_JOB_LABELS[msg.payload.job_type] ?? 'Bulk operation';
+        if (msg.payload.status === 'failed') {
+            toast.error(`${label} failed`, { duration: 8000 });
+            return;
+        }
+        const { processed, failed } = msg.payload;
+        if (failed > 0) {
+            toast.warning(`${label} complete — ${processed} applied, ${failed} skipped`, { duration: 8000 });
+        } else {
+            toast.success(`${label} complete — ${processed} item${processed === 1 ? '' : 's'} updated`);
+        }
+    };
+
+    useNotificationStream({ tenantID, onMessage });
     return null;
 }
 

@@ -32,6 +32,10 @@ interface BulkAdjustStockDialogProps {
  * AdjustStock path a single adjustment uses (see stock.BulkAdjustStock's doc comment) — lines
  * that fail (including one that trips the manager-approval threshold, which bulk doesn't itself
  * gate) are reported back per item rather than silently dropped or blocking the rest.
+ *
+ * Runs as a background job: submitting queues it and closes the dialog immediately (never blocks
+ * on how many lines there are); the real per-item result arrives via a toast once the job
+ * completes (org-shell's notification listener) or via useBulkJobStatus polling.
  */
 export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkAdjustStockDialogProps) {
   const warehouse = useActiveWarehouse(orgSlug);
@@ -62,25 +66,20 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
     }
 
     try {
-      const result = await bulkAdjust.mutateAsync({
+      const job = await bulkAdjust.mutateAsync({
         lines,
         reason,
         notes: notes.trim() || undefined,
         warehouse_id: warehouse.warehouseId,
       });
-      if (result.processed > 0) {
-        toast.success(`Adjusted ${result.processed} item${result.processed === 1 ? '' : 's'}`);
-      }
-      if (result.skipped.length > 0) {
-        const detail = result.skipped
-          .map((s) => `${items.find((i) => i.sku === s.sku)?.name ?? s.sku}: ${s.reason}`)
-          .join('; ');
-        toast.warning(`${result.skipped.length} item${result.skipped.length === 1 ? '' : 's'} not applied — ${detail}`, { duration: 8000 });
-      }
+      toast.info(
+        `Applying the adjustment to ${lines.length} item${lines.length === 1 ? '' : 's'} in the background — you'll be notified when it's done.`,
+        { description: `Job ${job.job_id.slice(0, 8)}…`, duration: 5000 },
+      );
       onDone?.();
       onClose();
     } catch (err) {
-      toast.error(await apiErrorMessage(err, 'Failed to apply bulk adjustment'));
+      toast.error(await apiErrorMessage(err, 'Failed to queue the bulk adjustment'));
     }
   }
 

@@ -113,9 +113,32 @@ export interface BulkAdjustStockInput {
   warehouse_id?: string;
 }
 
-export interface BulkAdjustStockResult {
+export interface SetItemOutletMembershipInput {
+  item_ids: string[];
+  target_warehouse_ids: string[];
+  notes?: string;
+}
+
+/** Returned by any endpoint that queues a background bulk job — see BulkJob below. */
+export interface BulkJobAccepted {
+  job_id: string;
+  status: string;
+  total: number;
+}
+
+export interface BulkJob {
+  id: string;
+  tenant_id: string;
+  job_type: string;
+  status: 'queued' | 'running' | 'completed' | 'failed';
+  total: number;
   processed: number;
-  skipped: { sku: string; reason: string }[];
+  failed_count: number;
+  result?: { skipped?: { item_id?: string; sku?: string; reason: string }[] };
+  error?: string;
+  created_at: string;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export const stockApi = {
@@ -146,8 +169,19 @@ export const stockApi = {
   relocate: (orgSlug: string, data: RelocateItemLocationInput) =>
     apiClient.post<RelocateItemLocationResult>(`/api/v1/${orgSlug}/inventory/stock/relocate`, data),
 
+  // Both queue a background job and return immediately — see BulkJob / useBulkJobStatus and the
+  // org-shell notification listener for the bulk_job.completed push.
   bulkAdjust: (orgSlug: string, data: BulkAdjustStockInput) =>
-    apiClient.post<BulkAdjustStockResult>(`/api/v1/${orgSlug}/inventory/stock/bulk-adjust`, data),
+    apiClient.post<BulkJobAccepted>(`/api/v1/${orgSlug}/inventory/stock/bulk-adjust`, data),
+
+  // The checkbox catalog-movement UX: check the outlets an item should be stocked in, uncheck
+  // the rest. Superseded RelocateItemLocationInput/relocate() as the frontend's entry point —
+  // see OutletMembershipDialog.tsx.
+  setMembership: (orgSlug: string, data: SetItemOutletMembershipInput) =>
+    apiClient.post<BulkJobAccepted>(`/api/v1/${orgSlug}/inventory/stock/set-membership`, data),
+
+  getBulkJob: (orgSlug: string, jobId: string) =>
+    apiClient.get<BulkJob>(`/api/v1/${orgSlug}/inventory/bulk-jobs/${jobId}`),
 
   getSummary: (orgSlug: string) =>
     apiClient.get<{
