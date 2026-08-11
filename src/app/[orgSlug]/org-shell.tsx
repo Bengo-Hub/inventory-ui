@@ -18,7 +18,34 @@ import { PWAUpdateBanner } from '@/components/pwa-update-banner';
 import { PWARegistration } from '@/components/pwa-registration';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { useAuthStore } from '@/store/auth';
+import { useOutletStore } from '@/store/outlet';
 import { useNotificationStream } from '@/hooks/use-notification-stream';
+import { useQueryClient } from '@tanstack/react-query';
+
+// BUG FIX (live-reported): switching outlets — via the header's HQ-only OutletFilter, the
+// select-outlet gate, PIN login, or the SSO callback's JWT-carried outlet — updates the
+// X-Outlet-ID header apiClient sends on FUTURE requests (see store/outlet.ts), but nothing told
+// already-mounted React Query hooks to refetch: no outlet-scoped hook's queryKey includes the
+// outlet, so the catalog/stock/etc. kept silently serving the PREVIOUS outlet's cached rows —
+// the page header/subtitle updated instantly (it reads the Zustand store directly) while the
+// actual data didn't, making two different outlets look identical. Fixed centrally here (one
+// watcher on the single source of truth, useOutletStore.outlet — every real flow updates this,
+// including the HQ dropdown via applyOutlet/applyAll's setHomeOutlet) rather than adding an
+// invalidate call to each of the several pages/components that can change the outlet, which
+// would silently rot as new outlet-scoped pages are added. Mounted in BOTH OrgShell branches
+// (including the bare auth-route layout) so a PIN login or the select-outlet gate — which
+// render there, before the dashboard shell exists — also gets this.
+function OutletQuerySync() {
+    const outletId = useOutletStore((s) => s.outlet?.id ?? null);
+    const queryClient = useQueryClient();
+    useEffect(() => {
+        void queryClient.invalidateQueries();
+        // Only the outlet identity should trigger this — queryClient is a stable ref for the
+        // lifetime of this shell.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [outletId]);
+    return null;
+}
 
 // Real-time push (stock changes) — mounted once for the whole tenant session so a POS sale (or
 // any other stock mutation) shows up live on the Stock page instead of only on a manual refresh.
@@ -77,6 +104,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
                 <AuthProvider>
                     <BrandingProvider>
                         <ManifestInjector />
+                        <OutletQuerySync />
                         <div className="min-h-screen bg-background">{children}</div>
                     </BrandingProvider>
                 </AuthProvider>
@@ -90,6 +118,7 @@ export function OrgShell({ children }: { children: ReactNode }) {
                 <BrandingProvider>
                     <SubscriptionEntitlementsProvider>
                     <ManifestInjector />
+                    <OutletQuerySync />
                     <NotificationListener />
                     <PlatformScopeGuard />
                     <OutletGate />

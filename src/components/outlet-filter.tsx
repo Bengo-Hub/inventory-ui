@@ -99,6 +99,11 @@ export function OutletFilter({ className }: { className?: string }) {
     }
   }, [fetched, setOutlets]);
 
+  // Sets the X-Outlet-ID header for future requests. The query-cache invalidation that must
+  // follow any outlet change lives centrally in OrgShell (watching useOutletStore.outlet, which
+  // applyOutlet/applyAll below always update too) rather than here, since this component is
+  // only one of several flows (PIN login, SSO callback, the select-outlet gate) that change the
+  // effective outlet — see org-shell.tsx for why.
   useEffect(() => {
     apiClient.setOutletID(selectedOutlet?.id ?? null);
   }, [selectedOutlet]);
