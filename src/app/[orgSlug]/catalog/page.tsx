@@ -882,7 +882,7 @@ export default function CatalogPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           {/* Title */}
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold tracking-tight">{nomenclature.catalog}</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Catalog</h1>
             <p className="text-sm text-muted-foreground mt-0.5">
               {outlet ? (
                 <>Showing {nomenclature.itemPlural.toLowerCase()} for <span className="font-medium text-foreground">{outlet.name}</span></>

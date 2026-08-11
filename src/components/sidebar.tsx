@@ -269,7 +269,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     {
       label: 'Catalog',
       items: [
-        { label: nomenclatureFor(useCase).catalog, icon: Package, href: '/catalog', moduleKey: 'catalog' },
+        { label: 'Catalog', icon: Package, href: '/catalog', moduleKey: 'catalog' },
         { label: 'Categories', icon: Tag, href: '/categories', moduleKey: 'categories' },
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
         // Manufacturing outlets get "Bill of Materials" under the Manufacturing group instead.
