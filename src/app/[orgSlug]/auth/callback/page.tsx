@@ -1,7 +1,6 @@
 'use client';
 
 import { useBiometric } from '@/hooks/use-biometric';
-import { apiClient } from '@/lib/api/client';
 import { useAuthStore } from '@/store/auth';
 import { SSOCallbackError } from '@bengo-hub/shared-ui-lib/auth';
 import { Fingerprint, Loader2 } from 'lucide-react';
@@ -92,21 +91,16 @@ function AuthCallbackContent() {
                 return;
             }
 
-            // Auto-preselect outlet from JWT claims for non-HQ single-outlet users.
-            const authState = useAuthStore.getState();
-            const authUser = authState.user;
-            const jwtOutletId = (authUser as any)?.outlet_id || (authUser as any)?.outletId;
-            const isHqUser = (authUser as any)?.is_hq_user || (authUser as any)?.isHqUser;
-
-            if (jwtOutletId && !isHqUser) {
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('inventory-selected-outlet-id', jwtOutletId);
-                }
-                apiClient.setOutletID(jwtOutletId);
-                router.replace(returnTo || `/${orgSlug}`);
-                return;
-            }
-
+            // BUG FIX (live-reported, "Bug B"): this used to auto-preselect straight from the
+            // JWT's outlet_id claim, calling only apiClient.setOutletID(jwtOutletId) — it never
+            // populated useOutletStore.outlet (no code/name/use_case available from the JWT
+            // claim alone), so every consumer that reads the store directly (useActiveWarehouse,
+            // ItemFormDialog's use-case scoping, sidebar gating, the header label) treated a
+            // single-outlet SSO user as unscoped "All Outlets" for the whole session. Removed in
+            // favour of ALWAYS routing through /auth/select-outlet, which already resolves the
+            // full outlet object from /my-outlets and auto-selects (no visible picker) for any
+            // non-HQ or single-outlet user — the one correct, complete implementation of this
+            // resolution, not a second partial one.
             const next = returnTo ? `?returnTo=${encodeURIComponent(returnTo)}` : '';
             router.replace(`/${orgSlug}/auth/select-outlet${next}`);
         }

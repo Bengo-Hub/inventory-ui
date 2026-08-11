@@ -12,10 +12,10 @@ import { useBulkItemStatus, useCreateItem, useHardDeleteItemAdmin, useItems, use
 import { useStock, useItemStockHistory } from '@/hooks/useStock';
 import type { StockLevel } from '@/lib/api/stock';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
-import { useWarehouses } from '@/hooks/useWarehouses';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
@@ -30,7 +30,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradeBadge } from '@bengo-hub/shared-ui-lib/subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
-import { useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal } from '@/lib/utils';
@@ -537,6 +537,7 @@ export default function CatalogPage() {
   const { data: categories } = useCategories(orgSlug);
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
   const [selectedWarehouseCode, setSelectedWarehouseCode] = useState('');
+  const [warehouseCodeTouched, setWarehouseCodeTouched] = useState(false);
 
   const { bulkImport, isPending: isImporting, downloadTemplate } = useBulkImport(orgSlug);
   const [isDownloadingTemplate, setIsDownloadingTemplate] = useState(false);
@@ -551,7 +552,15 @@ export default function CatalogPage() {
       setIsDownloadingTemplate(false);
     }
   }
-  const { data: warehouses } = useWarehouses(orgSlug);
+  const bulkImportWH = useActiveWarehouse(orgSlug);
+  // Default the bulk-import target to the active outlet's warehouse (consistent with every
+  // other write form), but never for an All-Outlets session — there the field stays blank
+  // ("All Warehouses") since a per-row warehouse_code/warehouse_name is expected instead.
+  useEffect(() => {
+    if (warehouseCodeTouched || bulkImportWH.mustPick) return;
+    const active = bulkImportWH.allWarehouses.find((w) => w.id === bulkImportWH.warehouseId);
+    if (active) setSelectedWarehouseCode(active.code);
+  }, [warehouseCodeTouched, bulkImportWH.mustPick, bulkImportWH.warehouseId, bulkImportWH.allWarehouses]);
   // Base-unit abbreviations for the ingredient cost cell ("0.13/g", "45/kg").
   const { data: unitsList } = useUnits(orgSlug);
   const unitAbbrById = new Map((unitsList ?? []).map((u) => [u.id, u.abbreviation]));
@@ -878,18 +887,18 @@ export default function CatalogPage() {
                 carry an upgrade badge and a tap prompts to upgrade instead of being hidden. */}
             {canAdd && (
               <>
-                {canBulkImport && warehouses && warehouses.length > 0 && (
-                  <select
-                    value={selectedWarehouseCode}
-                    onChange={(e) => setSelectedWarehouseCode(e.target.value)}
-                    className="h-9 rounded-lg border border-input bg-background px-3 text-sm font-medium text-foreground focus:ring-1 focus:ring-ring focus:outline-none max-w-[200px]"
-                    title="Target warehouse for import"
-                  >
-                    <option value="">All Warehouses</option>
-                    {warehouses.map((wh) => (
-                      <option key={wh.id} value={wh.code}>{wh.name}</option>
-                    ))}
-                  </select>
+                {canBulkImport && bulkImportWH.allWarehouses.length > 0 && (
+                  <div className="w-50" title="Target warehouse for import">
+                    <CreatableSelect
+                      value={selectedWarehouseCode}
+                      onChange={(v) => {
+                        setWarehouseCodeTouched(true);
+                        setSelectedWarehouseCode(v);
+                      }}
+                      options={bulkImportWH.allWarehouses.map((wh) => ({ id: wh.code, name: wh.name }))}
+                      placeholder="All Warehouses"
+                    />
+                  </div>
                 )}
 
                 <Button

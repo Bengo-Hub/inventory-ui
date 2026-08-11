@@ -3,7 +3,8 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLots';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -115,7 +116,7 @@ export default function LotsPage() {
 
     const [formItemId, setFormItemId] = useState('');
     const [formItemName, setFormItemName] = useState('');
-    const [formWarehouseId, setFormWarehouseId] = useState('');
+    const formWarehouse = useActiveWarehouse(orgSlug);
     const [formLotNumber, setFormLotNumber] = useState('');
     const [formQuantity, setFormQuantity] = useState('');
     const [formExpiryDate, setFormExpiryDate] = useState('');
@@ -125,7 +126,6 @@ export default function LotsPage() {
     const [formNotes, setFormNotes] = useState('');
 
     const { data: lots, isLoading, isError, refetch, isFetching } = useLots(orgSlug);
-    const { data: warehouses } = useWarehouses(orgSlug);
     useSuppliers(orgSlug); // preload suppliers for combobox
     const createLot = useCreateLot(orgSlug);
     const updateLot = useUpdateLot(orgSlug);
@@ -154,7 +154,7 @@ export default function LotsPage() {
         setEditing(null);
         setFormItemId('');
         setFormItemName('');
-        setFormWarehouseId('');
+        formWarehouse.reset();
         setFormLotNumber(generateLotNumber());
         setFormQuantity('');
         setFormExpiryDate('');
@@ -169,7 +169,6 @@ export default function LotsPage() {
         setEditing(lot);
         setFormItemId(lot.item_id);
         setFormItemName(lot.item_name ?? '');
-        setFormWarehouseId(lot.warehouse_id);
         setFormLotNumber(lot.lot_number);
         setFormQuantity(String(lot.quantity));
         setFormExpiryDate(lot.expiry_date ? lot.expiry_date.split('T')[0] : '');
@@ -199,7 +198,7 @@ export default function LotsPage() {
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        if (!formLotNumber.trim() || !formQuantity || !formWarehouseId) {
+        if (!formLotNumber.trim() || !formQuantity || (!editing && !formWarehouse.warehouseId)) {
             toast.error('Lot number, warehouse, and quantity are required');
             return;
         }
@@ -223,7 +222,7 @@ export default function LotsPage() {
             if (!formItemId) { toast.error('Select an item'); return; }
             const data: CreateLotInput = {
                 item_id: formItemId,
-                warehouse_id: formWarehouseId,
+                warehouse_id: formWarehouse.warehouseId,
                 lot_number: formLotNumber.trim(),
                 quantity: parseDecimal(formQuantity),
                 expiry_date: formExpiryDate || undefined,
@@ -366,19 +365,16 @@ export default function LotsPage() {
                                             )}
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-sm font-medium">Warehouse *</label>
-                                            <select
-                                                value={formWarehouseId}
-                                                onChange={(e) => setFormWarehouseId(e.target.value)}
-                                                disabled={!!editing}
-                                                required
-                                                className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none disabled:opacity-60"
-                                            >
-                                                <option value="">Select warehouse...</option>
-                                                {warehouses?.map((wh) => (
-                                                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                                ))}
-                                            </select>
+                                            {editing ? (
+                                                <>
+                                                    <label className="text-sm font-medium text-muted-foreground">Warehouse</label>
+                                                    <p className="text-sm font-medium">
+                                                        {formWarehouse.allWarehouses.find((w) => w.id === editing.warehouse_id)?.name ?? editing.warehouse_id}
+                                                    </p>
+                                                </>
+                                            ) : (
+                                                <ActiveWarehousePicker active={formWarehouse} label="Warehouse" required />
+                                            )}
                                         </div>
                                     </div>
 

@@ -3,36 +3,12 @@
 import { useAuthStore } from '@/store/auth';
 import { useOutletFilterStore, type OutletOption } from '@/store/outlet-filter';
 import { useOutletStore, INVENTORY_SELECTED_OUTLET_KEY } from '@/store/outlet';
-import { isInventoryApplicableUseCase } from '@/lib/use-case-nomenclature';
+import { canAccessAllOutlets } from '@/lib/auth/outlet-access';
+import { useAllOutlets } from '@/hooks/useAllOutlets';
 import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
 import { Check, ChevronDown, Store, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-
-const AUTH_API_URL =
-  process.env.NEXT_PUBLIC_AUTH_API_URL ||
-  process.env.NEXT_PUBLIC_SSO_URL ||
-  'https://sso.codevertexafrica.com';
-
-interface OutletListItem {
-  id: string;
-  code: string;
-  name: string;
-  use_case?: string;
-  is_hq?: boolean;
-  status?: string;
-}
-
-async function fetchOutlets(accessToken: string, tenantSlug: string): Promise<OutletListItem[]> {
-  const res = await fetch(`${AUTH_API_URL}/api/v1/tenants/${tenantSlug}/outlets`, {
-    headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
-  });
-  if (!res.ok) return [];
-  const data = await res.json();
-  const list: OutletListItem[] = Array.isArray(data) ? data : data.outlets ?? data.data ?? [];
-  return list.filter((o) => o.status !== 'archived');
-}
 
 /**
  * OutletFilter — branch/outlet selector for inventory-ui.
@@ -45,13 +21,7 @@ async function fetchOutlets(accessToken: string, tenantSlug: string): Promise<Ou
  */
 export function OutletFilter({ className }: { className?: string }) {
   const user = useAuthStore((s) => s.user);
-  const session = useAuthStore((s) => s.session);
-
-  const canFilter = !!(
-    user?.isPlatformOwner ||
-    user?.isSuperUser ||
-    user?.roles?.some((r) => ['admin', 'superuser', 'inventory_admin', 'super_admin'].includes(r))
-  );
+  const canFilter = canAccessAllOutlets(user);
 
   const { selectedOutlet, outlets, setOutlets, selectOutlet, clearOutlet } = useOutletFilterStore();
   const setHomeOutlet = useOutletStore((s) => s.setOutlet);
@@ -78,41 +48,42 @@ export function OutletFilter({ className }: { className?: string }) {
     setSearch('');
   }
 
-  const slug = (user as any)?.tenantSlug || (user as any)?.tenant_slug || '';
-
-  const { data: fetched = [] } = useQuery<OutletListItem[]>({
-    queryKey: ['outlet_list', slug],
-    queryFn: () => fetchOutlets(session?.accessToken ?? '', slug),
-    enabled: canFilter && !!session?.accessToken && !!slug,
-    staleTime: 5 * 60_000,
-  });
+  const { data: fetched = [] } = useAllOutlets(canFilter);
 
   useEffect(() => {
     if (fetched.length > 0) {
-      // Only show outlets relevant to inventory — logistics/weighbridge/enforcement outlets
-      // belong to other services and must not appear in the inventory outlet switcher.
       setOutlets(
-        fetched
-          .filter((o) => isInventoryApplicableUseCase(o.use_case))
-          .map((o) => ({ id: o.id, code: o.code, name: o.name, useCase: o.use_case, isHq: o.is_hq })),
+        fetched.map((o) => ({ id: o.id, code: o.code, name: o.name, useCase: o.use_case, isHq: o.is_hq })),
       );
     }
   }, [fetched, setOutlets]);
 
-  // Sets the X-Outlet-ID header for future requests. The query-cache invalidation that must
-  // follow any outlet change lives centrally in OrgShell (watching useOutletStore.outlet, which
-  // applyOutlet/applyAll below always update too) rather than here, since this component is
-  // only one of several flows (PIN login, SSO callback, the select-outlet gate) that change the
-  // effective outlet — see org-shell.tsx for why.
+  // BUG FIX (live-reported): this effect used to set the header to `selectedOutlet?.id ?? null`
+  // — but selectedOutlet (this component's own local drill-down state) is NOT persisted, so it
+  // always starts null on every fresh mount (every login redirect, every hard reload). That
+  // unconditionally clobbered the outlet header to null/unscoped, and the preselect effect below
+  // — meant to repair it — bails out immediately whenever homeOutlet is already set (the common
+  // case: PIN login, a returning session, an SSO single-outlet user), so it never re-fired and
+  // the header stayed wrong for the rest of the session even though the UI (reading
+  // useOutletStore.outlet directly) showed the correct outlet name. Fixed by resolving the
+  // EFFECTIVE outlet — the drill-down override if one is active, else the home/login outlet —
+  // instead of trusting this component's own possibly-still-empty local state. Mirrors the
+  // fallback pos-ui's equivalent store already uses correctly (store/auth.ts
+  // setSelectedOutletId there falls back to the home outlet the same way).
+  //
+  // The query-cache invalidation that must follow any outlet change lives centrally in
+  // OrgShell (watching useOutletStore.outlet, which applyOutlet/applyAll below always update
+  // too) rather than here, since this component is only one of several flows (PIN login, SSO
+  // callback, the select-outlet gate) that change the effective outlet — see org-shell.tsx.
+  const homeOutlet = useOutletStore((s) => s.outlet);
   useEffect(() => {
-    apiClient.setOutletID(selectedOutlet?.id ?? null);
-  }, [selectedOutlet]);
+    apiClient.setOutletID(selectedOutlet?.id ?? homeOutlet?.id ?? null);
+  }, [selectedOutlet, homeOutlet]);
 
   // Default branch preselect: an admin/manager with NO outlet of their own starts scoped to
   // the tenant's default branch (the HQ outlet, else the first) instead of the unscoped
   // "All Outlets" superset. An explicit "All Outlets" choice (localStorage marker 'all') and
   // a remembered last-used outlet are both honoured first.
-  const homeOutlet = useOutletStore((s) => s.outlet);
   useEffect(() => {
     if (selectedOutlet || homeOutlet || outlets.length === 0) return;
     let marker: string | null = null;

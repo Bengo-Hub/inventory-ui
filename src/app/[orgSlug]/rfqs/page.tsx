@@ -4,7 +4,8 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { useRFQs, useRFQ, useCreateRFQ, useDeleteRFQ } from '@/hooks/useRFQs';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { RFQ } from '@/lib/api/rfq';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
@@ -38,7 +39,9 @@ export default function RFQListPage() {
     const [lines, setLines] = useState<LineDraft[]>([{ itemId: '', itemName: '', quantity: '1', uom: '' }]);
 
     const { data: rfqs, isLoading, isError, refetch } = useRFQs(orgSlug);
-    const { data: warehouses } = useWarehouses(orgSlug);
+    // Scoped to the caller's own outlet (via useActiveWarehouse), not every warehouse
+    // tenant-wide — matches every other write-form's warehouse picker.
+    const { options: warehouseOptions } = useActiveWarehouse(orgSlug);
     const createRFQ = useCreateRFQ(orgSlug);
     const deleteRFQ = useDeleteRFQ(orgSlug);
     const { data: viewRFQ } = useRFQ(orgSlug, viewId ?? '');
@@ -192,16 +195,12 @@ export default function RFQListPage() {
                                         </div>
                                         <div className="space-y-2">
                                             <label className="text-sm font-medium">Destination Warehouse</label>
-                                            <select
+                                            <CreatableSelect
                                                 value={warehouseId}
-                                                onChange={(e) => setWarehouseId(e.target.value)}
-                                                className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                            >
-                                                <option value="">Select warehouse (optional)...</option>
-                                                {warehouses?.map((wh) => (
-                                                    <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                                ))}
-                                            </select>
+                                                onChange={setWarehouseId}
+                                                options={warehouseOptions.map((wh) => ({ id: wh.id, name: wh.name }))}
+                                                placeholder="Select warehouse (optional)..."
+                                            />
                                         </div>
                                     </div>
 

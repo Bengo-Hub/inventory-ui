@@ -6,7 +6,8 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
 import { useItems, useMarkItemEOL, useRestoreItemEOL } from '@/hooks/useItems';
 import type { Item } from '@/lib/api/items';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
@@ -78,7 +79,10 @@ function StockDrawer({
     const [bdConversion, setBdConversion] = useState('');
     const [bdNotes, setBdNotes] = useState('');
 
-    const { data: warehouses } = useWarehouses(orgSlug);
+    // Scoped to the caller's own outlet, not every warehouse tenant-wide — an adjustment must
+    // target exactly one real warehouse (the "All" option this used to offer was nonsensical
+    // for a single-location mutation; the row's own warehouse is still the default below).
+    const { options: warehouseOptions } = useActiveWarehouse(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const { data: itemAdj } = useAdjustments(orgSlug, { item_id: item.id, limit: 5 });
     const createAdj = useCreateAdjustment(orgSlug);
@@ -286,17 +290,14 @@ function StockDrawer({
                             </div>
 
                             <div className="space-y-1.5">
-                                <label className="text-xs font-medium">Warehouse</label>
-                                <select
+                                <label className="text-xs font-medium">Warehouse *</label>
+                                <CreatableSelect
                                     value={adjWarehouseId}
-                                    onChange={(e) => setAdjWarehouseId(e.target.value)}
-                                    className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="">All</option>
-                                    {warehouses?.map((wh) => (
-                                        <option key={wh.id} value={wh.id}>{wh.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={setAdjWarehouseId}
+                                    options={warehouseOptions.map((wh) => ({ id: wh.id, name: wh.name }))}
+                                    placeholder="Select warehouse…"
+                                    required
+                                />
                             </div>
 
                             <div className="space-y-1.5">

@@ -5,6 +5,8 @@ import { InfoHint } from '@/components/ui/info-hint';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import {
     useCreateStockCount,
@@ -37,7 +39,10 @@ function CreateCountDialog({ orgSlug, templates, onClose, onCreated }: {
     onClose: () => void;
     onCreated: (id: string) => void;
 }) {
-    const { data: warehouses } = useWarehouses(orgSlug);
+    // Options scoped to the caller's own outlet (via useActiveWarehouse), not every warehouse
+    // tenant-wide — the raw useWarehouses list let a scoped (non-admin) user pick a warehouse
+    // outside their assignment.
+    const { options: warehouseOptions } = useActiveWarehouse(orgSlug);
     const create = useCreateStockCount(orgSlug);
     const [templateId, setTemplateId] = useState('');
     const [warehouseId, setWarehouseId] = useState('');
@@ -98,16 +103,12 @@ function CreateCountDialog({ orgSlug, templates, onClose, onCreated }: {
                             )}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Warehouse / Outlet {tpl?.warehouse_id ? <span className="text-muted-foreground font-normal">(from sheet)</span> : '*'}</label>
-                                <select
+                                <CreatableSelect
                                     value={warehouseId}
-                                    onChange={(e) => setWarehouseId(e.target.value)}
-                                    className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="">{tpl?.warehouse_id ? 'Use the sheet’s location' : 'Select location…'}</option>
-                                    {(warehouses ?? []).map((w) => (
-                                        <option key={w.id} value={w.id}>{w.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={setWarehouseId}
+                                    options={warehouseOptions.map((w) => ({ id: w.id, name: w.name }))}
+                                    placeholder={tpl?.warehouse_id ? 'Use the sheet’s location' : 'Select location…'}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Reference <span className="text-muted-foreground font-normal">(optional)</span></label>
@@ -147,7 +148,7 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
     editing: StockCountTemplate | null;
     onClose: () => void;
 }) {
-    const { data: warehouses } = useWarehouses(orgSlug);
+    const { options: warehouseOptions } = useActiveWarehouse(orgSlug);
     const createTpl = useCreateStockCountTemplate(orgSlug);
     const updateTpl = useUpdateStockCountTemplate(orgSlug);
 
@@ -248,16 +249,12 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Default location <span className="text-muted-foreground font-normal">(optional)</span></label>
-                                <select
+                                <CreatableSelect
                                     value={warehouseId ?? ''}
-                                    onChange={(e) => setWarehouseId(e.target.value)}
-                                    className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                >
-                                    <option value="">Chosen when starting the count</option>
-                                    {(warehouses ?? []).map((w) => (
-                                        <option key={w.id} value={w.id}>{w.name}</option>
-                                    ))}
-                                </select>
+                                    onChange={setWarehouseId}
+                                    options={warehouseOptions.map((w) => ({ id: w.id, name: w.name }))}
+                                    placeholder="Chosen when starting the count"
+                                />
                             </div>
 
                             <div className="space-y-2">

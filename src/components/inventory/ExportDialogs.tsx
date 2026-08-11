@@ -6,8 +6,12 @@ import { Download, FileSpreadsheet, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { useCategories } from '@/hooks/useCategories';
-import { useOutlets } from '@/hooks/useRBAC';
-import { useWarehouses, useWarehouseLocations } from '@/hooks/useWarehouses';
+import { useWarehouseLocations } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { useAllOutlets } from '@/hooks/useAllOutlets';
+import { canAccessAllOutlets } from '@/lib/auth/outlet-access';
+import { useAuthStore } from '@/store/auth';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { itemsApi, type ProductsExportParams } from '@/lib/api/items';
 import { stockApi, type StockExportParams } from '@/lib/api/stock';
 
@@ -79,7 +83,12 @@ export function ProductsExportDialog({
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
   const { data: categories } = useCategories(orgSlug);
-  const { data: outlets } = useOutlets(orgSlug);
+  // Overriding the export's outlet scope is an admin/manager-only capability — everyone else
+  // exports their own current (ambient X-Outlet-ID) scope only, same as every other outlet
+  // filter in the app. Previously this select had no role gate at all.
+  const user = useAuthStore((s) => s.user);
+  const canPickOutlet = canAccessAllOutlets(user);
+  const { data: outlets } = useAllOutlets(canPickOutlet);
   const { openPreview, previewProps } = useDocumentPreview({ onError: (m) => toast.error(m) });
 
   function buildParams(format: 'pdf' | 'csv'): ProductsExportParams {
@@ -140,13 +149,15 @@ export function ProductsExportDialog({
             <option value="all">All</option>
           </select>
         </div>
-        {(outlets?.length ?? 0) > 0 && (
+        {canPickOutlet && (outlets?.length ?? 0) > 0 && (
           <div>
             <label className={labelCls}>Outlet</label>
-            <select className={selectCls} value={outletId} onChange={(e) => setOutletId(e.target.value)}>
-              <option value="">Current outlet scope</option>
-              {(outlets ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
+            <CreatableSelect
+              value={outletId}
+              onChange={setOutletId}
+              options={(outlets ?? []).map((o) => ({ id: o.id, name: o.name }))}
+              placeholder="Current outlet scope"
+            />
           </div>
         )}
         <label className="flex items-center gap-2 text-sm text-foreground">
@@ -175,9 +186,16 @@ export function StockExportDialog({
   const [groupByCategory, setGroupByCategory] = useState(false);
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
   const { data: categories } = useCategories(orgSlug);
-  const { data: warehouses } = useWarehouses(orgSlug);
+  // Warehouse choices come from useActiveWarehouse (not the raw useWarehouses list) so a scoped
+  // (non-admin) user only ever sees their own outlet's warehouses here — the plain hook returned
+  // every warehouse tenant-wide regardless of the caller's assignment.
+  const activeWarehouse = useActiveWarehouse(orgSlug);
   const { data: locations } = useWarehouseLocations(orgSlug, warehouseId);
-  const { data: outlets } = useOutlets(orgSlug);
+  // Overriding the export's outlet scope is an admin/manager-only capability — see the same
+  // gate in ProductsExportDialog above.
+  const user = useAuthStore((s) => s.user);
+  const canPickOutlet = canAccessAllOutlets(user);
+  const { data: outlets } = useAllOutlets(canPickOutlet);
   const { openPreview, previewProps } = useDocumentPreview({ onError: (m) => toast.error(m) });
 
   function buildParams(format: 'pdf' | 'csv'): StockExportParams {
@@ -216,10 +234,12 @@ export function StockExportDialog({
       <ExportShell title="Export Stock Levels" onClose={onClose} onExport={handleExport} exporting={exporting}>
         <div>
           <label className={labelCls}>Warehouse</label>
-          <select className={selectCls} value={warehouseId} onChange={(e) => { setWarehouseId(e.target.value); setLocationId(''); }}>
-            <option value="">All Warehouses{(outlets?.length ?? 0) > 0 ? ' (current outlet scope)' : ''}</option>
-            {(warehouses ?? []).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
+          <CreatableSelect
+            value={warehouseId}
+            onChange={(v) => { setWarehouseId(v); setLocationId(''); }}
+            options={activeWarehouse.options.map((w) => ({ id: w.id, name: w.name }))}
+            placeholder={`All Warehouses${(outlets?.length ?? 0) > 0 ? ' (current outlet scope)' : ''}`}
+          />
         </div>
         {warehouseId && (locations?.length ?? 0) > 0 && (
           <div>
@@ -230,13 +250,15 @@ export function StockExportDialog({
             </select>
           </div>
         )}
-        {!warehouseId && (outlets?.length ?? 0) > 0 && (
+        {!warehouseId && canPickOutlet && (outlets?.length ?? 0) > 0 && (
           <div>
             <label className={labelCls}>Outlet</label>
-            <select className={selectCls} value={outletId} onChange={(e) => setOutletId(e.target.value)}>
-              <option value="">Current outlet scope</option>
-              {(outlets ?? []).map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
-            </select>
+            <CreatableSelect
+              value={outletId}
+              onChange={setOutletId}
+              options={(outlets ?? []).map((o) => ({ id: o.id, name: o.name }))}
+              placeholder="Current outlet scope"
+            />
           </div>
         )}
         <div>

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/base';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { useItemStockHistory } from '@/hooks/useStock';
 import { useWarehouses } from '@/hooks/useWarehouses';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import type { StockMovementRow } from '@/lib/api/stock';
 import { History, TrendingDown, TrendingUp } from 'lucide-react';
 
@@ -118,22 +119,17 @@ export function ProductStockHistoryModal({
         <div className="flex flex-wrap items-center gap-3">
           <History className="h-4 w-4 text-muted-foreground" />
           <span className="font-mono text-xs text-muted-foreground">{data?.item.sku ?? sku}</span>
-          <select
-            value={warehouseId}
-            onChange={(e) => {
-              setWarehouseId(e.target.value);
-              setPage(1);
-            }}
-            className="ml-auto rounded-lg border border-input bg-background px-3 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
-            title="Business location"
-          >
-            <option value="">All Locations</option>
-            {(warehouses ?? []).map((wh) => (
-              <option key={wh.id} value={wh.id}>
-                {wh.name}
-              </option>
-            ))}
-          </select>
+          <div className="ml-auto w-50" title="Business location">
+            <CreatableSelect
+              value={warehouseId}
+              onChange={(v) => {
+                setWarehouseId(v);
+                setPage(1);
+              }}
+              options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
+              placeholder="All Locations"
+            />
+          </div>
         </div>
 
         {/* Quantities In / Out / Totals cards */}

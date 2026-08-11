@@ -7,7 +7,8 @@ import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
-import { useWarehouses } from '@/hooks/useWarehouses';
+import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { type CreateRequisitionInput, type Priority, type RequestType, type RequisitionLine } from '@/lib/api/requisitions';
 import { Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -53,8 +54,9 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
     const [notes, setNotes] = useState('');
     const [error, setError] = useState('');
 
-    // Inventory type: destination branch + catalog item lines.
-    const [branchId, setBranchId] = useState('');
+    // Inventory type: destination branch + catalog item lines. Defaults to the caller's own
+    // active outlet/warehouse (previously started blank, unlike every sibling write-form).
+    const activeWarehouse = useActiveWarehouse(orgSlug);
     const [invLines, setInvLines] = useState<InvLine[]>([emptyInv()]);
     // External type: free-text item lines with specs, estimated price and preferred supplier.
     const [extLines, setExtLines] = useState<ExtLine[]>([emptyExt()]);
@@ -67,7 +69,6 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
     const [serviceEstPrice, setServiceEstPrice] = useState('');
     const [addServiceSupplier, setAddServiceSupplier] = useState(false);
 
-    const { data: warehouses } = useWarehouses(orgSlug);
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data ?? [];
     const createSupplier = useCreateSupplier(orgSlug);
@@ -135,7 +136,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
             purpose: purpose.trim(),
             priority,
             required_by_date: requiredBy ? new Date(requiredBy).toISOString() : undefined,
-            outlet_id: isInventory && branchId ? branchId : undefined,
+            outlet_id: isInventory && activeWarehouse.warehouseId ? activeWarehouse.warehouseId : undefined,
             project_id: projectId.trim() || undefined,
             notes: notes.trim() || undefined,
             lines,
@@ -206,17 +207,11 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
 
                             {/* ── Inventory branch (inventory type only) ── */}
                             {isInventory && (
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium">Destination Branch / Warehouse</label>
-                                    <CreatableSelect
-                                        value={branchId}
-                                        onChange={setBranchId}
-                                        options={(warehouses ?? []).map((wh) => ({ id: wh.id, name: wh.name }))}
-                                        placeholder="— Select (optional) —"
-                                        onAddClick={() => setAddWarehouseOpen(true)}
-                                        addLabel="Add warehouse"
-                                    />
-                                </div>
+                                <ActiveWarehousePicker
+                                    active={activeWarehouse}
+                                    label="Destination Branch / Warehouse"
+                                    onAddNew={() => setAddWarehouseOpen(true)}
+                                />
                             )}
 
                             {/* ── Inventory line items ── */}
@@ -397,7 +392,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                 <WarehouseQuickCreateDialog
                     orgSlug={orgSlug}
                     onClose={() => setAddWarehouseOpen(false)}
-                    onCreated={(wh) => { setBranchId(wh.id); setAddWarehouseOpen(false); }}
+                    onCreated={(wh) => { activeWarehouse.setWarehouseId(wh.id); setAddWarehouseOpen(false); }}
                 />
             )}
         </div>
