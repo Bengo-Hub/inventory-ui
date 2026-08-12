@@ -3,6 +3,8 @@
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useOutletStore } from '@/store/outlet';
 import { useOutletFilterStore } from '@/store/outlet-filter';
+import { useAuthStore } from '@/store/auth';
+import { canAccessAllOutlets } from '@/lib/auth/outlet-access';
 import { type Warehouse } from '@/lib/api/warehouses';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -23,8 +25,10 @@ import { useEffect, useMemo, useState } from 'react';
  * A warehouse "belongs" to an outlet via Warehouse.outlet_id. The default warehouse for an
  * outlet is the one flagged is_default (falling back to the first one for that outlet).
  *
- * Returns the resolved warehouseId + a setter (so the form can override), the candidate
- * warehouses scoped to the active outlet, and `mustPick`/`unresolved` flags for inline gating.
+ * Returns the resolved warehouseId + a setter (so the form can override), the candidate warehouse
+ * list (full tenant-wide set for an HQ-capable admin's top-nav drill-down, but still locked to
+ * one outlet for scoped/non-admin staff — see `options`'s own doc below for why), and
+ * `mustPick`/`unresolved` flags for inline gating.
  */
 export interface UseActiveWarehouseResult {
   /** Currently effective warehouse id ('' when none chosen yet). */
@@ -33,8 +37,15 @@ export interface UseActiveWarehouseResult {
   setWarehouseId: (id: string) => void;
   /** Reset to the outlet default (clears the user-pick flag) — for form open/reset cycles. */
   reset: () => void;
-  /** Warehouses to offer in the picker — scoped to the active outlet when one is resolvable,
-   *  otherwise all warehouses (so an All-Outlets user can still choose any). */
+  /** Warehouses to offer in the picker. Widens to the FULL tenant-wide set for any user who
+   *  holds cross-outlet access (canAccessAllOutlets — platform owner/superuser/admin-level role),
+   *  so having a specific outlet "in view" up top never stops them picking a different outlet's
+   *  warehouse where the operation legitimately needs one (stock transfer's source most
+   *  concretely). Stays locked to just the active outlet for a genuinely scoped/non-admin staff
+   *  member instead — removing that lock would let them pick a warehouse outside their own
+   *  assignment. See the `scopedOptions` implementation below for the exact rule. `warehouseId`
+   *  still pre-selects the active outlet's warehouse either way — this only affects what's
+   *  offered in the dropdown. */
   options: Warehouse[];
   /** All warehouses (unscoped), for reference. */
   allWarehouses: Warehouse[];
@@ -74,12 +85,31 @@ export function useActiveWarehouse(orgSlug: string): UseActiveWarehouseResult {
   // outlet was never actually in question.
   const mustPick = !filterOutlet && !homeOutlet;
 
-  // Scope the picker options to the active outlet's warehouses when we can; otherwise show all.
+  // Scope the picker options to ONE outlet only for a genuinely scoped/non-admin staff member —
+  // letting the raw tenant-wide list through for them would let them pick a warehouse outside
+  // their own outlet assignment, which is the access-control gap this scoping originally closed
+  // (see stock-take/page.tsx's CreateCountDialog, which reuses this same options list for exactly
+  // that reason).
+  //
+  // The gate is the SAME permission check the top-nav OutletFilter itself uses to decide whether
+  // to show the drill-down at all (canAccessAllOutlets — platform owner / superuser / admin-level
+  // role), NOT merely "is the drill-down filter currently populated". Keying off `filterOutlet`
+  // alone was tried first and was wrong: OutletFilter's own default-branch-preselect effect only
+  // calls `selectOutlet` (which sets `filterOutlet`) when NEITHER store already has a value, so
+  // an admin/manager whose `homeOutlet` got set some other way first (PIN login, the
+  // select-outlet gate, SSO callback) would reach this hook with `filterOutlet` still empty even
+  // though they hold full cross-outlet access — leaving them just as locked out as the scoped
+  // staff this rule exists to restrict. Checking the permission directly instead of inferring it
+  // from incidental store timing fixes that for every admin/manager, not just the ones who
+  // happened to click the drill-down first.
+  const user = useAuthStore((s) => s.user);
+  const canSeeAllOutlets = canAccessAllOutlets(user);
   const scopedOptions = useMemo(() => {
+    if (canSeeAllOutlets) return allWarehouses;
     if (!activeOutletId) return allWarehouses;
     const scoped = allWarehouses.filter((w) => w.outlet_id === activeOutletId);
     return scoped.length > 0 ? scoped : allWarehouses;
-  }, [allWarehouses, activeOutletId]);
+  }, [allWarehouses, activeOutletId, canSeeAllOutlets]);
 
   const [warehouseId, setWarehouseIdState] = useState('');
   const [touched, setTouched] = useState(false);
