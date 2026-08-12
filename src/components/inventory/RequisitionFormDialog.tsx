@@ -6,7 +6,7 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useSuppliers';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { type CreateRequisitionInput, type Priority, type RequestType, type RequisitionLine } from '@/lib/api/requisitions';
@@ -71,6 +71,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data ?? [];
+    const searchSuppliers = useSupplierSearch(orgSlug);
     const createSupplier = useCreateSupplier(orgSlug);
 
     // Inline create-and-link: track which (per-line) supplier picker requested a quick-create,
@@ -286,6 +287,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                                 placeholder="Preferred supplier (optional)"
                                                 onAddClick={() => setAddSupplierForLine(i)}
                                                 addLabel="Add supplier"
+                                                onRemoteSearch={searchSuppliers}
                                             />
                                             <div className="flex items-center justify-between">
                                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -329,6 +331,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                                 placeholder="Who will provide this? (optional)"
                                                 onAddClick={() => setAddServiceSupplier(true)}
                                                 addLabel="Add provider"
+                                                onRemoteSearch={searchSuppliers}
                                             />
                                         </div>
                                         <div className="space-y-2">

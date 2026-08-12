@@ -1,7 +1,9 @@
 'use client';
 
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { suppliersApi, type CreateSupplierInput, type UpdateSupplierInput, type SupplierListParams, type PaginatedSuppliers } from '@/lib/api/suppliers';
+import type { SelectOption } from '@/components/inventory/CreatableSelect';
 
 const SUPPLIERS_KEY = 'suppliers';
 
@@ -15,6 +17,23 @@ export function useSuppliers(orgSlug: string, params?: SupplierListParams) {
     placeholderData: EMPTY_SUPPLIERS,
     staleTime: 60_000,
   });
+}
+
+/**
+ * Stable `onRemoteSearch` callback for any `CreatableSelect` picking a supplier
+ * (purchase orders, contracts, requisitions, preferred-supplier on the item form)
+ * — GET /inventory/suppliers?search=… backed by the SAME endpoint `useSuppliers`
+ * prefetches page 1 of, so a supplier past that first page (e.g. alphabetically
+ * beyond the default 20-row limit) is still found once typed.
+ */
+export function useSupplierSearch(orgSlug: string): (query: string) => Promise<SelectOption[]> {
+  return useCallback(
+    async (query: string) => {
+      const res = await suppliersApi.list(orgSlug, { search: query, limit: 20 });
+      return res.data.map((s) => ({ id: s.id, name: s.name, hint: s.contact_person || s.phone || undefined }));
+    },
+    [orgSlug],
+  );
 }
 
 export function useSupplier(orgSlug: string, id: string) {

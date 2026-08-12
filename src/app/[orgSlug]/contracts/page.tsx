@@ -2,7 +2,7 @@
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useContracts, useCreateContract, useUpdateContract, useActivateContract, useTerminateContract } from '@/hooks/useContracts';
-import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useSuppliers';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
@@ -47,6 +47,7 @@ export default function ContractsPage() {
     const terminate = useTerminateContract(org);
     const { data: suppliersPage } = useSuppliers(org);
     const suppliers = suppliersPage?.data ?? [];
+    const searchSuppliers = useSupplierSearch(org);
     const createSupplier = useCreateSupplier(org);
 
     const { canAny } = usePermissions();
@@ -168,6 +169,7 @@ export default function ContractsPage() {
                                             required
                                             onAddClick={() => setAddSupplierOpen(true)}
                                             addLabel="Add supplier"
+                                            onRemoteSearch={searchSuppliers}
                                         />
                                     </div>
                                     <div className="space-y-2">

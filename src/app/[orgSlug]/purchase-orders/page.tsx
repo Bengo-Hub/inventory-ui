@@ -20,7 +20,7 @@ import {
     useCancelPurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder, POStatus } from '@/lib/api/purchase-orders';
-import { useSuppliers, useCreateSupplier } from '@/hooks/useSuppliers';
+import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useSuppliers';
 import { useUnits } from '@/hooks/useUnits';
 import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
@@ -139,6 +139,10 @@ export default function PurchaseOrdersPage() {
     const [amendingId, setAmendingId] = useState<string | null>(null);
 
     const [supplierId, setSupplierId] = useState('');
+    // Display fallback for amend: the supplier's own record may live past the prefetched
+    // page (see useSupplierSearch), so the combobox needs the name on hand directly rather
+    // than relying on finding supplierId inside the loaded options.
+    const [supplierName, setSupplierName] = useState('');
     const [expectedDate, setExpectedDate] = useState('');
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
@@ -146,6 +150,7 @@ export default function PurchaseOrdersPage() {
     const [poLines, setPoLines] = useState<POLine[]>([blankPOLine()]);
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
+    const searchSuppliers = useSupplierSearch(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const suppliers = suppliersPage?.data;
     // Branch resolution: PO posts stock into a warehouse — default to the active outlet's,
@@ -215,6 +220,7 @@ export default function PurchaseOrdersPage() {
 
     function resetPOForm() {
         setSupplierId('');
+        setSupplierName('');
         activeWarehouse.reset();
         setExpectedDate('');
         setPoNotes('');
@@ -241,6 +247,7 @@ export default function PurchaseOrdersPage() {
         setSelectedPO(null); // leave the detail view; the dialog lives in the list view
         setAmendingId(po.id);
         setSupplierId(po.supplier_id);
+        setSupplierName(po.supplier_name ?? '');
         activeWarehouse.setWarehouseId(po.warehouse_id);
         setExpectedDate(po.expected_date ? po.expected_date.slice(0, 10) : '');
         setPoNotes(po.notes ?? '');
@@ -412,12 +419,14 @@ export default function PurchaseOrdersPage() {
                                         <label className="text-sm font-medium">Supplier *</label>
                                         <CreatableSelect
                                             value={supplierId}
-                                            onChange={setSupplierId}
+                                            valueLabel={supplierName}
+                                            onChange={(id) => { setSupplierId(id); setSupplierName(''); }}
                                             options={(suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
                                             placeholder="Select supplier..."
                                             required
                                             onAddClick={() => setAddSupplierOpen(true)}
                                             addLabel="Add supplier"
+                                            onRemoteSearch={searchSuppliers}
                                         />
                                     </div>
                                     <ActiveWarehousePicker
@@ -680,7 +689,7 @@ export default function PurchaseOrdersPage() {
                 isPending={createSupplier.isPending}
                 onClose={() => setAddSupplierOpen(false)}
                 onSubmit={(data) => createSupplier.mutate(data, {
-                    onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setAddSupplierOpen(false); },
+                    onSuccess: (s) => { toast.success('Supplier created'); setSupplierId(s.id); setSupplierName(s.name); setAddSupplierOpen(false); },
                     onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create supplier')),
                 })}
             />

@@ -9,13 +9,12 @@ import { convertQuantity, costPerBaseUnit, normalizeUnit, unitOptionsForBase } f
 import { EtimsCodeSelect } from '@/components/inventory/EtimsCodeSelect';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
-import { SupplierCombobox } from '@/components/inventory/SupplierCombobox';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
 import { BrandCombobox } from '@/components/inventory/BrandCombobox';
 import { ModelCombobox } from '@/components/inventory/ModelCombobox';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
-import { useCreateSupplier } from '@/hooks/useSuppliers';
+import { useCreateSupplier, useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
 import { type CreateSupplierInput } from '@/lib/api/suppliers';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
@@ -155,6 +154,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [preferredSupplierName, setPreferredSupplierName] = useState(item?.preferred_supplier_name ?? '');
   const [addVendorOpen, setAddVendorOpen] = useState(false);
   const createSupplierMut = useCreateSupplier(orgSlug);
+  const { data: preferredSuppliersPage } = useSuppliers(orgSlug);
+  const searchPreferredSuppliers = useSupplierSearch(orgSlug);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
@@ -846,15 +847,18 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
               {isStockable && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Preferred Supplier <span className="text-muted-foreground font-normal">(optional)</span></label>
-                  <SupplierCombobox
-                    orgSlug={orgSlug}
+                  <CreatableSelect
                     value={preferredSupplierId}
                     valueLabel={preferredSupplierName}
                     onChange={(id) => {
                       setPreferredSupplierId(id);
                       if (!id) setPreferredSupplierName('');
                     }}
-                    onAddNew={() => setAddVendorOpen(true)}
+                    options={(preferredSuppliersPage?.data ?? []).map((s) => ({ id: s.id, name: s.name, hint: s.contact_person || s.phone || undefined }))}
+                    placeholder="Select a preferred supplier..."
+                    onRemoteSearch={searchPreferredSuppliers}
+                    onAddClick={() => setAddVendorOpen(true)}
+                    addLabel="Add new vendor"
                   />
                   <p className="text-xs text-muted-foreground">Default vendor used when auto-cutting purchase orders for this item.</p>
                 </div>
