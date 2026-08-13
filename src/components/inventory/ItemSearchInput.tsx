@@ -67,6 +67,13 @@ interface Props {
    * Iced Passion Tea). Overrides `type`.
    */
   forRecipe?: boolean;
+  /**
+   * Scope the returned `available` figure to ONE warehouse (?warehouse_id=) instead of the
+   * outlet-wide aggregate across every warehouse it spans — pass the currently-selected
+   * "From Warehouse" so callers like Stock Transfer show what's actually shippable from
+   * that specific warehouse, not the whole outlet's stock.
+   */
+  warehouseId?: string;
 }
 
 function itemToResult(i: Item): ItemResult {
@@ -91,7 +98,7 @@ function itemToResult(i: Item): ItemResult {
   };
 }
 
-export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type, forRecipe }: Props) {
+export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type, forRecipe, warehouseId }: Props) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
@@ -101,11 +108,12 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
   const createItem = useCreateItem(orgSlug);
 
   const { data: results } = useQuery<ItemResult[]>({
-    queryKey: ['item-search', orgSlug, query, type, forRecipe ?? false],
+    queryKey: ['item-search', orgSlug, query, type, forRecipe ?? false, warehouseId ?? ''],
     queryFn: async () => {
       const params: Record<string, string> = { search: query };
       if (forRecipe) params.for_recipe = '1';
       else if (type) params.type = type;
+      if (warehouseId) params.warehouse_id = warehouseId;
       const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
         `/api/v1/${orgSlug}/inventory/items`,
         params

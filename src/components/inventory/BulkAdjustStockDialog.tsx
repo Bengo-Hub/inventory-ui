@@ -2,8 +2,10 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { useBulkAdjustStock } from '@/hooks/useStock';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ADJUSTMENT_REASON_OPTIONS } from '@/lib/adjustment-reasons';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal, DECIMAL_STEP } from '@/lib/utils';
@@ -39,9 +41,13 @@ interface BulkAdjustStockDialogProps {
  */
 export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkAdjustStockDialogProps) {
   const warehouse = useActiveWarehouse(orgSlug);
+  const { data: warehouses } = useWarehouses(orgSlug);
   const [reason, setReason] = useState('correction');
   const [notes, setNotes] = useState('');
   const [adjustments, setAdjustments] = useState<Record<string, string>>({});
+  // Optional per-row destination — when set, this line moves stock to another warehouse
+  // (transfer_out at the source + transfer_in there) instead of adjusting in place.
+  const [destinations, setDestinations] = useState<Record<string, string>>({});
 
   const bulkAdjust = useBulkAdjustStock(orgSlug);
   const isBusy = bulkAdjust.isPending;
@@ -58,7 +64,11 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
       return;
     }
     const lines = items
-      .map((i) => ({ sku: i.sku, adjustment: parseDecimal(adjustments[i.sku] ?? '') }))
+      .map((i) => ({
+        sku: i.sku,
+        adjustment: parseDecimal(adjustments[i.sku] ?? ''),
+        destination_warehouse_id: destinations[i.sku] || undefined,
+      }))
       .filter((l) => l.adjustment !== 0);
     if (lines.length === 0) {
       toast.error('Enter a non-zero adjustment for at least one item');
@@ -97,7 +107,8 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
             </div>
             <p className="text-xs text-muted-foreground">
               One warehouse and reason apply to every line below; enter a positive or negative
-              quantity per item.
+              quantity per item. Optionally pick a destination warehouse per row to move that
+              quantity there instead of adjusting in place.
             </p>
           </CardHeader>
           <CardContent className="overflow-y-auto flex-1">
@@ -133,6 +144,16 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
                         step={DECIMAL_STEP}
                         value={adjustments[item.sku] ?? ''}
                         onChange={(e) => setAdjustments((a) => ({ ...a, [item.sku]: e.target.value }))}
+                      />
+                    </div>
+                    <div className="w-40 shrink-0">
+                      <CreatableSelect
+                        value={destinations[item.sku] ?? ''}
+                        onChange={(v) => setDestinations((d) => ({ ...d, [item.sku]: v }))}
+                        options={(warehouses ?? [])
+                          .filter((wh) => wh.id !== warehouse.warehouseId)
+                          .map((wh) => ({ id: wh.id, name: wh.name }))}
+                        placeholder="Move to… (optional)"
                       />
                     </div>
                   </div>

@@ -397,6 +397,7 @@ export default function TransfersPage() {
                                                             value={item.itemName}
                                                             placeholder="Search item by name or SKU..."
                                                             fixedDropdown
+                                                            warehouseId={sourceWarehouse.warehouseId}
                                                             onSelect={(found) => {
                                                                 const updated = [...transferItems];
                                                                 updated[idx] = {

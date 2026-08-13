@@ -1,7 +1,7 @@
 'use client';
 
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
-import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
+import type { ItemResult } from '@/components/inventory/ItemSearchInput';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
@@ -29,6 +29,7 @@ import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks
 import { BarChart3, DollarSign, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -115,6 +116,23 @@ function computeUnitPriceForUnit(item: ItemResult, targetUnitAbbr: string, units
     return resolveDefaultUnitPrice(item);
 }
 
+/** SearchAddTable's option shape for the PO item picker — carries the full ItemResult so
+ *  onAdd can run the same auto-fill logic (unit/price/cost-basis) the old per-row picker did. */
+interface POItemOption extends SearchAddOption {
+    item: ItemResult;
+}
+
+/** Searches inventory items for the top-of-form SearchAddTable, restocking-relevant types only
+ *  (GOODS/INGREDIENT — see the type filter comment where this used to live on ItemSearchInput). */
+async function searchPOItems(orgSlug: string, query: string): Promise<POItemOption[]> {
+    const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
+        `/api/v1/${orgSlug}/inventory/items`,
+        { search: query, type: 'GOODS,INGREDIENT' },
+    );
+    const items = Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
+    return items.map((item) => ({ id: item.id, label: item.name, hint: item.sku, item }));
+}
+
 /** Recompute a line's unitPrice for a newly selected unit, using its retained cost basis. */
 function recalcUnitPriceForNewUnit(line: POLine, newUnitId: string, units: Unit[]): string {
     if (!line.costBasis) return line.unitPrice;
@@ -147,7 +165,9 @@ export default function PurchaseOrdersPage() {
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
     const [additionalShipping, setAdditionalShipping] = useState('');
-    const [poLines, setPoLines] = useState<POLine[]>([blankPOLine()]);
+    // Rows are created ONLY by picking an item in the SearchAddTable above the list (which both
+    // creates and populates the row in one step) — starts empty, not a blank placeholder row.
+    const [poLines, setPoLines] = useState<POLine[]>([]);
 
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const searchSuppliers = useSupplierSearch(orgSlug);
@@ -200,12 +220,28 @@ export default function PurchaseOrdersPage() {
         [],
     );
 
-    function blankPOLine(): POLine {
-        return { itemId: '', itemName: '', quantity: '', unitPrice: '', unitId: '', newSellingPrice: '', priceScope: 'all_stock' };
-    }
-
-    function addPOLine() {
-        setPoLines([...poLines, blankPOLine()]);
+    // Appends a fully-populated row from a SearchAddTable pick — replaces the old "add a blank
+    // row, then search inside it" flow (addPOLine/blankPOLine). Mirrors what the per-row
+    // ItemSearchInput's onSelect used to do inline.
+    function addLineFromItem(item: ItemResult) {
+        const defaultUnitId = resolveDefaultUnitId(item, units ?? []);
+        setPoLines((prev) => [...prev, {
+            itemId: item.id,
+            itemName: item.name,
+            unitId: defaultUnitId,
+            unitPrice: computeUnitPriceForUnit(item, unitAbbr(defaultUnitId, units ?? []), units ?? []),
+            quantity: item.reorder_quantity ? String(item.reorder_quantity) : '',
+            costBasis: {
+                costPrice: item.cost_price ?? null,
+                purchasePrice: item.purchase_price ?? null,
+                purchasePackSize: item.purchase_pack_size ?? null,
+                purchaseUnit: item.purchase_unit ?? null,
+                itemUnitId: item.unit_id ?? null,
+            },
+            currentSellingPrice: item.selling_price ?? null,
+            newSellingPrice: '',
+            priceScope: 'all_stock',
+        }]);
     }
 
     function removePOLine(idx: number) {
@@ -226,7 +262,7 @@ export default function PurchaseOrdersPage() {
         setPoNotes('');
         setPayTermDays('');
         setAdditionalShipping('');
-        setPoLines([blankPOLine()]);
+        setPoLines([]);
     }
 
     function closePODialog() {
@@ -265,9 +301,6 @@ export default function PurchaseOrdersPage() {
                 currentSellingPrice: li.current_selling_price ?? null,
             }))
         );
-        if ((po.line_items?.length ?? 0) === 0) {
-            setPoLines([blankPOLine()]);
-        }
         setCreateOpen(true);
     }
 
@@ -470,48 +503,20 @@ export default function PurchaseOrdersPage() {
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-sm font-medium">Line Items *</label>
-                                        <Button type="button" variant="ghost" size="sm" onClick={addPOLine}>
-                                            <Plus className="h-3 w-3 mr-1" />
-                                            Add Line
-                                        </Button>
-                                    </div>
+                                    <label className="text-sm font-medium">Line Items *</label>
+                                    {/* Purchase orders restock stock-tracked items — GOODS/INGREDIENT only, so e.g.
+                                        "Beef" the raw ingredient isn't buried under a dozen "Beef ..." menu items
+                                        that can't actually be purchased as stock. Picking a result both creates AND
+                                        populates the row below in one step (see addLineFromItem). */}
+                                    <SearchAddTable<POItemOption>
+                                        onSearch={(q) => searchPOItems(orgSlug, q)}
+                                        onAdd={(option) => addLineFromItem(option.item)}
+                                        excludeIds={poLines.filter((l) => l.itemId).map((l) => l.itemId)}
+                                        placeholder="Search item to add..."
+                                    />
                                     {poLines.map((line, idx) => (
                                         <div key={idx} className="space-y-2 p-3 rounded-lg border border-border">
-                                            <ItemSearchInput
-                                                orgSlug={orgSlug}
-                                                value={line.itemName}
-                                                // Purchase orders restock stock-tracked items — exclude RECIPE/menu
-                                                // items so e.g. "Beef" the raw ingredient isn't buried under a dozen
-                                                // "Beef ..." menu items that can't actually be purchased as stock.
-                                                type="GOODS,INGREDIENT"
-                                                onSelect={(item) => {
-                                                    const updated = [...poLines];
-                                                    const defaultUnitId = resolveDefaultUnitId(item, units ?? []);
-                                                    updated[idx] = {
-                                                        ...updated[idx],
-                                                        itemId: item.id,
-                                                        itemName: item.name,
-                                                        // Auto-fill from the picked item; all remain editable below.
-                                                        unitId: defaultUnitId,
-                                                        unitPrice: computeUnitPriceForUnit(item, unitAbbr(defaultUnitId, units ?? []), units ?? []),
-                                                        quantity: item.reorder_quantity ? String(item.reorder_quantity) : updated[idx].quantity,
-                                                        // Retained so switching the unit below rescales the price instead of
-                                                        // leaving it quoted against the wrong unit.
-                                                        costBasis: {
-                                                            costPrice: item.cost_price ?? null,
-                                                            purchasePrice: item.purchase_price ?? null,
-                                                            purchasePackSize: item.purchase_pack_size ?? null,
-                                                            purchaseUnit: item.purchase_unit ?? null,
-                                                            itemUnitId: item.unit_id ?? null,
-                                                        },
-                                                        currentSellingPrice: item.selling_price ?? null,
-                                                    };
-                                                    setPoLines(updated);
-                                                }}
-                                                placeholder="Search item..."
-                                            />
+                                            <p className="text-sm font-medium">{line.itemName}</p>
                                             <div className="grid grid-cols-4 gap-2 items-center">
                                                 <div className="space-y-1">
                                                     <label className="text-xs text-muted-foreground">Qty</label>

@@ -106,7 +106,7 @@ export interface RelocateItemLocationResult {
 }
 
 export interface BulkAdjustStockInput {
-  lines: { sku: string; adjustment: number }[];
+  lines: { sku: string; adjustment: number; destination_warehouse_id?: string }[];
   reason: string;
   reference?: string;
   notes?: string;
