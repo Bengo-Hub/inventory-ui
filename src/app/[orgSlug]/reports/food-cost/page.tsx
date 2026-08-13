@@ -1,6 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { useFoodCostVariance } from '@/hooks/useReports';
 import { reportsApi, type VarianceReportItem } from '@/lib/api/reports';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
@@ -70,12 +71,12 @@ export default function FoodCostVariancePage() {
                 <CardContent className="p-4">
                     <div className="flex flex-wrap items-end gap-4">
                         <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">From</label>
-                            <Input type="date" value={from} onChange={e => setFrom(e.target.value)} className="w-40" />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">To</label>
-                            <Input type="date" value={to} onChange={e => setTo(e.target.value)} className="w-40" />
+                            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Period</label>
+                            <DateRangePicker
+                                value={{ from, to }}
+                                onChange={(r) => { setFrom(r.from); setTo(r.to); }}
+                                className="w-56"
+                            />
                         </div>
                         <div className="flex items-center gap-2 pb-1">
                             <input
