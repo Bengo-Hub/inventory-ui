@@ -18,7 +18,6 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
 const EXPIRY_WARNING_DAYS = 30;
 // isExpiringSoon / isExpired live in ./lot-columns (shared with column render logic).
 
@@ -112,6 +111,7 @@ export default function LotsPage() {
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Lot | null>(null);
     const [pendingDelete, setPendingDelete] = useState<Lot | null>(null);
@@ -144,11 +144,11 @@ export default function LotsPage() {
           )
         : lots;
 
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
+    const paginatedItems = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
     const expiringSoonCount = lots?.filter((l) => isExpiringSoon(l.expiry_date)).length ?? 0;
 
-    useMemo(() => { setPage(1); }, [search, range]);
+    useMemo(() => { setPage(1); }, [search, range, pageSize]);
 
     const columns = useMemo(
         () => buildLotColumns({ isDeleting: deleteLot.isPending, onEdit: openEdit, onDelete: handleDelete }),
@@ -307,7 +307,8 @@ export default function LotsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={filtered?.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

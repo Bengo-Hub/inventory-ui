@@ -10,8 +10,6 @@ import { Filter, Package, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-const ITEMS_PER_PAGE = 20;
-
 export interface Reservation {
     id: string;
     orderId: string;
@@ -33,6 +31,7 @@ export default function ReservationsPage() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('All');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
 
     const { data: reservations, isLoading, isError, refetch } = useQuery<Reservation[]>({
         queryKey: ['reservations', orgSlug, search, statusFilter],
@@ -45,10 +44,10 @@ export default function ReservationsPage() {
         placeholderData: [],
     });
 
-    const totalPages = Math.max(1, Math.ceil((reservations?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = reservations?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((reservations?.length ?? 0) / pageSize));
+    const paginatedItems = reservations?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
-    useMemo(() => { setPage(1); }, [search, statusFilter]);
+    useMemo(() => { setPage(1); }, [search, statusFilter, pageSize]);
 
     const columns = useMemo(() => buildReservationColumns(), []);
 
@@ -108,7 +107,8 @@ export default function ReservationsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={reservations?.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

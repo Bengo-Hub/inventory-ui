@@ -13,17 +13,16 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const ITEMS_PER_PAGE = 20;
-
 export default function SuppliersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Supplier | null>(null);
 
-    const { data, isLoading, isError, refetch } = useSuppliers(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useSuppliers(orgSlug, { search: search || undefined, page, limit: pageSize });
     const createSupplier = useCreateSupplier(orgSlug);
     const updateSupplier = useUpdateSupplier(orgSlug);
     const deleteSupplier = useDeleteSupplier(orgSlug);
@@ -36,9 +35,9 @@ export default function SuppliersPage() {
     const isPending = createSupplier.isPending || updateSupplier.isPending;
 
     const paginatedItems = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, pageSize]);
 
     function openCreate() {
         setEditing(null);
@@ -130,7 +129,8 @@ export default function SuppliersPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

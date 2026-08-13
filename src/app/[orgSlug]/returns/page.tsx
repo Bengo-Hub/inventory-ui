@@ -17,7 +17,6 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
 interface Line { itemId: string; itemName: string; quantity: string; unitCost: string; subTotal: string }
@@ -29,6 +28,7 @@ export default function PurchaseReturnsPage() {
     const [status, setStatus] = useState<ReturnPaymentStatus | ''>('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [viewing, setViewing] = useState<PurchaseReturn | null>(null);
 
@@ -36,7 +36,7 @@ export default function PurchaseReturnsPage() {
     const [reason, setReason] = useState('');
     const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
-    const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: pageSize });
     const create = useCreatePurchaseReturn(org);
     const approve = useApprovePurchaseReturn(org);
     const { data: suppliersPage } = useSuppliers(org);
@@ -47,8 +47,8 @@ export default function PurchaseReturnsPage() {
     const canChange = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
 
     const rows = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status, range]);
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+    useMemo(() => { setPage(1); }, [status, range, pageSize]);
 
     const nameOf = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? '—';
     const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -123,7 +123,8 @@ export default function PurchaseReturnsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

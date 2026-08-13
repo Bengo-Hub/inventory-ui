@@ -40,8 +40,6 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
-const ITEMS_PER_PAGE = 20;
-
 interface POLine {
     itemId: string;
     itemName: string;
@@ -154,6 +152,7 @@ export default function PurchaseOrdersPage() {
     const [statusFilter, setStatusFilter] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [amendingId, setAmendingId] = useState<string | null>(null);
@@ -187,7 +186,7 @@ export default function PurchaseOrdersPage() {
         from: range.from || undefined,
         to: range.to || undefined,
         page,
-        limit: ITEMS_PER_PAGE,
+        limit: pageSize,
     });
     const orders = data?.data;
     const { data: poDetail } = usePurchaseOrder(orgSlug, selectedPO ?? '');
@@ -214,10 +213,10 @@ export default function PurchaseOrdersPage() {
         );
     }
 
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
     const paginatedItems = orders ?? [];
 
-    useMemo(() => { setPage(1); }, [search, statusFilter, range]);
+    useMemo(() => { setPage(1); }, [search, statusFilter, range, pageSize]);
 
     const columns = useMemo(
         () => buildPurchaseOrderColumns({ onView: (po) => setSelectedPO(po.id), onPrint: (po) => previewPO(po) }),
@@ -427,7 +426,8 @@ export default function PurchaseOrdersPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

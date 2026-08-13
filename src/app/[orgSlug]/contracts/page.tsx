@@ -18,7 +18,6 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
 const toDateInput = (s?: string) => (s ? s.slice(0, 10) : '');
@@ -29,6 +28,7 @@ export default function ContractsPage() {
     const [status, setStatus] = useState<ContractStatus | ''>('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Contract | null>(null);
     const [viewing, setViewing] = useState<Contract | null>(null);
@@ -42,7 +42,7 @@ export default function ContractsPage() {
     const [endDate, setEndDate] = useState('');
     const [terms, setTerms] = useState('');
 
-    const { data, isLoading, isError, refetch } = useContracts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useContracts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: pageSize });
     const create = useCreateContract(org);
     const update = useUpdateContract(org);
     const activate = useActivateContract(org);
@@ -57,8 +57,8 @@ export default function ContractsPage() {
     const canChange = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
 
     const rows = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status, range]);
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+    useMemo(() => { setPage(1); }, [status, range, pageSize]);
 
     const nameOf = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? '—';
     const isPending = create.isPending || update.isPending;
@@ -143,7 +143,8 @@ export default function ContractsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

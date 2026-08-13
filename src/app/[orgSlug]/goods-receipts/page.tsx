@@ -16,18 +16,17 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { usePermissions, P } from '@/hooks/usePermissions';
 
-const ITEMS_PER_PAGE = 20;
-
 export default function GoodsReceiptsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [status, setStatus] = useState<GRNStatus | ''>('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [viewId, setViewId] = useState<string | null>(null);
 
-    const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: pageSize });
     const post = usePostGoodsReceipt(org);
     // Only used to resolve PO numbers for display — pull the max page size rather than
     // paginating, since this isn't a user-facing list of purchase orders.
@@ -40,8 +39,8 @@ export default function GoodsReceiptsPage() {
     const canChange = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
 
     const rows = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status, range]);
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+    useMemo(() => { setPage(1); }, [status, range, pageSize]);
     const poNumberOf = (id: string) => (orders ?? []).find((o) => o.id === id)?.po_number ?? id.slice(0, 8);
 
     function handlePost(id: string) {
@@ -96,7 +95,8 @@ export default function GoodsReceiptsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

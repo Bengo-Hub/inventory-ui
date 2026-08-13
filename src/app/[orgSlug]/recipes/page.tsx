@@ -18,8 +18,6 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
-
 function generateSKU(name: string): string {
     const slug = name.toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
     return `RCP-${slug}-${Date.now().toString(36).toUpperCase()}`;
@@ -35,6 +33,7 @@ export default function RecipesPage() {
 
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Recipe | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Recipe | null>(null);
@@ -48,7 +47,7 @@ export default function RecipesPage() {
     const [formMargin, setFormMargin] = useState('30');
     const [formRequiresQC, setFormRequiresQC] = useState(true);
 
-    const { data, isLoading, isError, refetch } = useRecipes(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useRecipes(orgSlug, { search: search || undefined, page, limit: pageSize });
     const createMutation = useCreateRecipe(orgSlug);
     const updateMutation = useUpdateRecipe(orgSlug);
     const deleteMutation = useDeleteRecipe(orgSlug);
@@ -84,9 +83,9 @@ export default function RecipesPage() {
         };
         return [...rows].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
     }, [data?.data, search]);
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, pageSize]);
 
     function openCreate() {
         setEditing(null);
@@ -229,7 +228,8 @@ export default function RecipesPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

@@ -20,7 +20,6 @@ import { apiClient } from '@/lib/api/client';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const ITEMS_PER_PAGE = 20;
 const textareaClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none resize-none';
 
 type Tab = '' | WarrantyStatus;
@@ -43,6 +42,7 @@ export default function WarrantiesPage() {
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Warranty | null>(null);
     const [viewing, setViewing] = useState<Warranty | null>(null);
@@ -88,9 +88,9 @@ export default function WarrantiesPage() {
 
     const all = useMemo(() => data ?? [], [data]);
     const filtered = useMemo(() => (tab ? all.filter((w) => w.status === tab) : all), [all, tab]);
-    const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
-    const rows = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-    useEffect(() => { setPage(1); }, [tab, search]);
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const rows = filtered.slice((page - 1) * pageSize, page * pageSize);
+    useEffect(() => { setPage(1); }, [tab, search, pageSize]);
 
     const isPending = create.isPending || update.isPending;
     const mutErr = async (e: unknown, msg: string) => toast.error(await apiErrorMessage(e, msg));
@@ -219,7 +219,8 @@ export default function WarrantiesPage() {
                                 totalPages={totalPages}
                                 onPageChange={setPage}
                                 total={filtered.length}
-                                pageSize={ITEMS_PER_PAGE}
+                                pageSize={pageSize}
+                                onPageSizeChange={setPageSize}
                             />
                         </div>
                     </CardContent>

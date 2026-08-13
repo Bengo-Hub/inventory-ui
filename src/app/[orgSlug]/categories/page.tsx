@@ -15,8 +15,6 @@ import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildCategoryColumns, type CategoryRow } from './category-columns';
 
-const ITEMS_PER_PAGE = 20;
-
 export interface Category {
     id: string;
     name: string;
@@ -42,6 +40,7 @@ export default function CategoriesPage() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Category
     const [editing, setEditing] = useState<Category | null>(null);
@@ -145,8 +144,8 @@ export default function CategoriesPage() {
         return result;
     }, [categories, search]);
 
-    const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
-    const paginatedItems = sorted.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+    const paginatedItems = sorted.slice((page - 1) * pageSize, page * pageSize);
 
     useMemo(() => { setPage(1); }, [search]);
 
@@ -239,7 +238,8 @@ export default function CategoriesPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={sorted.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
                         />
                     </div>
                 </CardContent>

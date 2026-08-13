@@ -14,8 +14,6 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
-const ITEMS_PER_PAGE = 20;
-
 interface UnitPayload {
     name: string;
     abbreviation: string;
@@ -84,6 +82,7 @@ export default function UnitsPage() {
     const queryClient = useQueryClient();
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Unit | null>(null);
     const [viewUnit, setViewUnit] = useState<Unit | null>(null);
@@ -152,10 +151,10 @@ export default function UnitsPage() {
         deleteMutation.mutate(unit.id);
     }
 
-    const totalPages = Math.max(1, Math.ceil((units?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = units?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((units?.length ?? 0) / pageSize));
+    const paginatedItems = units?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, pageSize]);
 
     function openCreate() {
         setEditing(null);
@@ -246,7 +245,8 @@ export default function UnitsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={units?.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

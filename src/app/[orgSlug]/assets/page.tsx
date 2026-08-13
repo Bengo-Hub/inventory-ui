@@ -18,8 +18,6 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const ITEMS_PER_PAGE = 20;
-
 const STATUSES: AssetStatus[] = ['active', 'inactive', 'maintenance', 'disposed', 'lost', 'damaged', 'retired'];
 
 export default function AssetsPage() {
@@ -29,13 +27,14 @@ export default function AssetsPage() {
     const [status, setStatus] = useState<AssetStatus | ''>('');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Asset | null>(null);
     const [viewing, setViewing] = useState<Asset | null>(null);
     const [disposeTarget, setDisposeTarget] = useState<Asset | null>(null);
 
     const { data, isLoading, isError, refetch } = useAssets(orgSlug, {
-        status: status || undefined, search: search || undefined, page, limit: ITEMS_PER_PAGE,
+        status: status || undefined, search: search || undefined, page, limit: pageSize,
     });
     const createAsset = useCreateAsset(orgSlug);
     const updateAsset = useUpdateAsset(orgSlug);
@@ -48,8 +47,8 @@ export default function AssetsPage() {
     const canDelete = canAny([P.CATALOG_DELETE, P.CATALOG_MANAGE]);
 
     const rows = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status, search]);
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
+    useMemo(() => { setPage(1); }, [status, search, pageSize]);
 
     function act(label: string, p: Promise<unknown>) {
         p.then(() => toast.success(label)).catch(async (e) => toast.error(await apiErrorMessage(e, `Failed to ${label.toLowerCase()}`)));
@@ -141,7 +140,8 @@ export default function AssetsPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

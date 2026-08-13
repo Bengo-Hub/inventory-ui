@@ -12,8 +12,6 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const ITEMS_PER_PAGE = 20;
-
 function ConfirmDeleteDialog({
     groupName,
     onConfirm,
@@ -50,11 +48,12 @@ export default function ModifiersPage() {
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<ModifierGroup | null>(null);
     const [pendingDelete, setPendingDelete] = useState<ModifierGroup | null>(null);
 
-    const { data, isLoading, isError, refetch } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useModifierGroups(orgSlug, { search: search || undefined, page, limit: pageSize });
     const createMutation = useCreateModifierGroup(orgSlug);
     const updateMutation = useUpdateModifierGroup(orgSlug);
     const deleteMutation = useDeleteModifierGroup(orgSlug);
@@ -62,9 +61,9 @@ export default function ModifiersPage() {
     const mutation = editing ? updateMutation : createMutation;
 
     const paginatedItems = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, pageSize]);
 
     function openCreate() {
         setEditing(null);
@@ -162,7 +161,8 @@ export default function ModifiersPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={data?.total}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

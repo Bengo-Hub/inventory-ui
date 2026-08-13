@@ -28,8 +28,6 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 20;
-
 // Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
 // full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
 function TransferDetailDrawer({ orgSlug, transferId, onClose }: { orgSlug: string; transferId: string | null; onClose: () => void }) {
@@ -134,6 +132,7 @@ export default function TransfersPage() {
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
     useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Transfer
     const [viewId, setViewId] = useState<string | null>(null);
@@ -167,10 +166,10 @@ export default function TransfersPage() {
           )
         : transfers;
 
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
+    const paginatedItems = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
-    useMemo(() => { setPage(1); }, [search, range]);
+    useMemo(() => { setPage(1); }, [search, range, pageSize]);
 
     const columns = useMemo(
         () => buildTransferColumns({ onView: (t) => setViewId(t.id) }),
@@ -301,7 +300,8 @@ export default function TransfersPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={filtered?.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

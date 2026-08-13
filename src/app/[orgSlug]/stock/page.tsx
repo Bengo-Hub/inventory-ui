@@ -28,8 +28,6 @@ import { approvalGateFromError } from '@/lib/api/approvals';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
-const ITEMS_PER_PAGE = 25;
-
 // Only stockable item types appear on stock levels (mirrors the backend
 // stockableTypes filter); services/vouchers/recipes never hold balances.
 const STOCKABLE_TYPES = ['GOODS', 'INGREDIENT', 'EQUIPMENT'] as const;
@@ -462,6 +460,7 @@ export default function StockPage() {
     const [categoryId, setCategoryId] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
     const [selectedItem, setSelectedItem] = useState<StockLevel | null>(null);
     const [drawerAction, setDrawerAction] = useState<'adjust' | 'breakdown' | undefined>(undefined);
     // Centralized per-item stock ledger modal (Go-Digital "Product stock history").
@@ -530,8 +529,8 @@ export default function StockPage() {
         return list;
     }, [stock, statusFilter]);
 
-    const totalPages = Math.max(1, Math.ceil(filteredStock.length / ITEMS_PER_PAGE));
-    const paginatedItems = filteredStock.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+    const totalPages = Math.max(1, Math.ceil(filteredStock.length / pageSize));
+    const paginatedItems = filteredStock.slice((page - 1) * pageSize, page * pageSize);
 
     // Bulk stock adjustment — the same shared dialog the Products and Adjustments pages open.
     const stockBulkActions: BulkAction[] = canAdjust ? [
@@ -544,7 +543,7 @@ export default function StockPage() {
         },
     ] : [];
 
-    useMemo(() => { setPage(1); }, [search, statusFilter, categoryId, typeFilter]);
+    useMemo(() => { setPage(1); }, [search, statusFilter, categoryId, typeFilter, pageSize]);
 
     const stockColumns = useMemo(
         () => buildStockColumns({
@@ -708,7 +707,8 @@ export default function StockPage() {
                             totalPages={totalPages}
                             onPageChange={setPage}
                             total={filteredStock.length}
-                            pageSize={ITEMS_PER_PAGE}
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                 </CardContent>

@@ -29,8 +29,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
-const ITEMS_PER_PAGE = 20;
-
 // ─── Bundle Form Modal ────────────────────────────────────────────────────────
 
 interface ComponentRow {
@@ -348,18 +346,19 @@ export default function BundlesPage() {
     const orgSlug = params?.orgSlug as string;
 
     const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(20);
     const [modalOpen, setModalOpen] = useState(false);
     const [editing, setEditing] = useState<Bundle | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Bundle | null>(null);
 
-    const { data, isLoading, isError, refetch } = useBundles(orgSlug, { page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useBundles(orgSlug, { page, limit: pageSize });
     const { data: itemsData } = useItems(orgSlug, { limit: 200 });
     const createBundle = useCreateBundle(orgSlug);
     const updateBundle = useUpdateBundle(orgSlug);
     const deleteBundle = useDeleteBundle(orgSlug);
 
     const bundles = data?.data ?? [];
-    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
+    const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
     const allItems = itemsData?.data ?? [];
     const isPending = createBundle.isPending || updateBundle.isPending;
 
@@ -438,6 +437,8 @@ export default function BundlesPage() {
                                 </div>
                             }
                             storageKey="bundles-col-prefs"
+                            pageSize={pageSize}
+                            onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
                         />
                     </div>
                 </CardContent>

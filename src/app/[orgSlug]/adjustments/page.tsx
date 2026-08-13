@@ -262,6 +262,7 @@ export default function AdjustmentsPage() {
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page] = useState(1);
+    const [pageSize, setPageSize] = useState(25);
     const [showModal, setShowModal] = useState(false);
     const [prefillSku, setPrefillSku] = useState('');
     const [prefillName, setPrefillName] = useState('');
@@ -297,9 +298,8 @@ export default function AdjustmentsPage() {
         );
     }, [adjustments, search]);
 
-    const ITEMS_PER_PAGE = 25;
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
-    const paginated = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
+    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
+    const paginated = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
     const columns = useMemo(() => buildAdjustmentColumns(), []);
 
@@ -368,6 +368,8 @@ export default function AdjustmentsPage() {
                             onRetry={() => refetch()}
                             emptyText="No adjustments recorded yet"
                             storageKey="adjustments-col-prefs"
+                            pageSize={pageSize}
+                            onPageSizeChange={setPageSize}
                         />
                     </div>
                     {!isLoading && totalPages > 1 && (
