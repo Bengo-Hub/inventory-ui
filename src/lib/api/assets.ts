@@ -10,6 +10,7 @@ export interface AssetCategory {
   depreciation_rate: number;
   useful_life_years: number;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface Asset {

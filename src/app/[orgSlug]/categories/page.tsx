@@ -26,6 +26,7 @@ export interface Category {
     parent_id?: string | null;
     parent_name?: string | null;
     is_active: boolean;
+    created_at?: string;
 }
 
 interface CategoryPayload {

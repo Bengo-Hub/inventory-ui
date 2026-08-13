@@ -64,6 +64,14 @@ export function buildRecipeColumns(cb: RecipeColumnCallbacks): DataTableColumn<R
       render: (r) => formatCurrency(cb.isMfg ? r.total_cost : r.suggested_price),
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'xl',
+      accessor: (r) => r.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

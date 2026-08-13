@@ -69,6 +69,7 @@ export interface ApprovalRule {
   max_amount: number | null;
   is_active: boolean;
   steps: ApprovalStep[];
+  created_at?: string;
 }
 
 export interface ApprovalRuleInput {

@@ -84,6 +84,15 @@ export function buildSupplierColumns(cb: SupplierColumnCallbacks): DataTableColu
       render: (s) => <Badge variant={s.is_active ? 'success' : 'outline'}>{s.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      sortable: true,
+      hideBelow: 'md',
+      accessor: (s) => s.created_at,
+      cellClassName: 'text-muted-foreground',
+      render: (s) => new Date(s.created_at).toLocaleDateString(),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

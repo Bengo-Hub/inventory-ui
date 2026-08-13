@@ -71,6 +71,14 @@ export function buildModifierColumns(cb: ModifierColumnCallbacks): DataTableColu
       render: (g) => <Badge variant="outline">{g.options?.length ?? 0}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'lg',
+      accessor: (g) => g.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (g) => (g.created_at ? new Date(g.created_at).toLocaleDateString() : '—'),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

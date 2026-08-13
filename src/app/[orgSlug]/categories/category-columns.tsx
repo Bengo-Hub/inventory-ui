@@ -56,6 +56,14 @@ export function buildCategoryColumns(cb: CategoryColumnCallbacks): DataTableColu
       render: (c) => <Badge variant={c.is_active ? 'success' : 'outline'}>{c.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'md',
+      accessor: (c) => c.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (c) => (c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

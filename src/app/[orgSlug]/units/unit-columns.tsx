@@ -23,6 +23,7 @@ export interface Unit {
   type?: string;
   item_count?: number;
   is_active?: boolean;
+  created_at?: string;
 }
 
 export interface UnitColumnCallbacks {
@@ -67,6 +68,15 @@ export function buildUnitColumns(cb: UnitColumnCallbacks): DataTableColumn<Unit>
       accessor: (u) => u.item_count ?? 0,
       cellClassName: 'tabular-nums',
       render: (u) => (u.item_count ?? 0).toLocaleString(),
+    },
+    {
+      key: 'created_at',
+      header: 'Added',
+      sortable: true,
+      hideBelow: 'md',
+      accessor: (u) => u.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (u) => (u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'),
     },
     {
       key: 'actions',

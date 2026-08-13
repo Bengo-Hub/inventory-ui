@@ -49,6 +49,14 @@ export function buildAssetCategoryColumns(cb: AssetCategoryColumnCallbacks): Dat
       cellClassName: 'tabular-nums',
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'lg',
+      accessor: (c) => c.created_at,
+      cellClassName: 'text-muted-foreground',
+      render: (c) => new Date(c.created_at).toLocaleDateString(),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

@@ -61,6 +61,14 @@ export function buildApprovalRuleColumns(cb: ApprovalRuleColumnCallbacks): DataT
       render: (r) => <Badge variant={r.is_active ? 'success' : 'outline'}>{r.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'lg',
+      accessor: (r) => r.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

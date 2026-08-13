@@ -45,6 +45,7 @@ export interface Recipe {
     prep_time_minutes?: number | null;
     allergens?: string[];
     ingredients: RecipeIngredient[];
+    created_at?: string;
 }
 
 export interface RecipePayload {

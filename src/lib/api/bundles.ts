@@ -70,6 +70,7 @@ export interface Bundle {
   accommodation_included?: boolean;
   sessions_total?: number | null;
   validity_days?: number | null;
+  created_at?: string;
 }
 
 export interface CreateBundleComponentInput {

@@ -46,6 +46,14 @@ export function buildBundleColumns(cb: BundleColumnCallbacks): DataTableColumn<B
       render: (b) => <Badge variant={b.is_active ? 'success' : 'outline'}>{b.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      hideBelow: 'md',
+      accessor: (b) => b.created_at ?? '',
+      cellClassName: 'text-muted-foreground',
+      render: (b) => (b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

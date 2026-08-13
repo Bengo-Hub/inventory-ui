@@ -56,6 +56,15 @@ export function buildRequisitionColumns(cb: RequisitionColumnCallbacks): DataTab
       render: (r) => <Badge variant={STATUS_VARIANT[r.status]}>{r.status.replace(/_/g, ' ')}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      sortable: true,
+      hideBelow: 'lg',
+      accessor: (r) => r.created_at,
+      cellClassName: 'text-muted-foreground',
+      render: (r) => new Date(r.created_at).toLocaleDateString(),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

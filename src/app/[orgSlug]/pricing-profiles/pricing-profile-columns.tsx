@@ -56,6 +56,15 @@ export function buildPricingProfileColumns(cb: PricingProfileColumnCallbacks): D
       render: (t) => <Badge variant={t.is_active ? 'success' : 'outline'}>{t.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
     {
+      key: 'created_at',
+      header: 'Added',
+      sortable: true,
+      hideBelow: 'md',
+      accessor: (t) => t.created_at,
+      cellClassName: 'text-muted-foreground',
+      render: (t) => new Date(t.created_at).toLocaleDateString(),
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',
