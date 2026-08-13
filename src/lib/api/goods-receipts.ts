@@ -62,7 +62,7 @@ export interface CreateGRNInput {
   lines: CreateGRNLineInput[];
 }
 
-export interface GRNListParams { status?: GRNStatus; purchase_order_id?: string; page?: number; limit?: number; }
+export interface GRNListParams { status?: GRNStatus; purchase_order_id?: string; from?: string; to?: string; page?: number; limit?: number; }
 export interface PaginatedGRNs { data: GoodsReceipt[]; total: number; page: number; limit: number; hasMore: boolean; }
 
 export interface MatchLine { item_id: string; ordered: number; received: number; status: string; }

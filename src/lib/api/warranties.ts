@@ -44,6 +44,8 @@ export interface WarrantyListParams {
   status?: WarrantyStatus;
   item_id?: string;
   search?: string;
+  from?: string;
+  to?: string;
 }
 
 const base = (org: string) => `/api/v1/${org}/inventory/warranties`;

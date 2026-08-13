@@ -18,6 +18,7 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL } from './transfers-columns';
@@ -131,6 +132,7 @@ export default function TransfersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Transfer
@@ -150,7 +152,10 @@ export default function TransfersPage() {
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
-    const { data: transfers, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug);
+    const { data: transfers, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug, {
+        from: range.from || undefined,
+        to: range.to || undefined,
+    });
     const { data: warehouses } = useWarehouses(orgSlug);
     const createTransfer = useCreateTransfer(orgSlug);
 
@@ -165,7 +170,7 @@ export default function TransfersPage() {
     const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, range]);
 
     const columns = useMemo(
         () => buildTransferColumns({ onView: (t) => setViewId(t.id) }),
@@ -268,7 +273,7 @@ export default function TransfersPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -278,6 +283,7 @@ export default function TransfersPage() {
                             className="pl-10"
                         />
                     </div>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

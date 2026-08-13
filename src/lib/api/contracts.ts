@@ -32,6 +32,8 @@ export type UpdateContractInput = Partial<CreateContractInput>;
 export interface ContractListParams {
   status?: ContractStatus;
   supplier_id?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

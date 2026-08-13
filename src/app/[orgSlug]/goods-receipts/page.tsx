@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { GoodsReceiptDialog } from '@/components/inventory/GoodsReceiptDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { useGoodsReceipts, useGoodsReceipt, usePostGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { type GRNStatus } from '@/lib/api/goods-receipts';
@@ -21,11 +22,12 @@ export default function GoodsReceiptsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [status, setStatus] = useState<GRNStatus | ''>('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [viewId, setViewId] = useState<string | null>(null);
 
-    const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
     const post = usePostGoodsReceipt(org);
     // Only used to resolve PO numbers for display — pull the max page size rather than
     // paginating, since this isn't a user-facing list of purchase orders.
@@ -39,7 +41,7 @@ export default function GoodsReceiptsPage() {
 
     const rows = data?.data ?? [];
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status]);
+    useMemo(() => { setPage(1); }, [status, range]);
     const poNumberOf = (id: string) => (orders ?? []).find((o) => o.id === id)?.po_number ?? id.slice(0, 8);
 
     function handlePost(id: string) {
@@ -71,11 +73,12 @@ export default function GoodsReceiptsPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row flex-wrap items-center gap-2">
                     <select className="border border-border rounded-md px-3 py-2 text-sm bg-background w-fit" value={status} onChange={(e) => setStatus(e.target.value as GRNStatus | '')}>
                         <option value="">All statuses</option>
                         {(['draft', 'posted', 'cancelled'] as GRNStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

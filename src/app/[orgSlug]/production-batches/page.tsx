@@ -6,6 +6,7 @@ import {
     useProductionBatches, useCreateBatch, useStartBatch, useCompleteBatch, useCancelBatch,
 } from '@/hooks/useProductionBatches';
 import { type CreateBatchInput, type ProductionBatch, type BatchStatus } from '@/lib/api/productionBatches';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildBatchColumns } from './batch-columns';
 import { BarChart3, Factory, Plus } from 'lucide-react';
@@ -24,10 +25,11 @@ export default function ProductionBatchesPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [status, setStatus] = useState<BatchStatus | ''>('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
 
-    const { data, isLoading, isError, refetch } = useProductionBatches(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useProductionBatches(orgSlug, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
     const createBatch = useCreateBatch(orgSlug);
     const startBatch = useStartBatch(orgSlug);
     const completeBatch = useCompleteBatch(orgSlug);
@@ -39,7 +41,7 @@ export default function ProductionBatchesPage() {
 
     const rows = data?.data ?? [];
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status]);
+    useMemo(() => { setPage(1); }, [status, range]);
 
     function act(label: string, p: Promise<unknown>) {
         p.then(() => toast.success(label)).catch(async (e) => toast.error(await apiErrorMessage(e, `Failed to ${label.toLowerCase()}`)));
@@ -98,12 +100,13 @@ export default function ProductionBatchesPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row flex-wrap items-center gap-2">
                     <select className="border border-border rounded-md px-3 py-2 text-sm bg-background"
                         value={status} onChange={(e) => setStatus(e.target.value as BatchStatus | '')}>
                         <option value="">All statuses</option>
                         {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                     </select>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

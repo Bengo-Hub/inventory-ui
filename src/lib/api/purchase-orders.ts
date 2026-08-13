@@ -64,6 +64,8 @@ export interface POListParams {
   search?: string;
   supplier_id?: string;
   warehouse_id?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

@@ -62,6 +62,8 @@ export interface CreateTransferInput {
 export interface TransferListParams {
   status?: TransferStatus;
   warehouse_id?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

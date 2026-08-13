@@ -8,6 +8,7 @@ import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuic
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildPurchaseOrderColumns, STATUS_VARIANT, STATUS_LABEL } from './purchase-orders-columns';
 import {
@@ -151,6 +152,7 @@ export default function PurchaseOrdersPage() {
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [selectedPO, setSelectedPO] = useState<string | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
@@ -182,6 +184,8 @@ export default function PurchaseOrdersPage() {
     const { data, isLoading, isError, refetch } = usePurchaseOrders(orgSlug, {
         search: search || undefined,
         status: (statusFilter || undefined) as POStatus | undefined,
+        from: range.from || undefined,
+        to: range.to || undefined,
         page,
         limit: ITEMS_PER_PAGE,
     });
@@ -213,7 +217,7 @@ export default function PurchaseOrdersPage() {
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
     const paginatedItems = orders ?? [];
 
-    useMemo(() => { setPage(1); }, [search, statusFilter]);
+    useMemo(() => { setPage(1); }, [search, statusFilter, range]);
 
     const columns = useMemo(
         () => buildPurchaseOrderColumns({ onView: (po) => setSelectedPO(po.id), onPrint: (po) => previewPO(po) }),
@@ -404,6 +408,7 @@ export default function PurchaseOrdersPage() {
                             <option value="received">Received</option>
                             <option value="cancelled">Cancelled</option>
                         </select>
+                        <DateRangePicker value={range} onChange={setRange} className="sm:w-56" />
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">

@@ -7,6 +7,7 @@ import {
     useReviewRequisition, useApproveRequisition, useRejectRequisition,
 } from '@/hooks/useRequisitions';
 import { type CreateRequisitionInput, type Requisition, type RequisitionStatus } from '@/lib/api/requisitions';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildRequisitionColumns } from './requisition-columns';
 import { ClipboardList, Plus } from 'lucide-react';
@@ -25,11 +26,12 @@ export default function RequisitionsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [status, setStatus] = useState<RequisitionStatus | ''>('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     useCreateFromQuery(() => setDialogOpen(true)); // mobile quick-add → open New Requisition
 
-    const { data, isLoading, isError, refetch } = useRequisitions(orgSlug, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useRequisitions(orgSlug, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
     const createReq = useCreateRequisition(orgSlug);
     const submitReq = useSubmitRequisition(orgSlug);
     const reviewReq = useReviewRequisition(orgSlug);
@@ -42,7 +44,7 @@ export default function RequisitionsPage() {
 
     const rows = data?.data ?? [];
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status]);
+    useMemo(() => { setPage(1); }, [status, range]);
 
     function act(label: string, p: Promise<unknown>) {
         p.then(() => toast.success(label)).catch(async (e) => toast.error(await apiErrorMessage(e, `Failed to ${label.toLowerCase()}`)));
@@ -84,12 +86,13 @@ export default function RequisitionsPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row flex-wrap items-center gap-2">
                     <select className="border border-border rounded-md px-3 py-2 text-sm bg-background"
                         value={status} onChange={(e) => setStatus(e.target.value as RequisitionStatus | '')}>
                         <option value="">All statuses</option>
                         {STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, ' ')}</option>)}
                     </select>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

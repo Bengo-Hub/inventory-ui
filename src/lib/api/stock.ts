@@ -89,6 +89,8 @@ export interface StockExportParams extends StockListParams {
 export interface AdjustmentListParams {
   warehouse_id?: string;
   item_id?: string;
+  date_from?: string;
+  date_to?: string;
   page?: number;
   limit?: number;
 }

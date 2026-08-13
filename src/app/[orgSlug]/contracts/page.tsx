@@ -6,6 +6,7 @@ import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useS
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildContractColumns, STATUS_VARIANT } from './contract-columns';
 import { type Contract, type ContractStatus } from '@/lib/api/contracts';
@@ -26,6 +27,7 @@ export default function ContractsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [status, setStatus] = useState<ContractStatus | ''>('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Contract | null>(null);
@@ -40,7 +42,7 @@ export default function ContractsPage() {
     const [endDate, setEndDate] = useState('');
     const [terms, setTerms] = useState('');
 
-    const { data, isLoading, isError, refetch } = useContracts(org, { status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = useContracts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
     const create = useCreateContract(org);
     const update = useUpdateContract(org);
     const activate = useActivateContract(org);
@@ -56,7 +58,7 @@ export default function ContractsPage() {
 
     const rows = data?.data ?? [];
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status]);
+    useMemo(() => { setPage(1); }, [status, range]);
 
     const nameOf = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? '—';
     const isPending = create.isPending || update.isPending;
@@ -113,11 +115,12 @@ export default function ContractsPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row flex-wrap items-center gap-2">
                     <select className="border border-border rounded-md px-3 py-2 text-sm bg-background w-fit" value={status} onChange={(e) => setStatus(e.target.value as ContractStatus | '')}>
                         <option value="">All statuses</option>
                         {(['draft', 'active', 'expired', 'terminated'] as ContractStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

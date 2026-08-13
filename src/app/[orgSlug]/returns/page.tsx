@@ -3,6 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { usePurchaseReturns, useCreatePurchaseReturn, useApprovePurchaseReturn } from '@/hooks/usePurchaseReturns';
 import { useSuppliers } from '@/hooks/useSuppliers';
 import { type PurchaseReturn, type ReturnPaymentStatus } from '@/lib/api/purchase-returns';
@@ -26,6 +27,7 @@ export default function PurchaseReturnsPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [status, setStatus] = useState<ReturnPaymentStatus | ''>('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [viewing, setViewing] = useState<PurchaseReturn | null>(null);
@@ -34,7 +36,7 @@ export default function PurchaseReturnsPage() {
     const [reason, setReason] = useState('');
     const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
-    const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, page, limit: ITEMS_PER_PAGE });
+    const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: ITEMS_PER_PAGE });
     const create = useCreatePurchaseReturn(org);
     const approve = useApprovePurchaseReturn(org);
     const { data: suppliersPage } = useSuppliers(org);
@@ -46,7 +48,7 @@ export default function PurchaseReturnsPage() {
 
     const rows = data?.data ?? [];
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / ITEMS_PER_PAGE));
-    useMemo(() => { setPage(1); }, [status]);
+    useMemo(() => { setPage(1); }, [status, range]);
 
     const nameOf = (id?: string | null) => suppliers.find((s) => s.id === id)?.name ?? '—';
     const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
@@ -98,11 +100,12 @@ export default function PurchaseReturnsPage() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row flex-wrap items-center gap-2">
                     <select className="border border-border rounded-md px-3 py-2 text-sm bg-background w-fit" value={status} onChange={(e) => setStatus(e.target.value as ReturnPaymentStatus | '')}>
                         <option value="">All statuses</option>
                         {(['pending', 'due', 'partial', 'paid'] as ReturnPaymentStatus[]).map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

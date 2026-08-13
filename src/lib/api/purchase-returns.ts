@@ -28,6 +28,8 @@ export interface CreatePurchaseReturnInput {
 
 export interface ReturnListParams {
   payment_status?: ReturnPaymentStatus;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

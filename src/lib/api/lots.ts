@@ -49,6 +49,8 @@ export interface LotListParams {
   warehouse_id?: string;
   item_id?: string;
   expiring_before?: string;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }

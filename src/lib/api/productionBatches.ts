@@ -37,7 +37,7 @@ export interface CreateBatchInput {
   notes?: string;
 }
 
-export interface BatchListParams { status?: BatchStatus; recipe_id?: string; page?: number; limit?: number; }
+export interface BatchListParams { status?: BatchStatus; recipe_id?: string; from?: string; to?: string; page?: number; limit?: number; }
 export interface PaginatedBatches { data: ProductionBatch[]; total: number; page: number; limit: number; hasMore: boolean; }
 
 export interface ManufacturingDashboard {

@@ -4,6 +4,7 @@ import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/component
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarranties, useCreateWarranty, useUpdateWarranty, useClaimWarranty, useVoidWarranty, useDeleteWarranty, useWarrantyLookup } from '@/hooks/useWarranties';
 import { type Warranty, type WarrantyStatus, type WarrantyWriteInput } from '@/lib/api/warranties';
@@ -40,6 +41,7 @@ export default function WarrantiesPage() {
     const org = params?.orgSlug as string;
     const [tab, setTab] = useState<Tab>('');
     const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [open, setOpen] = useState(false);
     const [editing, setEditing] = useState<Warranty | null>(null);
@@ -62,7 +64,7 @@ export default function WarrantiesPage() {
     // Search goes to the server; status is filtered client-side because the API computes
     // "expired" from the coverage window (an active row past warranty_end reads as expired),
     // so a server-side status=active/expired filter wouldn't match what users see.
-    const { data, isLoading, isError, refetch } = useWarranties(org, { search: search.trim() || undefined });
+    const { data, isLoading, isError, refetch } = useWarranties(org, { search: search.trim() || undefined, from: range.from || undefined, to: range.to || undefined });
     const create = useCreateWarranty(org);
     const update = useUpdateWarranty(org);
     const claim = useClaimWarranty(org);
@@ -193,6 +195,7 @@ export default function WarrantiesPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input className="pl-10" placeholder="Search serial, item or SKU…" value={search} onChange={(e) => setSearch(e.target.value)} />
                             </div>
+                            <DateRangePicker value={range} onChange={setRange} className="w-56" />
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">

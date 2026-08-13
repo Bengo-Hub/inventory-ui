@@ -2,6 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLots';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
@@ -109,6 +110,7 @@ export default function LotsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Lot | null>(null);
@@ -125,7 +127,10 @@ export default function LotsPage() {
     const [formSupplierRef, setFormSupplierRef] = useState('');
     const [formNotes, setFormNotes] = useState('');
 
-    const { data: lots, isLoading, isError, refetch, isFetching } = useLots(orgSlug);
+    const { data: lots, isLoading, isError, refetch, isFetching } = useLots(orgSlug, {
+        from: range.from || undefined,
+        to: range.to || undefined,
+    });
     useSuppliers(orgSlug); // preload suppliers for combobox
     const createLot = useCreateLot(orgSlug);
     const updateLot = useUpdateLot(orgSlug);
@@ -143,7 +148,7 @@ export default function LotsPage() {
     const paginatedItems = filtered?.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE) ?? [];
     const expiringSoonCount = lots?.filter((l) => isExpiringSoon(l.expiry_date)).length ?? 0;
 
-    useMemo(() => { setPage(1); }, [search]);
+    useMemo(() => { setPage(1); }, [search, range]);
 
     const columns = useMemo(
         () => buildLotColumns({ isDeleting: deleteLot.isPending, onEdit: openEdit, onDelete: handleDelete }),
@@ -274,7 +279,7 @@ export default function LotsPage() {
             )}
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -284,6 +289,7 @@ export default function LotsPage() {
                             className="pl-10"
                         />
                     </div>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

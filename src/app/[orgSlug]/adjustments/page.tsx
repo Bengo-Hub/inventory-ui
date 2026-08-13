@@ -9,6 +9,7 @@ import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuickCreateDialog';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
+import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { useCreateAdjustment, useAdjustments } from '@/hooks/useStock';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
@@ -259,6 +260,7 @@ export default function AdjustmentsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
+    const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page] = useState(1);
     const [showModal, setShowModal] = useState(false);
     const [prefillSku, setPrefillSku] = useState('');
@@ -280,7 +282,10 @@ export default function AdjustmentsPage() {
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
 
-    const { data: adjustments, isLoading, isError, refetch, isFetching } = useAdjustments(orgSlug);
+    const { data: adjustments, isLoading, isError, refetch, isFetching } = useAdjustments(orgSlug, {
+        date_from: range.from || undefined,
+        date_to: range.to || undefined,
+    });
 
     const filtered = useMemo(() => {
         if (!search) return adjustments;
@@ -340,7 +345,7 @@ export default function AdjustmentsPage() {
             <FeatureLockBanner feature="stock_tracking" />
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -350,6 +355,7 @@ export default function AdjustmentsPage() {
                             className="pl-10"
                         />
                     </div>
+                    <DateRangePicker value={range} onChange={setRange} className="w-56 sm:w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">

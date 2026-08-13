@@ -52,6 +52,8 @@ export interface CreateRequisitionInput {
 export interface RequisitionListParams {
   status?: RequisitionStatus;
   request_type?: RequestType;
+  from?: string;
+  to?: string;
   page?: number;
   limit?: number;
 }
