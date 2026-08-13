@@ -3,7 +3,7 @@
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { getAgentInfo, listLocalPrinters } from '@/lib/inventory/print-agent';
+import { AGENT_BASE, getAgentInfo, listLocalPrinters } from '@/lib/inventory/print-agent';
 import { getLabelPrintPrefs, setLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
 import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
 import {
@@ -24,6 +24,7 @@ import {
   CalendarDays,
   ChefHat,
   Download,
+  ExternalLink,
   FileText,
   Globe,
   Layers,
@@ -920,13 +921,35 @@ function PrintingTab() {
             machine, it works here too with no separate install.
           </p>
         </CardHeader>
-        <CardContent className="flex items-center gap-2">
-          <a href={AGENT_DOWNLOAD_URL} className="inline-flex">
-            <Button variant="outline" className="gap-1.5"><Download className="h-4 w-4" /> Download print agent</Button>
-          </a>
-          <Button variant="outline" className="gap-1.5" onClick={detect} disabled={detecting}>
-            <RefreshCw className={`h-4 w-4 ${detecting ? 'animate-spin' : ''}`} /> {detecting ? 'Checking…' : 'Refresh status'}
-          </Button>
+        <CardContent className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <a href={AGENT_DOWNLOAD_URL} className="inline-flex">
+              <Button variant="outline" className="gap-1.5"><Download className="h-4 w-4" /> Download print agent</Button>
+            </a>
+            <Button variant="outline" className="gap-1.5" onClick={detect} disabled={detecting}>
+              <RefreshCw className={`h-4 w-4 ${detecting ? 'animate-spin' : ''}`} /> {detecting ? 'Checking…' : 'Refresh status'}
+            </Button>
+            {!reachable && (
+              <a
+                href={`${AGENT_BASE}/health`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+              >
+                <ExternalLink className="h-3.5 w-3.5" /> Open agent directly (diagnostic)
+              </a>
+            )}
+          </div>
+          {!reachable && (
+            <p className="text-xs text-muted-foreground bg-accent/30 rounded-lg px-3 py-2">
+              If the diagnostic link above loads JSON (e.g. <code className="text-[11px]">{'{"ok":true,...}'}</code>) but
+              this still says &quot;Agent not detected&quot;, the agent is fine — your browser is blocking this
+              site&apos;s local network access. Click the padlock icon in the address bar → Site permissions →
+              set <span className="font-medium text-foreground">Local network</span> to Allow, reload, then
+              Refresh status again. If the link doesn&apos;t load at all, the agent isn&apos;t running — check
+              the &quot;Codevertex POS Print Agent&quot; Windows service (services.msc).
+            </p>
+          )}
         </CardContent>
       </Card>
 
