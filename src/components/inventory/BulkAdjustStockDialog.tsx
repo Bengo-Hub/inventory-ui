@@ -5,11 +5,11 @@ import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useBulkAdjustStock } from '@/hooks/useStock';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
-import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ADJUSTMENT_REASON_OPTIONS } from '@/lib/adjustment-reasons';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { cn } from '@/lib/utils';
 import { parseDecimal, DECIMAL_STEP } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { Minus, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -44,9 +44,17 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
   const { data: warehouses } = useWarehouses(orgSlug);
   const [reason, setReason] = useState('correction');
   const [notes, setNotes] = useState('');
+  // adjustments holds the POSITIVE quantity the user typed; direction ('add'/'remove', default
+  // 'add') decides the sign applied at submit — replaces the old single "+/- qty" text field,
+  // which several users misread as always meaning "add" (typing e.g. "3" to remove 3 did nothing
+  // visually different from adding 3, so a removal typed without the minus sign silently added
+  // stock instead).
   const [adjustments, setAdjustments] = useState<Record<string, string>>({});
+  const [directions, setDirections] = useState<Record<string, 'add' | 'remove'>>({});
   // Optional per-row destination — when set, this line moves stock to another warehouse
-  // (transfer_out at the source + transfer_in there) instead of adjusting in place.
+  // (transfer_out at the source + transfer_in there) instead of adjusting in place. A "move" has
+  // no add/remove concept of its own (the backend always moves the full typed quantity regardless
+  // of sign), so the direction toggle is hidden for a row once a destination is picked.
   const [destinations, setDestinations] = useState<Record<string, string>>({});
 
   const bulkAdjust = useBulkAdjustStock(orgSlug);
@@ -64,11 +72,18 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
       return;
     }
     const lines = items
-      .map((i) => ({
-        sku: i.sku,
-        adjustment: parseDecimal(adjustments[i.sku] ?? ''),
-        destination_warehouse_id: destinations[i.sku] || undefined,
-      }))
+      .map((i) => {
+        const qty = Math.abs(parseDecimal(adjustments[i.sku] ?? ''));
+        const hasDestination = !!destinations[i.sku];
+        // A move's sign doesn't matter (the backend always moves the full typed quantity), so
+        // only apply the remove-direction sign for an in-place adjustment.
+        const signed = !hasDestination && (directions[i.sku] ?? 'add') === 'remove' ? -qty : qty;
+        return {
+          sku: i.sku,
+          adjustment: signed,
+          destination_warehouse_id: destinations[i.sku] || undefined,
+        };
+      })
       .filter((l) => l.adjustment !== 0);
     if (lines.length === 0) {
       toast.error('Enter a non-zero adjustment for at least one item');
@@ -96,7 +111,7 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative z-50 w-full max-w-lg max-h-[90vh] flex flex-col">
+      <div className="relative z-50 w-full max-w-2xl max-h-[90vh] flex flex-col">
         <Card className="flex flex-col overflow-hidden max-h-[90vh]">
           <CardHeader className="shrink-0">
             <div className="flex items-center justify-between">
@@ -106,9 +121,9 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
               </button>
             </div>
             <p className="text-xs text-muted-foreground">
-              One warehouse and reason apply to every line below; enter a positive or negative
-              quantity per item. Optionally pick a destination warehouse per row to move that
-              quantity there instead of adjusting in place.
+              One warehouse and reason apply to every line below. Pick Add or Remove and enter a
+              quantity per item, or pick a destination warehouse to move that quantity there
+              instead of adjusting in place.
             </p>
           </CardHeader>
           <CardContent className="overflow-y-auto flex-1">
@@ -131,33 +146,77 @@ export function BulkAdjustStockDialog({ orgSlug, items, onClose, onDone }: BulkA
 
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground">Adjustment per item</p>
-                {items.map((item) => (
-                  <div key={item.sku} className="flex items-center gap-3">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{item.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
+                {items.map((item) => {
+                  const hasDestination = !!destinations[item.sku];
+                  const direction = directions[item.sku] ?? 'add';
+                  return (
+                    <div key={item.sku} className="flex items-center gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{item.name}</p>
+                        <p className="font-mono text-xs text-muted-foreground">{item.sku}</p>
+                      </div>
+                      {/* Add/Remove toggle — replaces the old sign-in-the-number-field convention
+                          that several users misread (typing "3" to remove looked identical to
+                          adding 3). Hidden once a destination is picked: a move has no add/remove
+                          concept of its own, it always moves the full typed quantity. */}
+                      {!hasDestination && (
+                        <div className="flex shrink-0 rounded-lg border border-input overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setDirections((d) => ({ ...d, [item.sku]: 'add' }))}
+                            title="Add stock"
+                            className={cn(
+                              'flex items-center gap-1 px-2 h-9 text-xs font-medium transition-colors',
+                              direction === 'add' ? 'bg-green-600 text-white' : 'bg-background text-muted-foreground hover:bg-accent',
+                            )}
+                          >
+                            <Plus className="h-3.5 w-3.5" /> Add
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDirections((d) => ({ ...d, [item.sku]: 'remove' }))}
+                            title="Remove stock"
+                            className={cn(
+                              'flex items-center gap-1 px-2 h-9 text-xs font-medium border-l border-input transition-colors',
+                              direction === 'remove' ? 'bg-red-600 text-white' : 'bg-background text-muted-foreground hover:bg-accent',
+                            )}
+                          >
+                            <Minus className="h-3.5 w-3.5" /> Remove
+                          </button>
+                        </div>
+                      )}
+                      <div className="w-24 shrink-0">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="Qty"
+                          step={DECIMAL_STEP}
+                          value={adjustments[item.sku] ?? ''}
+                          onChange={(e) => setAdjustments((a) => ({ ...a, [item.sku]: e.target.value }))}
+                        />
+                      </div>
+                      <div className="w-36 shrink-0">
+                        {/* Plain native <select>, not the shared searchable combobox — that
+                            component's dropdown positions absolute/non-portaled, which clips
+                            invisible inside this dialog's scrollable body (the reported "options
+                            aren't loading" bug; the warehouses ARE there, the popup just renders
+                            off-screen). A native select has no such failure mode. */}
+                        <select
+                          value={destinations[item.sku] ?? ''}
+                          onChange={(e) => setDestinations((d) => ({ ...d, [item.sku]: e.target.value }))}
+                          className="w-full h-9 rounded-lg border border-input bg-background px-2 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
+                        >
+                          <option value="">Move to… (optional)</option>
+                          {(warehouses ?? [])
+                            .filter((wh) => wh.id !== warehouse.warehouseId)
+                            .map((wh) => (
+                              <option key={wh.id} value={wh.id}>{wh.name}</option>
+                            ))}
+                        </select>
+                      </div>
                     </div>
-                    <div className="w-32 shrink-0">
-                      <Input
-                        type="number"
-                        placeholder="+/- qty"
-                        step={DECIMAL_STEP}
-                        value={adjustments[item.sku] ?? ''}
-                        onChange={(e) => setAdjustments((a) => ({ ...a, [item.sku]: e.target.value }))}
-                      />
-                    </div>
-                    <div className="w-40 shrink-0">
-                      <CreatableSelect
-                        value={destinations[item.sku] ?? ''}
-                        onChange={(v) => setDestinations((d) => ({ ...d, [item.sku]: v }))}
-                        options={(warehouses ?? [])
-                          .filter((wh) => wh.id !== warehouse.warehouseId)
-                          .map((wh) => ({ id: wh.id, name: wh.name }))}
-                        placeholder="Move to… (optional)"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className="space-y-2">
