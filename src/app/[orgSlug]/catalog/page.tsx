@@ -1140,7 +1140,6 @@ export default function CatalogPage() {
               exportFileName="catalog"
               pageSize={pageSize}
               onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
-              pageSizeOptions={[10, 20, 25, 50, 100]}
               page={page}
               totalPages={totalPages}
               onPageChange={setPage}
