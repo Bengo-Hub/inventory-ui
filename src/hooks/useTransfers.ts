@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { transfersApi, type CreateTransferInput, type TransferListParams, type TransferSummary } from '@/lib/api/transfers';
+import { transfersApi, type CreateTransferInput, type UpdateTransferInput, type TransferListParams, type TransferSummary } from '@/lib/api/transfers';
 
 const TRANSFERS_KEY = 'transfers';
 
@@ -33,6 +33,17 @@ export function useCreateTransfer(orgSlug: string) {
   });
 }
 
+export function useUpdateTransfer(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateTransferInput }) => transfersApi.update(orgSlug, id, data),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [TRANSFERS_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [TRANSFERS_KEY, orgSlug, id] });
+    },
+  });
+}
+
 export function useShipTransfer(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
@@ -47,7 +58,9 @@ export function useShipTransfer(orgSlug: string) {
 export function useReceiveTransfer(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, items }: { id: string; items?: { item_id: string; received_qty: number }[] }) =>
+    // items is optional — omit it entirely for "everything arrived as shipped" (every line
+    // credits its full drafted quantity, same as before this override existed).
+    mutationFn: ({ id, items }: { id: string; items?: { item_id: string; line_id: string; received_qty: number; variance_reason?: string }[] }) =>
       transfersApi.receive(orgSlug, id, items),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: [TRANSFERS_KEY, orgSlug] });

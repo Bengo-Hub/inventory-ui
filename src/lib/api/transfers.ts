@@ -21,6 +21,7 @@ export interface TransferItem {
   item_sku?: string;
   quantity: number;
   received_qty?: number;
+  variance_reason?: string;
 }
 
 export interface TransferWarehouse {
@@ -59,6 +60,17 @@ export interface CreateTransferInput {
   items: { item_id: string; quantity: number }[];
 }
 
+// Amends a DRAFT transfer's line items + header fields — source/destination warehouse are
+// immutable so they aren't part of this shape (cancel + recreate covers a wrong-warehouse pick).
+export interface UpdateTransferInput {
+  notes?: string;
+  reference_no?: string;
+  shipping_charges?: number;
+  carrier?: string;
+  freight_notes?: string;
+  items: { item_id: string; quantity: number }[];
+}
+
 export interface TransferListParams {
   status?: TransferStatus;
   warehouse_id?: string;
@@ -80,11 +92,17 @@ export const transfersApi = {
   create: (orgSlug: string, data: CreateTransferInput) =>
     apiClient.post<Transfer>(`/api/v1/${orgSlug}/inventory/transfers`, data),
 
+  update: (orgSlug: string, id: string, data: UpdateTransferInput) =>
+    apiClient.put<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}`, data),
+
   ship: (orgSlug: string, id: string) =>
     apiClient.post<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}/ship`, {}),
 
-  receive: (orgSlug: string, id: string, receivedItems?: { item_id: string; received_qty: number }[]) =>
-    apiClient.post<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}/receive`, { items: receivedItems }),
+  // items is optional — omit entirely for "everything arrived as shipped" (every line credits
+  // its full drafted quantity). line_id (NOT item_id) is the key the backend matches on, since a
+  // transfer can carry more than one line for the same item (different lots/variants).
+  receive: (orgSlug: string, id: string, items?: { item_id: string; line_id: string; received_qty: number; variance_reason?: string }[]) =>
+    apiClient.post<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}/receive`, items ? { items } : undefined),
 
   cancel: (orgSlug: string, id: string) =>
     apiClient.post<Transfer>(`/api/v1/${orgSlug}/inventory/transfers/${id}/cancel`, {}),

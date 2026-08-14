@@ -29,6 +29,7 @@ export const STATUS_LABEL: Record<string, string> = {
 
 export interface TransferColumnCallbacks {
   onView: (t: TransferSummary) => void;
+  onEdit: (t: TransferSummary) => void;
 }
 
 export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColumn<TransferSummary>[] {
@@ -85,7 +86,13 @@ export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColu
       align: 'right',
       exportable: false,
       mobileAction: true,
-      render: (t) => <RowActions onView={() => cb.onView(t)} />,
+      render: (t) => (
+        <RowActions
+          onView={() => cb.onView(t)}
+          onEdit={() => cb.onEdit(t)}
+          canEdit={t.status === 'draft'}
+        />
+      ),
     },
   ];
 }
