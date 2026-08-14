@@ -64,6 +64,11 @@ export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColu
       render: (t) => (
         <div className="flex items-center gap-2">
           <Badge variant={STATUS_VARIANT[t.status] ?? 'default'}>{STATUS_LABEL[t.status] ?? t.status}</Badge>
+          {t.origin !== 'manual' && (
+            <span title="Auto-recorded from a bulk stock adjustment, not created via New Transfer">
+              <Badge variant="outline">Auto</Badge>
+            </span>
+          )}
           <div className="flex items-center gap-1 text-muted-foreground text-xs">
             <Package className="h-3 w-3" />
             {t.line_count}

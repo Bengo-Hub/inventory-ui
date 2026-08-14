@@ -2,10 +2,18 @@ import { apiClient } from './client';
 
 export type TransferStatus = 'draft' | 'pending' | 'in_transit' | 'received' | 'cancelled';
 
+// Origin distinguishes a normal user-initiated transfer ("manual", the New Transfer dialog) from
+// one auto-recorded after the fact by another feature — currently only "bulk_adjust" (a bulk
+// stock adjustment whose lines specified a destination warehouse). Auto-recorded transfers are
+// already "received" (the move already happened) and exist purely so it shows up with a
+// transfer_number in this list, same as a manually-created one.
+export type TransferOrigin = 'manual' | 'bulk_adjust' | string;
+
 export interface TransferSummary {
   id: string;
   transfer_number: string;
   status: TransferStatus;
+  origin: TransferOrigin;
   source_warehouse_name: string;
   destination_warehouse_name: string;
   line_count: number;
@@ -37,6 +45,7 @@ export interface Transfer {
   source_warehouse: TransferWarehouse;
   destination_warehouse: TransferWarehouse;
   status: TransferStatus;
+  origin: TransferOrigin;
   notes?: string;
   reference_no?: string;
   shipping_charges?: number;

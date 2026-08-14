@@ -75,7 +75,16 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
             loading={!!transferId && isLoading}
             title={transfer?.transfer_number ?? 'Stock Transfer'}
             subtitle={transfer ? `${transfer.source_warehouse?.name || '—'} → ${transfer.destination_warehouse?.name || '—'}` : undefined}
-            badges={transfer && <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>{STATUS_LABEL[transfer.status] ?? transfer.status}</Badge>}
+            badges={transfer && (
+                <>
+                    <Badge variant={STATUS_VARIANT[transfer.status] ?? 'default'}>{STATUS_LABEL[transfer.status] ?? transfer.status}</Badge>
+                    {transfer.origin !== 'manual' && (
+                        <span title="Auto-recorded from a bulk stock adjustment, not created via New Transfer">
+                            <Badge variant="outline">Auto</Badge>
+                        </span>
+                    )}
+                </>
+            )}
             fields={transfer ? [
                 { label: 'From', value: transfer.source_warehouse?.name || '—' },
                 { label: 'To', value: transfer.destination_warehouse?.name || '—' },
