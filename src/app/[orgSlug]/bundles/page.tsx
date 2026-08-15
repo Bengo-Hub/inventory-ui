@@ -4,7 +4,10 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Pagination } from '@/components/ui/pagination';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
 import { buildBundleColumns } from './bundle-columns';
 import {
     useBundles,
@@ -12,9 +15,13 @@ import {
     useDeleteBundle,
     useUpdateBundle,
 } from '@/hooks/useBundles';
-import { useItems } from '@/hooks/useItems';
+import { useItems, useCreateItem } from '@/hooks/useItems';
 import { type Bundle, type CreateBundleInput, type PackageType, type PriceBasis, type ComponentKind, type MealPeriod, PACKAGE_TYPES, MEAL_PERIODS } from '@/lib/api/bundles';
-import type { Item } from '@/lib/api/items';
+import { searchItems, type Item, type CreateItemInput } from '@/lib/api/items';
+
+interface ItemSearchOption extends SearchAddOption {
+    item: Item;
+}
 
 const PRICE_BASES: { value: PriceBasis; label: string }[] = [
     { value: 'flat', label: 'Flat' },
@@ -25,7 +32,7 @@ const PRICE_BASES: { value: PriceBasis; label: string }[] = [
 const bundleSelectCls = 'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none appearance-none';
 import { Minus, Package, Plus, Trash2, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 
@@ -122,6 +129,27 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
         }
         setComponents(prev => [...prev, { component_item_id: item.id, item_name: item.name, quantity: addQty }]);
         setAddQty(1);
+    }
+
+    // Inline "create a new item" from the add-component search (SearchAddTable's footer slot) —
+    // mirrors ItemSearchInput's own handleCreateSubmit/onSelectExisting behavior. The create
+    // dialog is a separate flow from SearchAddTable's own click-to-pick, so it can't clear the
+    // search box via onAdd — clearSearchRef stashes the footer render prop's `clear` (refreshed
+    // on every render the dropdown is open) so the async create-success handler can call it.
+    const createItem = useCreateItem(orgSlug);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [createInitialName, setCreateInitialName] = useState('');
+    const clearSearchRef = useRef<() => void>(() => {});
+    function handleCreateSubmit(data: CreateItemInput) {
+        createItem.mutate(data, {
+            onSuccess: (created) => {
+                toast.success('Item created');
+                setCreateOpen(false);
+                addComponent(created);
+                clearSearchRef.current();
+            },
+            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create item')),
+        });
     }
 
     function removeComponent(id: string) {
@@ -307,13 +335,45 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                         {/* Add component row */}
                         <div className="flex gap-2 items-end">
                             <div className="flex-1">
-                                <ItemSearchInput
-                                    orgSlug={orgSlug}
-                                    value=""
+                                <SearchAddTable<ItemSearchOption>
+                                    onSearch={async (q) => (await searchItems(orgSlug, q))
+                                        .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
+                                    onAdd={(opt) => addComponent(opt.item)}
+                                    excludeIds={components.map((c) => c.component_item_id)}
                                     placeholder="Search item to add…"
                                     fixedDropdown
-                                    onSelect={(item) => addComponent(item)}
+                                    endAdornment={({ setQuery }) => (
+                                        <BarcodeScanButton
+                                            title="Scan item barcode"
+                                            hint="Point the camera at the item barcode."
+                                            className="h-8 w-8 rounded-lg"
+                                            onScan={(code) => setQuery(code)}
+                                        />
+                                    )}
+                                    footer={({ query, clear }) => {
+                                        clearSearchRef.current = clear;
+                                        return query.length >= 2 ? (
+                                            <button
+                                                type="button"
+                                                className="flex w-full items-center gap-1.5 border-t border-border px-4 py-2.5 text-sm text-primary hover:bg-accent"
+                                                onMouseDown={(e) => { e.preventDefault(); setCreateInitialName(query); setCreateOpen(true); }}
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                                Create &quot;{query}&quot;
+                                            </button>
+                                        ) : null;
+                                    }}
                                 />
+                                {createOpen && (
+                                    <ItemFormDialog
+                                        orgSlug={orgSlug}
+                                        initialName={createInitialName}
+                                        onClose={() => setCreateOpen(false)}
+                                        onSubmit={handleCreateSubmit}
+                                        isPending={createItem.isPending}
+                                        onSelectExisting={(existing) => { setCreateOpen(false); addComponent(existing); clearSearchRef.current(); }}
+                                    />
+                                )}
                             </div>
                             <div className="flex items-center gap-1">
                                 <input

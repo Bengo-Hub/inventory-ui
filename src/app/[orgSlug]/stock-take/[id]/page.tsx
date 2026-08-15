@@ -4,7 +4,6 @@ import { Badge, Button, Card, CardContent, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
 import { Pagination } from '@/components/ui/pagination';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
-import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import {
@@ -18,6 +17,12 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { VARIANCE_REASONS, type StockCountLine, type StockCountStatus } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { apiClient } from '@/lib/api/client';
+import { searchItems, type Item } from '@/lib/api/items';
+import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+
+interface ItemSearchOption extends SearchAddOption {
+    item: Item;
+}
 import { ArrowLeft, CheckCircle2, ScanBarcode, Search, Send } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -343,18 +348,16 @@ export default function StockTakeDetailPage() {
                         {/* Add item manually — stock-tracked types only: RECIPE/SERVICE
                             items hold no stock of their own (their ingredients are counted). */}
                         {editable && (
-                            <ItemSearchInput
-                                orgSlug={orgSlug}
-                                value=""
-                                placeholder="Add an item to this count…"
-                                type="GOODS,INGREDIENT,EQUIPMENT"
-                                enableScan={false}
-                                onSelect={(item) =>
+                            <SearchAddTable<ItemSearchOption>
+                                onSearch={async (q) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }))
+                                    .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
+                                onAdd={(opt) =>
                                     addLine.mutate(
-                                        { item_id: item.id, sku: item.sku, counted_qty: 0 },
+                                        { item_id: opt.item.id, sku: opt.item.sku, counted_qty: 0 },
                                         { onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to add item')) },
                                     )
                                 }
+                                placeholder="Add an item to this count…"
                             />
                         )}
 

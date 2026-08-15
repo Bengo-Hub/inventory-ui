@@ -2,7 +2,6 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
-import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { useWarehouses } from '@/hooks/useWarehouses';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
@@ -18,10 +17,19 @@ import {
 } from '@/hooks/useStockCounts';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
+import { searchItems } from '@/lib/api/items';
 import { useOutletStore } from '@/store/outlet';
 import type { StockCount, StockCountTemplate } from '@/lib/api/stock-counts';
+import type { Item } from '@/lib/api/items';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+
+// Search-add row shape for the "Specific items" box below — carries the full Item so the
+// caller can pull whatever fields it needs (currently just id/name/sku).
+interface ItemSearchOption extends SearchAddOption {
+    item: Item;
+}
 import { buildStockTakeColumns } from './stock-take-columns';
 import { ClipboardCheck, LayoutTemplate, Play, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
@@ -278,15 +286,13 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Specific items</label>
-                                <ItemSearchInput
-                                    orgSlug={orgSlug}
-                                    value=""
+                                <SearchAddTable<ItemSearchOption>
+                                    onSearch={async (q) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }))
+                                        .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
+                                    onAdd={(opt) => setItems((prev) => prev.some((p) => p.id === opt.item.id) ? prev : [...prev, { id: opt.item.id, name: opt.item.name, sku: opt.item.sku }])}
+                                    excludeIds={items.map((it) => it.id)}
                                     placeholder="Add an item to the sheet…"
-                                    type="GOODS,INGREDIENT,EQUIPMENT"
-                                    enableScan={false}
-                                    allowCreate={false}
                                     fixedDropdown
-                                    onSelect={(item) => setItems((prev) => prev.some((p) => p.id === item.id) ? prev : [...prev, { id: item.id, name: item.name, sku: item.sku }])}
                                 />
                                 {items.length > 0 && (
                                     <div className="flex flex-wrap gap-1.5">

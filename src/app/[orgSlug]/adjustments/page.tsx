@@ -2,7 +2,8 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { InfoHint } from '@/components/ui/info-hint';
-import { ItemSearchInput, type ItemResult } from '@/components/inventory/ItemSearchInput';
+import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
+import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { ADJUSTMENT_REASON_OPTIONS } from '@/lib/adjustment-reasons';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
@@ -18,6 +19,8 @@ import { FeatureLockBanner } from '@/components/subscription/feature-lock-banner
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildAdjustmentColumns } from './adjustments-columns';
 import type { StockAdjustment } from '@/lib/api/stock';
+import { searchItems, type Item } from '@/lib/api/items';
+import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
 import { Minus, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -26,6 +29,10 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+
+interface ItemSearchOption extends SearchAddOption {
+    item: Item;
+}
 
 /**
  * When a large adjustment is routed through the approval workflow the API returns a 422
@@ -402,15 +409,22 @@ export default function AdjustmentsPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <ItemSearchInput
-                                orgSlug={orgSlug}
-                                value=""
-                                allowCreate={false}
-                                onSelect={(item: ItemResult) => {
-                                    if (bulkItems.some((i) => i.sku === item.sku)) return;
-                                    setBulkItems((prev) => [...prev, { sku: item.sku, name: item.name }]);
+                            <SearchAddTable<ItemSearchOption>
+                                onSearch={async (q) => (await searchItems(orgSlug, q))
+                                    .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
+                                onAdd={(opt) => {
+                                    if (bulkItems.some((i) => i.sku === opt.item.sku)) return;
+                                    setBulkItems((prev) => [...prev, { sku: opt.item.sku, name: opt.item.name }]);
                                 }}
                                 placeholder="Search items to add..."
+                                endAdornment={({ setQuery }) => (
+                                    <BarcodeScanButton
+                                        title="Scan item barcode"
+                                        hint="Point the camera at the item barcode."
+                                        className="h-8 w-8 rounded-lg"
+                                        onScan={(code) => setQuery(code)}
+                                    />
+                                )}
                             />
                             {bulkItems.length > 0 && (
                                 <div className="space-y-1.5 max-h-60 overflow-y-auto">

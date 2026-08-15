@@ -268,6 +268,27 @@ function itemsBase(orgSlug: string) {
   return `/api/v1/${orgSlug}/inventory/items`;
 }
 
+export interface ItemSearchParams {
+  type?: string;
+  forRecipe?: boolean;
+  warehouseId?: string;
+}
+
+/** Item search for SearchAddTable-based "search → click → add to a list" flows (bulk stock
+ *  adjustment, bundle components, stock-take add-item boxes) — mirrors ItemSearchInput's own
+ *  internal queryFn/params exactly, kept here as a plain async function since SearchAddTable's
+ *  onSearch (fired from a debounced effect, not render) can't use a hook. ItemSearchInput itself
+ *  is untouched — its many "persistent select" callers keep working exactly as before. */
+export async function searchItems(orgSlug: string, query: string, params: ItemSearchParams = {}): Promise<Item[]> {
+  if (!orgSlug || query.trim().length < 2) return [];
+  const qp: Record<string, string> = { search: query };
+  if (params.forRecipe) qp.for_recipe = '1';
+  else if (params.type) qp.type = params.type;
+  if (params.warehouseId) qp.warehouse_id = params.warehouseId;
+  const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(itemsBase(orgSlug), qp);
+  return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
+}
+
 export interface PaginatedItems {
   data: Item[];
   total: number;
