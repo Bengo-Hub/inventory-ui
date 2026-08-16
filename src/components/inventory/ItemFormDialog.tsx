@@ -11,9 +11,10 @@ import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
-import { BrandCombobox } from '@/components/inventory/BrandCombobox';
-import { ModelCombobox } from '@/components/inventory/ModelCombobox';
+import { BrandCombobox, AddBrandDialog } from '@/components/inventory/BrandCombobox';
+import { ModelCombobox, AddModelDialog, useItemModels } from '@/components/inventory/ModelCombobox';
 import { UnitQuickCreateDialog } from '@/components/inventory/UnitQuickCreateDialog';
+import { useBrands } from '@/hooks/useBrands';
 import { useCreateSupplier, useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
 import { type CreateSupplierInput } from '@/lib/api/suppliers';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -158,6 +159,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const searchPreferredSuppliers = useSupplierSearch(orgSlug);
   const [addCategoryOpen, setAddCategoryOpen] = useState(false);
   const [addUnitOpen, setAddUnitOpen] = useState(false);
+  // "+ New brand" / "+ New model" (GOODS only) — dialogs rendered as siblings of the outer
+  // <form> below, same reasoning as addCategoryOpen/addUnitOpen: see BrandCombobox's doc
+  // comment for why they can't be self-contained inside BrandCombobox/ModelCombobox.
+  const [addBrandOpen, setAddBrandOpen] = useState(false);
+  const [addModelOpen, setAddModelOpen] = useState(false);
+  const { data: brands } = useBrands(orgSlug);
+  const { data: models } = useItemModels(orgSlug, brandId);
   const [barcode, setBarcode] = useState(item?.barcode ?? '');
   const [reorderLevel, setReorderLevel] = useState(String(item?.reorder_level ?? ''));
   const [reorderQty, setReorderQty] = useState(String(item?.reorder_quantity ?? ''));
@@ -819,7 +827,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Brand <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <BrandCombobox orgSlug={orgSlug} value={brandId} onChange={setBrandId} />
+                    <BrandCombobox orgSlug={orgSlug} value={brandId} onChange={setBrandId} onAddClick={() => setAddBrandOpen(true)} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium inline-flex items-center gap-1">
@@ -833,7 +841,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     {/* Searchable + creatable combobox over models already used on the tenant's goods,
                         narrowed to the selected brand (a model belongs to a brand). No Model master —
                         model stays per-item free text, so "+ New model" simply selects the typed string. */}
-                    <ModelCombobox orgSlug={orgSlug} value={model} onChange={setModel} brandId={brandId || undefined} />
+                    <ModelCombobox orgSlug={orgSlug} value={model} onChange={setModel} brandId={brandId || undefined} onAddClick={() => setAddModelOpen(true)} />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
                     <label className="text-sm font-medium">Manufacturer <span className="text-muted-foreground font-normal">(optional)</span></label>
@@ -1620,6 +1628,23 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
           orgSlug={orgSlug}
           onClose={() => setAddUnitOpen(false)}
           onCreated={(u) => { setUnitId(u.id); setAddUnitOpen(false); }}
+        />
+      )}
+      {addBrandOpen && (
+        <AddBrandDialog
+          orgSlug={orgSlug}
+          initialName=""
+          brands={brands ?? []}
+          onClose={() => setAddBrandOpen(false)}
+          onCreated={(brand) => { setBrandId(brand.id); setAddBrandOpen(false); }}
+        />
+      )}
+      {addModelOpen && (
+        <AddModelDialog
+          initialName=""
+          models={models ?? []}
+          onClose={() => setAddModelOpen(false)}
+          onCreated={(name) => { setModel(name); setAddModelOpen(false); }}
         />
       )}
 

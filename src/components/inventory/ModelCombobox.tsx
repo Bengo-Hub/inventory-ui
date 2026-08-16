@@ -17,6 +17,13 @@ interface Props {
   onChange: (model: string) => void;
   /** When set, model suggestions are narrowed to this brand's existing goods (brand-aware). */
   brandId?: string;
+  /**
+   * Invoked when "+ New model" is clicked — see BrandCombobox's onAddClick doc comment.
+   * The caller must render AddModelDialog itself, outside the item form's <form>, so its
+   * own <form> never nests inside the outer one (nested forms bubble a "submit" straight
+   * into the outer form's onSubmit and prematurely save/close it).
+   */
+  onAddClick: () => void;
   placeholder?: string;
   disabled?: boolean;
 }
@@ -24,13 +31,12 @@ interface Props {
 /**
  * Model picker for the GOODS item form: the shared SearchableCombobox over the models
  * already used on the tenant's goods (brand-aware — narrowed to the selected brand when
- * one is chosen) with a "+ New model" footer opening an inline create dialog. Models are
- * per-item free text (no Model master, so no new schema/migration) — creating one simply
- * selects the typed string. Mirrors BrandCombobox / the Category & Unit pickers.
+ * one is chosen) with a "+ New model" footer. Models are per-item free text (no Model
+ * master, so no new schema/migration) — creating one simply selects the typed string.
+ * Mirrors BrandCombobox / the Category & Unit pickers.
  */
-export function ModelCombobox({ orgSlug, value, onChange, brandId, placeholder = 'Select a model…', disabled }: Props) {
+export function ModelCombobox({ orgSlug, value, onChange, brandId, onAddClick, placeholder = 'Select a model…', disabled }: Props) {
   const { data: models } = useItemModels(orgSlug, brandId);
-  const [addOpen, setAddOpen] = useState(false);
 
   // Distinct suggestions plus the current value (so a free-typed / just-created model still
   // renders as the selected label even when it isn't among the tenant's existing goods).
@@ -40,35 +46,25 @@ export function ModelCombobox({ orgSlug, value, onChange, brandId, placeholder =
     .map((m) => ({ value: m, label: m }));
 
   return (
-    <>
-      <SearchableCombobox
-        options={options}
-        value={value}
-        onChange={(m) => onChange(m)}
-        placeholder={placeholder}
-        searchPlaceholder="Search models…"
-        emptyText="No matching models — add one below."
-        disabled={disabled}
-        clearable
-        footer={
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted/60"
-          >
-            <Plus className="h-4 w-4" /> New model
-          </button>
-        }
-      />
-      {addOpen && (
-        <AddModelDialog
-          initialName=""
-          models={models ?? []}
-          onClose={() => setAddOpen(false)}
-          onCreated={(name) => { setAddOpen(false); onChange(name); }}
-        />
-      )}
-    </>
+    <SearchableCombobox
+      options={options}
+      value={value}
+      onChange={(m) => onChange(m)}
+      placeholder={placeholder}
+      searchPlaceholder="Search models…"
+      emptyText="No matching models — add one below."
+      disabled={disabled}
+      clearable
+      footer={
+        <button
+          type="button"
+          onClick={onAddClick}
+          className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted/60"
+        >
+          <Plus className="h-4 w-4" /> New model
+        </button>
+      }
+    />
   );
 }
 

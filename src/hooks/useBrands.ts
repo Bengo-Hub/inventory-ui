@@ -27,6 +27,16 @@ export function useCreateBrand(orgSlug: string) {
   });
 }
 
+export function useUpdateBrand(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: BrandPayload }) => brandsApi.update(orgSlug, id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [BRANDS_KEY, orgSlug] });
+    },
+  });
+}
+
 export function useDeleteBrand(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

@@ -14,55 +14,53 @@ interface Props {
   /** Selected brand id (ItemBrand uuid). Empty string = no brand. */
   value: string;
   onChange: (brandId: string) => void;
+  /**
+   * Invoked when "+ New brand" is clicked. The caller owns opening/rendering
+   * AddBrandDialog itself — see the doc comment below for why this can't be
+   * self-contained the way the picker otherwise would be.
+   */
+  onAddClick: () => void;
   placeholder?: string;
   disabled?: boolean;
 }
 
 /**
  * Brand picker for the GOODS item form: the shared SearchableCombobox over the
- * tenant's ItemBrand master with a "+ New brand" footer opening an inline create
- * dialog. Emits the selected brand id (items reference a brand via brand_id).
- * Mirrors CategoryCombobox / the Category & Unit CreatableSelect pickers.
+ * tenant's ItemBrand master with a "+ New brand" footer. This component is used
+ * inside ItemFormDialog's <form>, so AddBrandDialog (itself a <form>) must NOT be
+ * rendered here — a <form> nested inside another <form> means clicking "Create"
+ * fires a submit event that bubbles up and also triggers the OUTER item form's
+ * onSubmit, prematurely saving/closing the item and losing the in-progress brand.
+ * The caller renders AddBrandDialog as a sibling of the outer <form> instead,
+ * exactly like AddCategoryDialog / UnitQuickCreateDialog / SupplierFormDialog.
  */
-export function BrandCombobox({ orgSlug, value, onChange, placeholder = 'Select a brand…', disabled }: Props) {
+export function BrandCombobox({ orgSlug, value, onChange, onAddClick, placeholder = 'Select a brand…', disabled }: Props) {
   const { data: brands } = useBrands(orgSlug);
-  const [addOpen, setAddOpen] = useState(false);
 
   return (
-    <>
-      <SearchableCombobox
-        options={(brands ?? []).map((b) => ({
-          value: b.id,
-          label: b.name,
-          hint: b.code || undefined,
-        }))}
-        value={value}
-        onChange={(id) => onChange(id)}
-        placeholder={placeholder}
-        searchPlaceholder="Search brands…"
-        emptyText="No matching brands."
-        disabled={disabled}
-        clearable
-        footer={
-          <button
-            type="button"
-            onClick={() => setAddOpen(true)}
-            className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted/60"
-          >
-            <Plus className="h-4 w-4" /> New brand
-          </button>
-        }
-      />
-      {addOpen && (
-        <AddBrandDialog
-          orgSlug={orgSlug}
-          initialName=""
-          brands={brands ?? []}
-          onClose={() => setAddOpen(false)}
-          onCreated={(brand) => { setAddOpen(false); onChange(brand.id); }}
-        />
-      )}
-    </>
+    <SearchableCombobox
+      options={(brands ?? []).map((b) => ({
+        value: b.id,
+        label: b.name,
+        hint: b.code || undefined,
+      }))}
+      value={value}
+      onChange={(id) => onChange(id)}
+      placeholder={placeholder}
+      searchPlaceholder="Search brands…"
+      emptyText="No matching brands."
+      disabled={disabled}
+      clearable
+      footer={
+        <button
+          type="button"
+          onClick={onAddClick}
+          className="flex w-full items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-muted/60"
+        >
+          <Plus className="h-4 w-4" /> New brand
+        </button>
+      }
+    />
   );
 }
 
