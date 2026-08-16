@@ -10,13 +10,15 @@ import { type CreateRequisitionInput, type Requisition, type RequisitionStatus }
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildRequisitionColumns } from './requisition-columns';
-import { ClipboardList, Plus } from 'lucide-react';
+import { ClipboardList, Plus, Printer } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 const STATUSES: RequisitionStatus[] = ['draft', 'submitted', 'procurement_review', 'approved', 'rejected', 'ordered', 'completed'];
 
@@ -56,13 +58,25 @@ export default function RequisitionsPage() {
         });
     }
 
+    // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
+    // streaming inventory-api's GET /requisitions/{id}/pdf.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewRequisition(r: Requisition) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/requisitions/${r.id}/pdf`),
+            { fileName: `${r.reference_number}.pdf`, title: r.reference_number },
+        );
+    }
+
     function workflowActions(r: Requisition) {
-        if (!canChange) return null;
         return (
             <div className="flex gap-2 justify-end">
-                {r.status === 'draft' && <Button variant="outline" onClick={() => act('Submitted', submitReq.mutateAsync(r.id))}>Submit</Button>}
-                {r.status === 'submitted' && <Button variant="outline" onClick={() => act('In review', reviewReq.mutateAsync(r.id))}>Review</Button>}
-                {(r.status === 'submitted' || r.status === 'procurement_review') && (
+                <Button variant="ghost" size="sm" aria-label="Print / Export" title="Print / Export PDF" onClick={() => previewRequisition(r)}>
+                    <Printer className="h-4 w-4" />
+                </Button>
+                {canChange && r.status === 'draft' && <Button variant="outline" onClick={() => act('Submitted', submitReq.mutateAsync(r.id))}>Submit</Button>}
+                {canChange && r.status === 'submitted' && <Button variant="outline" onClick={() => act('In review', reviewReq.mutateAsync(r.id))}>Review</Button>}
+                {canChange && (r.status === 'submitted' || r.status === 'procurement_review') && (
                     <>
                         <Button onClick={() => act('Approved', approveReq.mutateAsync(r.id))}>Approve</Button>
                         <Button variant="outline" onClick={() => act('Rejected', rejectReq.mutateAsync(r.id))}>Reject</Button>
@@ -123,6 +137,8 @@ export default function RequisitionsPage() {
             {dialogOpen && (
                 <RequisitionFormDialog isPending={createReq.isPending} onSubmit={handleSubmit} onClose={() => setDialogOpen(false)} />
             )}
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

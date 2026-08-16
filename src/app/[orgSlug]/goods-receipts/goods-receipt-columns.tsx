@@ -20,6 +20,7 @@ export interface GoodsReceiptColumnCallbacks {
   poNumberOf: (id: string) => string;
   onView: (g: GoodsReceipt) => void;
   onPost: (g: GoodsReceipt) => void;
+  onPrint: (g: GoodsReceipt) => void;
 }
 
 export function buildGoodsReceiptColumns(cb: GoodsReceiptColumnCallbacks): DataTableColumn<GoodsReceipt>[] {
@@ -65,6 +66,7 @@ export function buildGoodsReceiptColumns(cb: GoodsReceiptColumnCallbacks): DataT
       render: (g) => (
         <RowActions
           onView={() => cb.onView(g)}
+          onPrint={() => cb.onPrint(g)}
           extra={
             cb.canChange && g.status === 'draft' && (
               <Button variant="outline" size="sm" disabled={cb.isPosting} onClick={() => cb.onPost(g)}>

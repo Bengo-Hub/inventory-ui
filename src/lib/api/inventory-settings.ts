@@ -1,5 +1,14 @@
 import { apiClient } from './client';
 
+// Tenant's saved default template/format for barcode label printing — PrintLabelsDialog (bulk)
+// and BarcodeDialog (single-item) fall back to this when the operator hasn't chosen one for the
+// current print, so a tenant's preferred label stock doesn't have to be re-picked every time.
+export interface LabelPrintDefaults {
+  format?: 'avery_a4' | 'thermal_zpl' | 'thermal_tspl' | 'dymo' | '';
+  template?: string;
+  rotate?: boolean | null;
+}
+
 export interface InventorySettings {
   tenant_id: string;
   low_stock_threshold_pct: number;
@@ -33,6 +42,7 @@ export interface InventorySettings {
   default_target_margin_percent?: number | null;
   prices_inclusive_of_tax: boolean;
   default_tax_code: string;
+  label_print_defaults?: LabelPrintDefaults;
   updated_at: string;
 }
 
@@ -58,6 +68,7 @@ export interface UpdateInventorySettingsInput {
   enable_conference_packages?: boolean;
   prices_inclusive_of_tax?: boolean;
   default_tax_code?: string;
+  label_print_defaults?: LabelPrintDefaults;
 }
 
 export interface UpdateInventoryModulesInput {

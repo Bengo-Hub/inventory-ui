@@ -24,6 +24,7 @@ import type { Item } from '@/lib/api/items';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 // Search-add row shape for the "Specific items" box below — carries the full Item so the
 // caller can pull whatever fields it needs (currently just id/name/sku).
@@ -347,7 +348,18 @@ export default function StockTakePage() {
         return (id?: string | null) => (id ? map.get(id) ?? '—' : '—');
     }, [warehouses]);
 
-    const columns = useMemo(() => buildStockTakeColumns({ whName }), [whName]);
+    // Document preview (Print/Export) — streams inventory-api's GET /stock-counts/{id}/pdf.
+    // Mode is left to the server's own status-based default (blank pre-count vs variance
+    // post-count) rather than forced from here.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewCount(c: StockCount) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock-counts/${c.id}/pdf`),
+            { fileName: `${c.reference || c.id.slice(0, 8)}.pdf`, title: c.reference || 'Stock Count' },
+        );
+    }
+
+    const columns = useMemo(() => buildStockTakeColumns({ whName, onPrint: (c) => previewCount(c) }), [whName]);
 
     function openCount(id: string) {
         router.push(`/${orgSlug}/stock-take/${id}`);
@@ -495,6 +507,8 @@ export default function StockTakePage() {
                     onClose={() => setTplDialog({ open: false, editing: null })}
                 />
             )}
+
+            <PdfPreview {...previewProps} />
         </SubscriptionGate>
     );
 }

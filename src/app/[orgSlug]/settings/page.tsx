@@ -5,6 +5,7 @@ import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/setti
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { AGENT_BASE, getAgentInfo, listLocalPrinters } from '@/lib/inventory/print-agent';
 import { getLabelPrintPrefs, setLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
+import type { LabelFormat, LabelTemplateName } from '@/lib/api/barcode';
 import { useDocumentSequences, useUpdateDocumentSequence } from '@/hooks/useDocumentSequences';
 import {
   useInventorySettings,
@@ -867,12 +868,44 @@ function DocumentsTab({ orgSlug }: { orgSlug: string }) {
 const POS_API_BASE = process.env.NEXT_PUBLIC_POS_API_URL ?? 'https://posapi.codevertexafrica.com';
 const AGENT_DOWNLOAD_URL = `${POS_API_BASE}/api/v1/pos/print-agent/download?os=windows`;
 
-function PrintingTab() {
+function PrintingTab({ orgSlug }: { orgSlug: string }) {
   const [reachable, setReachable] = useState(false);
   const [version, setVersion] = useState<string | undefined>();
   const [printers, setPrinters] = useState<string[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState(() => getLabelPrintPrefs().printerName ?? '');
   const [detecting, setDetecting] = useState(false);
+
+  // Tenant-level label-print defaults (label_print_defaults on TenantInventoryConfig) — the
+  // server-side fallback PrintLabelsDialog/BarcodeDialog use when the operator hasn't chosen a
+  // format/template for the current print. This field has always existed server-side; it just
+  // had no Settings UI to edit it (the only "remembered default" was the client-only
+  // localStorage prefs above, which resets per-browser/per-device).
+  const { data: settings, isLoading: settingsLoading } = useInventorySettings(orgSlug);
+  const updateSettings = useUpdateInventorySettings(orgSlug);
+  const [labelDefaults, setLabelDefaults] = useState<{ format: LabelFormat | ''; template: string; rotate: boolean }>({
+    format: '', template: '', rotate: false,
+  });
+  useEffect(() => {
+    if (settings?.label_print_defaults) {
+      const d = settings.label_print_defaults;
+      setLabelDefaults({ format: d.format ?? '', template: d.template ?? '', rotate: !!d.rotate });
+    }
+  }, [settings]);
+  function saveLabelDefaults() {
+    updateSettings.mutate(
+      {
+        label_print_defaults: {
+          format: labelDefaults.format || undefined,
+          template: labelDefaults.template || undefined,
+          rotate: labelDefaults.rotate,
+        },
+      },
+      {
+        onSuccess: () => toast.success('Label print defaults saved'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to save label print defaults')),
+      },
+    );
+  }
 
   async function detect() {
     setDetecting(true);
@@ -987,6 +1020,73 @@ function PrintingTab() {
                 Used by &quot;Print via Local Agent&quot; on the Print Labels dialog and the item-detail Barcode action.
               </p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Printer className="h-4 w-4 text-primary" />
+            <span className="font-bold text-sm">Label Print Defaults</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            The default label format/template every device on this tenant falls back to when nobody has
+            picked one for the current print — Print Labels (bulk) and the item-detail Barcode action
+            both read this.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {settingsLoading ? (
+            <div className="h-20 flex items-center justify-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /></div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className={labelClass}>Format</label>
+                  <select
+                    value={labelDefaults.format}
+                    onChange={(e) => setLabelDefaults((d) => ({ ...d, format: e.target.value as LabelFormat | '' }))}
+                    className={inputClass}
+                  >
+                    <option value="">No default — always ask</option>
+                    <option value="avery_a4">Avery A4 sheet</option>
+                    <option value="thermal_zpl">Thermal — ZPL (Zebra)</option>
+                    <option value="thermal_tspl">Thermal — TSPL (Xprinter/TSC)</option>
+                    <option value="dymo">DYMO</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className={labelClass}>Template</label>
+                  <select
+                    value={labelDefaults.template}
+                    onChange={(e) => setLabelDefaults((d) => ({ ...d, template: e.target.value }))}
+                    className={inputClass}
+                    disabled={labelDefaults.format === '' || labelDefaults.format === 'avery_a4' || labelDefaults.format === 'dymo'}
+                  >
+                    <option value="">Use the format&apos;s default</option>
+                    {(['2x1', '3x2', '4x2', '4x6', '1row_40x30', '2row_38x30', '3row_25x40', '4row_18x30', '1row_29x62', 'custom'] as LabelTemplateName[]).map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={labelDefaults.rotate}
+                  onChange={(e) => setLabelDefaults((d) => ({ ...d, rotate: e.target.checked }))}
+                  className="rounded"
+                />
+                Rotate 90° by default (label roll mounted with the long edge along the feed)
+              </label>
+              <div className="flex justify-end">
+                <Button size="sm" onClick={saveLabelDefaults} disabled={updateSettings.isPending}>
+                  {updateSettings.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                  {updateSettings.isPending ? 'Saving…' : 'Save'}
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1156,7 +1256,7 @@ export default function SettingsPage() {
         {activeTab === 'modules' && <ModulesTab orgSlug={orgSlug} />}
         {activeTab === 'tax' && <TaxComplianceTab orgSlug={orgSlug} />}
         {activeTab === 'documents' && <DocumentsTab orgSlug={orgSlug} />}
-        {activeTab === 'printing' && <PrintingTab />}
+        {activeTab === 'printing' && <PrintingTab orgSlug={orgSlug} />}
         {activeTab === 'integrations' && <IntegrationsTab />}
         {activeTab === 'platform' && isPlatformOwner && <PlatformTab />}
       </div>

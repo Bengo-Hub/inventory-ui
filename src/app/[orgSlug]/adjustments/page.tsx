@@ -29,6 +29,8 @@ import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
@@ -308,7 +310,20 @@ export default function AdjustmentsPage() {
     const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
     const paginated = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
 
-    const columns = useMemo(() => buildAdjustmentColumns(), []);
+    // Document preview (Print/Export) — streams inventory-api's GET /adjustments/document?
+    // reference=… . An adjustment isn't its own document (one audit-trail row per item/warehouse
+    // movement); the printable "Stock Adjustment Note" groups every row sharing one reference
+    // batch, so this reprints the whole batch from whichever row in it the operator clicked.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewAdjustment(a: StockAdjustment) {
+        if (!a.reference) return;
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/adjustments/document`, { reference: a.reference }),
+            { fileName: `${a.reference}.pdf`, title: a.reference },
+        );
+    }
+
+    const columns = useMemo(() => buildAdjustmentColumns({ onPrint: (a) => previewAdjustment(a) }), []);
 
     function openModal(sku = '', name = '') {
         setPrefillSku(sku);
@@ -468,6 +483,8 @@ export default function AdjustmentsPage() {
                     onDone={() => setBulkItems([])}
                 />
             )}
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

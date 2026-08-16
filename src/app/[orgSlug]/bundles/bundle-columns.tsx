@@ -4,13 +4,14 @@
 // mirror the platform's <page>-columns.tsx convention.
 
 import { Badge, Button } from '@/components/ui/base';
-import { Trash2 } from 'lucide-react';
+import { Printer, Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Bundle } from '@/lib/api/bundles';
 
 export interface BundleColumnCallbacks {
   onEdit: (bundle: Bundle) => void;
   onDelete: (bundle: Bundle) => void;
+  onPrint: (bundle: Bundle) => void;
 }
 
 export function buildBundleColumns(cb: BundleColumnCallbacks): DataTableColumn<Bundle>[] {
@@ -61,6 +62,9 @@ export function buildBundleColumns(cb: BundleColumnCallbacks): DataTableColumn<B
       mobileAction: true,
       render: (bundle) => (
         <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+          <Button variant="ghost" size="sm" aria-label="Print / Export" title="Print / Export PDF" onClick={() => cb.onPrint(bundle)}>
+            <Printer className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="sm" onClick={() => cb.onEdit(bundle)}>
             Edit
           </Button>

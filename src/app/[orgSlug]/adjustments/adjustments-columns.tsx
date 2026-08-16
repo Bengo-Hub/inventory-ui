@@ -3,10 +3,17 @@
 // DataTable column definitions for the Stock Adjustments history list — split out of
 // page.tsx to mirror the platform's <page>-columns.tsx convention.
 
+import type { MouseEvent } from 'react';
+import { Button } from '@/components/ui/base';
+import { Printer } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockAdjustment } from '@/lib/api/stock';
 
-export function buildAdjustmentColumns(): DataTableColumn<StockAdjustment>[] {
+export interface AdjustmentColumnCallbacks {
+  onPrint: (a: StockAdjustment) => void;
+}
+
+export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTableColumn<StockAdjustment>[] {
   return [
     {
       key: 'date',
@@ -52,6 +59,26 @@ export function buildAdjustmentColumns(): DataTableColumn<StockAdjustment>[] {
       filterable: true,
       accessor: (a) => a.reason,
       cellClassName: 'text-muted-foreground capitalize',
+    },
+    {
+      key: 'actions',
+      header: '',
+      align: 'right',
+      exportable: false,
+      mobileAction: true,
+      render: (a) => a.reference
+        ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Print / Export"
+            title="Print the adjustment note for this reference"
+            onClick={(e: MouseEvent) => { e.stopPropagation(); cb.onPrint(a); }}
+          >
+            <Printer className="h-4 w-4" />
+          </Button>
+        )
+        : null,
     },
   ];
 }

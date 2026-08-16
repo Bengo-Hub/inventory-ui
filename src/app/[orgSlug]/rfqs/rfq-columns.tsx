@@ -23,6 +23,7 @@ export interface RfqColumnCallbacks {
   onView: (rfq: RFQ) => void;
   onOpen: (rfq: RFQ) => void;
   onDelete: (rfq: RFQ) => void;
+  onPrint: (rfq: RFQ) => void;
 }
 
 export function buildRfqColumns(cb: RfqColumnCallbacks): DataTableColumn<RFQ>[] {
@@ -68,6 +69,7 @@ export function buildRfqColumns(cb: RfqColumnCallbacks): DataTableColumn<RFQ>[] 
         <div onClick={(e) => e.stopPropagation()}>
           <RowActions
             onView={() => cb.onView(rfq)}
+            onPrint={() => cb.onPrint(rfq)}
             onEdit={() => cb.onOpen(rfq)}
             canEdit={cb.canChange}
             editLabel="Open full RFQ"

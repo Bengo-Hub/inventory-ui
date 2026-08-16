@@ -16,6 +16,8 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
@@ -69,12 +71,23 @@ export default function PurchaseReturnsPage() {
         });
     }
 
+    // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
+    // streaming inventory-api's GET /purchase-returns/{id}/pdf (debit-note style RTV document).
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewReturn(r: PurchaseReturn) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${org}/inventory/purchase-returns/${r.id}/pdf`),
+            { fileName: `${r.return_number}.pdf`, title: r.return_number },
+        );
+    }
+
     const columns = useMemo(
         () => buildReturnsColumns({
             canChange,
             nameOf,
             onView: (r) => setViewing(r),
             onApprove: (r) => handleApprove(r.id),
+            onPrint: (r) => previewReturn(r),
         }),
         [canChange, suppliers],
     );
@@ -205,10 +218,17 @@ export default function PurchaseReturnsPage() {
                     { label: 'Date returned', value: new Date(viewing.date_returned).toLocaleDateString() },
                     { label: 'Reason', value: viewing.reason, full: true, hideIfEmpty: true },
                 ] : []}
-                actions={viewing && canChange && viewing.payment_status !== 'paid' && (
-                    <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) })}>Approve</Button>
+                actions={viewing && (
+                    <>
+                        <Button size="sm" variant="outline" onClick={() => previewReturn(viewing)}>Print</Button>
+                        {canChange && viewing.payment_status !== 'paid' && (
+                            <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) })}>Approve</Button>
+                        )}
+                    </>
                 )}
             />
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

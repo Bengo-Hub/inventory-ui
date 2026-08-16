@@ -20,6 +20,7 @@ export interface ReturnsColumnCallbacks {
   nameOf: (id?: string | null) => string;
   onView: (r: PurchaseReturn) => void;
   onApprove: (r: PurchaseReturn) => void;
+  onPrint: (r: PurchaseReturn) => void;
 }
 
 export function buildReturnsColumns(cb: ReturnsColumnCallbacks): DataTableColumn<PurchaseReturn>[] {
@@ -73,6 +74,7 @@ export function buildReturnsColumns(cb: ReturnsColumnCallbacks): DataTableColumn
       render: (r) => (
         <RowActions
           onView={() => cb.onView(r)}
+          onPrint={() => cb.onPrint(r)}
           extra={
             cb.canChange && r.payment_status !== 'paid' && (
               <Button variant="outline" size="sm" onClick={() => cb.onApprove(r)}>

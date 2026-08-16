@@ -15,6 +15,8 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 export default function GoodsReceiptsPage() {
     const params = useParams();
@@ -50,6 +52,17 @@ export default function GoodsReceiptsPage() {
         });
     }
 
+    // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
+    // streaming inventory-api's GET /goods-receipts/{id}/pdf. This was the confirmed real gap:
+    // the PO-receiving GRN had a number and a concept but no printable document at all.
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewGRN(g: { id: string; grn_number: string }) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${org}/inventory/goods-receipts/${g.id}/pdf`),
+            { fileName: `${g.grn_number}.pdf`, title: g.grn_number },
+        );
+    }
+
     const columns = useMemo(
         () => buildGoodsReceiptColumns({
             canChange,
@@ -57,6 +70,7 @@ export default function GoodsReceiptsPage() {
             poNumberOf,
             onView: (g) => setViewId(g.id),
             onPost: (g) => handlePost(g.id),
+            onPrint: (g) => previewGRN(g),
         }),
         [canChange, post.isPending, orders],
     );
@@ -116,8 +130,13 @@ export default function GoodsReceiptsPage() {
                     { label: 'Received', value: viewGRN.received_date ? new Date(viewGRN.received_date).toLocaleDateString() : '—' },
                     { label: 'Notes', value: viewGRN.notes, full: true, hideIfEmpty: true },
                 ] : []}
-                actions={viewGRN && canChange && viewGRN.status === 'draft' && (
-                    <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) })}>Post — update stock</Button>
+                actions={viewGRN && (
+                    <>
+                        <Button size="sm" variant="outline" onClick={() => previewGRN(viewGRN)}>Print</Button>
+                        {canChange && viewGRN.status === 'draft' && (
+                            <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) })}>Post — update stock</Button>
+                        )}
+                    </>
                 )}
             >
                 {viewGRN && (viewGRN.lines?.length ?? 0) > 0 && (
@@ -155,6 +174,8 @@ export default function GoodsReceiptsPage() {
                     </div>
                 )}
             </DetailDrawer>
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

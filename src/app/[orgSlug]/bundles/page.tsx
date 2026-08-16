@@ -18,6 +18,8 @@ import {
 import { useItems, useCreateItem } from '@/hooks/useItems';
 import { type Bundle, type CreateBundleInput, type PackageType, type PriceBasis, type ComponentKind, type MealPeriod, PACKAGE_TYPES, MEAL_PERIODS } from '@/lib/api/bundles';
 import { searchItems, type Item, type CreateItemInput } from '@/lib/api/items';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
@@ -459,7 +461,17 @@ export default function BundlesPage() {
         });
     }
 
-    const columns = useMemo(() => buildBundleColumns({ onEdit: openEdit, onDelete: setDeleteTarget }), []);
+    // Document preview (Print/Export) — streams inventory-api's GET /bundles/{id}/spec.pdf
+    // (an on-demand kit/package spec sheet — master data, not a numbered transactional document).
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewBundle(bundle: Bundle) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/bundles/${bundle.id}/spec.pdf`),
+            { fileName: `${bundle.name}.pdf`, title: bundle.name },
+        );
+    }
+
+    const columns = useMemo(() => buildBundleColumns({ onEdit: openEdit, onDelete: setDeleteTarget, onPrint: (b) => previewBundle(b) }), []);
 
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -529,6 +541,8 @@ export default function BundlesPage() {
                 onConfirm={confirmDelete}
                 onCancel={() => setDeleteTarget(null)}
             />
+
+            <PdfPreview {...previewProps} />
         </div>
     );
 }

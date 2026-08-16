@@ -16,6 +16,8 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 interface LineDraft {
     itemId: string;
@@ -66,6 +68,17 @@ export default function RFQListPage() {
           )
         : rfqs;
 
+    // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
+    // streaming inventory-api's GET /rfqs/{id}/pdf (includes a supplier-quotation appendix once
+    // responses exist).
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewRfq(rfq: RFQ) {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/rfqs/${rfq.id}/pdf`),
+            { fileName: `${rfq.rfq_number}.pdf`, title: rfq.rfq_number },
+        );
+    }
+
     const columns = useMemo(
         () => buildRfqColumns({
             canChange,
@@ -74,6 +87,7 @@ export default function RFQListPage() {
             onView: (rfq) => setViewId(rfq.id),
             onOpen: (rfq) => router.push(`/${orgSlug}/rfqs/${rfq.id}`),
             onDelete: handleDelete,
+            onPrint: (rfq) => previewRfq(rfq),
         }),
         [canChange, canDelete, deleteRFQ.isPending, orgSlug, router],
     );
@@ -283,7 +297,10 @@ export default function RFQListPage() {
                     { label: 'Notes', value: viewRFQ.notes, full: true, hideIfEmpty: true },
                 ] : []}
                 actions={viewRFQ && (
-                    <Button size="sm" onClick={() => router.push(`/${orgSlug}/rfqs/${viewRFQ.id}`)}>Open full RFQ</Button>
+                    <>
+                        <Button size="sm" variant="outline" onClick={() => previewRfq(viewRFQ)}>Print</Button>
+                        <Button size="sm" onClick={() => router.push(`/${orgSlug}/rfqs/${viewRFQ.id}`)}>Open full RFQ</Button>
+                    </>
                 )}
             >
                 {viewRFQ && (viewRFQ.lines?.length ?? 0) > 0 && (
@@ -312,6 +329,8 @@ export default function RFQListPage() {
                     </div>
                 )}
             </DetailDrawer>
+
+            <PdfPreview {...previewProps} />
         </>
     );
 }
