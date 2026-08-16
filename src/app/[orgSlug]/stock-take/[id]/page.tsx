@@ -19,11 +19,12 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { apiClient } from '@/lib/api/client';
 import { searchItems, type Item } from '@/lib/api/items';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
 }
-import { ArrowLeft, CheckCircle2, ScanBarcode, Search, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Printer, ScanBarcode, Search, Send } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -283,6 +284,17 @@ export default function StockTakeDetailPage() {
         return (id?: string) => (id ? map.get(id) ?? '—' : '—');
     }, [warehouses]);
 
+    // Document preview (Print/Export) — same pattern as the stock-take list page, streaming
+    // inventory-api's GET /stock-counts/{id}/pdf. Mode left to the server's own status-based
+    // default (blank pre-count vs variance post-count).
+    const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+    function previewCount() {
+        openPreview(
+            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock-counts/${countId}/pdf`),
+            { fileName: `${count?.reference || countId.slice(0, 8)}.pdf`, title: count?.reference || 'Stock Count' },
+        );
+    }
+
     return (
         <SubscriptionGate feature="stock_tracking">
             <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
@@ -300,6 +312,9 @@ export default function StockTakeDetailPage() {
                         </p>
                     </div>
                     {status && <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>}
+                    <Button variant="outline" size="sm" onClick={previewCount} disabled={!count}>
+                        <Printer className="h-4 w-4 mr-1.5" /> Print
+                    </Button>
                 </div>
 
                 {isLoading || !count ? (
@@ -491,6 +506,8 @@ export default function StockTakeDetailPage() {
                     </>
                 )}
             </div>
+
+            <PdfPreview {...previewProps} />
         </SubscriptionGate>
     );
 }

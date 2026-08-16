@@ -2,10 +2,13 @@
 
 import { Button } from '@/components/ui/base';
 import { useEventAvailability, useIssueTicket } from '@/hooks/use-tickets';
-import { Loader2, Ticket, X } from 'lucide-react';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { CheckCircle2, Loader2, Printer, Ticket, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import type { Ticket as TicketRecord } from '@/lib/api/tickets';
 
 interface SellTicketModalProps {
   orgSlug: string;
@@ -19,6 +22,17 @@ interface SellTicketModalProps {
 export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTicketModalProps) {
   const { data: availability, isLoading } = useEventAvailability(orgSlug, eventId);
   const issue = useIssueTicket(orgSlug);
+  // Printable proof of purchase — inventory-api's GET /tickets/{code}/pdf existed but was never
+  // called from anywhere in inventory-ui, so a staff-issued ticket had no printable/downloadable
+  // form. Issuing switches this modal to a confirmation state offering it instead of just closing.
+  const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+  const [issued, setIssued] = useState<TicketRecord | null>(null);
+  function previewTicket(t: TicketRecord) {
+    openPreview(
+      () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/tickets/${t.code}/pdf`),
+      { fileName: `ticket-${t.code}.pdf`, title: `Ticket ${t.code}` },
+    );
+  }
 
   const tiers = availability?.tiers ?? [];
   const [tierId, setTierId] = useState('');
@@ -49,7 +63,7 @@ export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTi
       return;
     }
     try {
-      await issue.mutateAsync({
+      const t = await issue.mutateAsync({
         event_item_id: eventId,
         tier_id: selectedTier?.tier_id,
         tier_name: selectedTier?.name,
@@ -59,7 +73,7 @@ export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTi
         buyer_email: buyerEmail.trim() || undefined,
       });
       toast.success(`Issued ${quantity} ticket${quantity !== 1 ? 's' : ''}`);
-      onClose();
+      setIssued(t);
     } catch (e) {
       toast.error(await apiErrorMessage(e, 'Failed to issue ticket (sold out or capacity exceeded?)'));
     }
@@ -76,7 +90,21 @@ export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTi
           </button>
         </div>
 
-        {isLoading ? (
+        {issued ? (
+          <div className="p-6 space-y-4 text-center">
+            <CheckCircle2 className="h-10 w-10 mx-auto text-emerald-500" />
+            <div>
+              <p className="font-semibold">Ticket{issued.quantity > 1 ? 's' : ''} issued</p>
+              <p className="text-sm text-muted-foreground font-mono mt-1">{issued.code}</p>
+            </div>
+            <div className="flex gap-3">
+              <Button variant="outline" className="flex-1" onClick={onClose}>Done</Button>
+              <Button className="flex-1" onClick={() => previewTicket(issued)}>
+                <Printer className="h-4 w-4 mr-2" /> Print Ticket
+              </Button>
+            </div>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
         ) : tiers.length === 0 ? (
           <div className="p-6 text-sm text-muted-foreground text-center">
@@ -146,6 +174,8 @@ export function SellTicketModal({ orgSlug, eventId, eventName, onClose }: SellTi
           </form>
         )}
       </div>
+
+      <PdfPreview {...previewProps} />
     </div>
   );
 }

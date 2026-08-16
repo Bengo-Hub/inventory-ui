@@ -4,7 +4,9 @@ import { Button, Card, CardContent } from '@/components/ui/base';
 import { QrScanner } from '@/components/events/QrScanner';
 import { ticketsApi, type Ticket } from '@/lib/api/tickets';
 import { useRedeemTicket } from '@/hooks/use-tickets';
-import { Camera, CheckCircle2, Keyboard, Loader2, QrCode, Search, Ticket as TicketIcon, XCircle } from 'lucide-react';
+import { apiClient } from '@/lib/api/client';
+import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { Camera, CheckCircle2, Keyboard, Loader2, Printer, QrCode, Search, Ticket as TicketIcon, XCircle } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
@@ -38,6 +40,15 @@ export default function TicketCheckInPage() {
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [looking, setLooking] = useState(false);
   const redeem = useRedeemTicket(orgSlug);
+  // Reprint — a guest who lost/never got their ticket can have it reprinted at the door once
+  // looked up here, via the same GET /tickets/{code}/pdf endpoint SellTicketModal prints from.
+  const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
+  function previewTicket(t: Ticket) {
+    openPreview(
+      () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/tickets/${t.code}/pdf`),
+      { fileName: `ticket-${t.code}.pdf`, title: `Ticket ${t.code}` },
+    );
+  }
 
   const lookup = async (raw?: string) => {
     const c = (raw ?? code).trim().toUpperCase();
@@ -173,14 +184,24 @@ export default function TicketCheckInPage() {
               {ticket.redeemed_at && (<><span className="text-muted-foreground">Redeemed</span><span className="text-right font-medium">{new Date(ticket.redeemed_at).toLocaleString()}</span></>)}
             </div>
             {ticket.status === 'issued' && (
-              <Button className="w-full" onClick={() => checkIn(ticket.code)} disabled={redeem.isPending}>
-                {redeem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                <span className="ml-2">Confirm Check-In</span>
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => previewTicket(ticket)}>
+                  <Printer className="h-4 w-4" />
+                </Button>
+                <Button className="flex-1" onClick={() => checkIn(ticket.code)} disabled={redeem.isPending}>
+                  {redeem.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                  <span className="ml-2">Confirm Check-In</span>
+                </Button>
+              </div>
             )}
             {ticket.status === 'redeemed' && (
-              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-400 pt-1">
-                <CheckCircle2 className="h-4 w-4" /> Valid — already checked in.
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-400">
+                  <CheckCircle2 className="h-4 w-4" /> Valid — already checked in.
+                </div>
+                <Button variant="outline" size="sm" onClick={() => previewTicket(ticket)}>
+                  <Printer className="h-4 w-4 mr-1.5" /> Reprint
+                </Button>
               </div>
             )}
             {(ticket.status === 'cancelled' || ticket.status === 'void' || ticket.status === 'refunded') && (
@@ -191,6 +212,8 @@ export default function TicketCheckInPage() {
           </CardContent>
         </Card>
       )}
+
+      <PdfPreview {...previewProps} />
     </div>
   );
 }
