@@ -80,6 +80,14 @@ export async function printRawToLocalName(name: string, hex: string): Promise<bo
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, format: 'rawhex', data: hex }),
     });
+    if (!res.ok) {
+      // The agent answers a driver/spooler-level failure (wrong name, offline printer, "Access is
+      // denied", …) as a non-2xx JSON body — previously discarded here, so a rejected job looked
+      // identical in devtools to a network error. Surface the real reason so "print window opened
+      // instead of a silent send" reports can be diagnosed from the reporter's own console.
+      const body = await res.text().catch(() => '');
+      console.warn(`print-agent: /print rejected (HTTP ${res.status}) for "${name}": ${body}`);
+    }
     return res.ok;
   } catch (e) {
     console.warn('print-agent: /print request failed', e);
