@@ -21,15 +21,59 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { apiClient } from '@/lib/api/client';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL } from './transfers-columns';
 import { TransferItemsEditor } from './transfer-items-editor';
 import { EditTransferDialog } from './edit-transfer-dialog';
 import { ReceiveTransferDialog } from './receive-transfer-dialog';
-import { Plus, RefreshCw, Search, X } from 'lucide-react';
+import { ChevronDown, FileDown, FileSpreadsheet, FileText, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+
+// Format picker for a document button — "Delivery Note" / "Goods Received Note" — opening a
+// small menu of PDF (preview) / Excel / CSV (download) instead of a single format. Self-contained
+// (no shared dropdown primitive exists in this app yet) with the same ref+mousedown click-outside
+// pattern used by TaxCodeCombobox/EtimsCodeSelect.
+function DocFormatMenu({ label, disabled, onSelect }: { label: string; disabled?: boolean; onSelect: (format: 'pdf' | 'xlsx' | 'csv') => void }) {
+    const [open, setOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function onDoc(e: MouseEvent) {
+            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+        }
+        document.addEventListener('mousedown', onDoc);
+        return () => document.removeEventListener('mousedown', onDoc);
+    }, []);
+
+    function pick(format: 'pdf' | 'xlsx' | 'csv') {
+        setOpen(false);
+        onSelect(format);
+    }
+
+    return (
+        <div className="relative inline-block" ref={ref}>
+            <Button size="sm" variant="outline" disabled={disabled} onClick={() => setOpen((v) => !v)}>
+                {label}<ChevronDown className="h-3.5 w-3.5 ml-1.5" />
+            </Button>
+            {open && (
+                <div className="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-border bg-popover shadow-lg py-1">
+                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('pdf')}>
+                        <FileText className="h-3.5 w-3.5" /> PDF
+                    </button>
+                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('xlsx')}>
+                        <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
+                    </button>
+                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('csv')}>
+                        <FileDown className="h-3.5 w-3.5" /> CSV
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
 
 // Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
 // full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
@@ -39,12 +83,20 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
     const cancelMutation = useCancelTransfer(orgSlug);
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m) => toast.error(m) });
 
-    function openTransferDoc(type: 'delivery_note' | 'grn', title: string) {
+    function openTransferDoc(type: 'delivery_note' | 'grn', title: string, format: 'pdf' | 'xlsx' | 'csv' = 'pdf') {
         if (!transferId || !transfer) return;
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/transfers/${transferId}/pdf`, { type }),
-            { fileName: `${transfer.transfer_number}-${type}.pdf`, title: `${title} — ${transfer.transfer_number}` },
-        );
+        const url = `/api/v1/${orgSlug}/inventory/transfers/${transferId}/pdf`;
+        if (format === 'pdf') {
+            openPreview(
+                () => apiClient.getBlob(url, { type, format }),
+                { fileName: `${transfer.transfer_number}-${type}.pdf`, title: `${title} — ${transfer.transfer_number}` },
+            );
+            return;
+        }
+        apiClient
+            .getBlob(url, { type, format })
+            .then((blob) => downloadBlob(blob, `${transfer.transfer_number}-${type}.${format}`))
+            .catch(() => toast.error(`Could not export ${title.toLowerCase()}. Please try again.`));
     }
 
     function handleShip() {
@@ -99,10 +151,10 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
                     {canShip && <Button size="sm" onClick={handleShip} disabled={isBusy}>Ship Transfer</Button>}
                     {canReceive && <Button size="sm" onClick={() => onReceive(transfer.id)} disabled={isBusy}>Mark Received</Button>}
                     {(transfer.status === 'in_transit' || transfer.status === 'received') && (
-                        <Button size="sm" variant="outline" onClick={() => openTransferDoc('delivery_note', 'Delivery Note')}>Delivery Note</Button>
+                        <DocFormatMenu label="Delivery Note" onSelect={(format) => openTransferDoc('delivery_note', 'Delivery Note', format)} />
                     )}
                     {transfer.status === 'received' && (
-                        <Button size="sm" variant="outline" onClick={() => openTransferDoc('grn', 'Goods Received Note')}>Goods Received Note</Button>
+                        <DocFormatMenu label="Goods Received Note" onSelect={(format) => openTransferDoc('grn', 'Goods Received Note', format)} />
                     )}
                     {canCancel && (
                         <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10" onClick={handleCancel} disabled={isBusy}>Cancel Transfer</Button>

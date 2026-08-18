@@ -19,7 +19,8 @@ const selectCls =
   'h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:ring-1 focus:ring-ring focus:outline-none';
 const labelCls = 'text-xs font-medium text-muted-foreground mb-1 block';
 
-function DownloadCsv(blob: Blob, filename: string) {
+/** Saves any Blob (CSV, XLSX, …) client-side under the given filename via a throwaway <a download>. */
+export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -107,7 +108,7 @@ export function ProductsExportDialog({
     setExporting(format);
     try {
       if (format === 'csv') {
-        DownloadCsv(await itemsApi.exportDoc(orgSlug, buildParams('csv')), `products-${new Date().toISOString().slice(0, 10)}.csv`);
+        downloadBlob(await itemsApi.exportDoc(orgSlug, buildParams('csv')), `products-${new Date().toISOString().slice(0, 10)}.csv`);
         onClose();
       } else {
         await openPreview(() => itemsApi.exportDoc(orgSlug, buildParams('pdf')), { fileName: 'products.pdf', title: 'Products Export', orientation: 'landscape' });
@@ -217,7 +218,7 @@ export function StockExportDialog({
     setExporting(format);
     try {
       if (format === 'csv') {
-        DownloadCsv(await stockApi.exportDoc(orgSlug, buildParams('csv')), `stock-levels-${new Date().toISOString().slice(0, 10)}.csv`);
+        downloadBlob(await stockApi.exportDoc(orgSlug, buildParams('csv')), `stock-levels-${new Date().toISOString().slice(0, 10)}.csv`);
         onClose();
       } else {
         await openPreview(() => stockApi.exportDoc(orgSlug, buildParams('pdf')), { fileName: 'stock-levels.pdf', title: 'Stock Levels Export', orientation: 'landscape' });
