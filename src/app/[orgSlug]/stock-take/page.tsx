@@ -25,6 +25,8 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import type { DocFormat } from '@/components/inventory/DocFormatMenu';
 
 // Search-add row shape for the "Specific items" box below — carries the full Item so the
 // caller can pull whatever fields it needs (currently just id/name/sku).
@@ -352,14 +354,19 @@ export default function StockTakePage() {
     // Mode is left to the server's own status-based default (blank pre-count vs variance
     // post-count) rather than forced from here.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewCount(c: StockCount) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock-counts/${c.id}/pdf`),
-            { fileName: `${c.reference || c.id.slice(0, 8)}.pdf`, title: c.reference || 'Stock Count' },
-        );
+    function previewCount(c: StockCount, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/stock-counts/${c.id}/pdf`;
+        const filenameBase = c.reference || c.id.slice(0, 8);
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${filenameBase}.pdf`, title: c.reference || 'Stock Count' });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${filenameBase}.${format}`))
+            .catch(() => toast.error('Could not export stock count. Please try again.'));
     }
 
-    const columns = useMemo(() => buildStockTakeColumns({ whName, onPrint: (c) => previewCount(c) }), [whName]);
+    const columns = useMemo(() => buildStockTakeColumns({ whName, onPrint: (c, format) => previewCount(c, format) }), [whName]);
 
     function openCount(id: string) {
         router.push(`/${orgSlug}/stock-take/${id}`);

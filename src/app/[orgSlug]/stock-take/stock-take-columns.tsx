@@ -3,9 +3,8 @@
 // DataTable column definitions for the Stock Take list — split out of page.tsx to
 // mirror the platform's <page>-columns.tsx convention.
 
-import type { MouseEvent } from 'react';
 import { Badge, Button } from '@/components/ui/base';
-import { Printer } from 'lucide-react';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockCount, StockCountStatus } from '@/lib/api/stock-counts';
 
@@ -27,7 +26,7 @@ export const STATUS_LABEL: Record<StockCountStatus, string> = {
 
 export interface StockTakeColumnCallbacks {
   whName: (id?: string | null) => string;
-  onPrint: (c: StockCount) => void;
+  onPrint: (c: StockCount, format: DocFormat) => void;
 }
 
 export function buildStockTakeColumns(cb: StockTakeColumnCallbacks): DataTableColumn<StockCount>[] {
@@ -70,15 +69,7 @@ export function buildStockTakeColumns(cb: StockTakeColumnCallbacks): DataTableCo
       mobileAction: true,
       render: (c) => (
         <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Print / Export"
-            title="Print / Export PDF"
-            onClick={(e: MouseEvent) => { e.stopPropagation(); cb.onPrint(c); }}
-          >
-            <Printer className="h-4 w-4" />
-          </Button>
+          <DocFormatMenu label="Export" onSelect={(format) => cb.onPrint(c, format)} />
           <Button variant="ghost" size="sm">Open</Button>
         </div>
       ),

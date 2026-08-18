@@ -3,6 +3,8 @@
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { GoodsReceiptDialog } from '@/components/inventory/GoodsReceiptDialog';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { useGoodsReceipts, useGoodsReceipt, usePostGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
@@ -56,11 +58,15 @@ export default function GoodsReceiptsPage() {
     // streaming inventory-api's GET /goods-receipts/{id}/pdf. This was the confirmed real gap:
     // the PO-receiving GRN had a number and a concept but no printable document at all.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewGRN(g: { id: string; grn_number: string }) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${org}/inventory/goods-receipts/${g.id}/pdf`),
-            { fileName: `${g.grn_number}.pdf`, title: g.grn_number },
-        );
+    function previewGRN(g: { id: string; grn_number: string }, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${org}/inventory/goods-receipts/${g.id}/pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${g.grn_number}.pdf`, title: g.grn_number });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${g.grn_number}.${format}`))
+            .catch(() => toast.error('Could not export goods receipt. Please try again.'));
     }
 
     const columns = useMemo(
@@ -132,7 +138,7 @@ export default function GoodsReceiptsPage() {
                 ] : []}
                 actions={viewGRN && (
                     <>
-                        <Button size="sm" variant="outline" onClick={() => previewGRN(viewGRN)}>Print</Button>
+                        <DocFormatMenu label="Print / Export" onSelect={(format) => previewGRN(viewGRN, format)} />
                         {canChange && viewGRN.status === 'draft' && (
                             <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) })}>Post — update stock</Button>
                         )}

@@ -31,6 +31,8 @@ import { approvalGateFromError } from '@/lib/api/approvals';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import type { DocFormat } from '@/components/inventory/DocFormatMenu';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
@@ -315,15 +317,19 @@ export default function AdjustmentsPage() {
     // movement); the printable "Stock Adjustment Note" groups every row sharing one reference
     // batch, so this reprints the whole batch from whichever row in it the operator clicked.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewAdjustment(a: StockAdjustment) {
+    function previewAdjustment(a: StockAdjustment, format: DocFormat = 'pdf') {
         if (!a.reference) return;
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/adjustments/document`, { reference: a.reference }),
-            { fileName: `${a.reference}.pdf`, title: a.reference },
-        );
+        const url = `/api/v1/${orgSlug}/inventory/adjustments/document`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { reference: a.reference, format }), { fileName: `${a.reference}.pdf`, title: a.reference });
+            return;
+        }
+        apiClient.getBlob(url, { reference: a.reference, format })
+            .then((blob) => downloadBlob(blob, `${a.reference}.${format}`))
+            .catch(() => toast.error('Could not export stock adjustment. Please try again.'));
     }
 
-    const columns = useMemo(() => buildAdjustmentColumns({ onPrint: (a) => previewAdjustment(a) }), []);
+    const columns = useMemo(() => buildAdjustmentColumns({ onPrint: (a, format) => previewAdjustment(a, format) }), []);
 
     function openModal(sku = '', name = '') {
         setPrefillSku(sku);

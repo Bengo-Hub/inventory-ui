@@ -20,11 +20,13 @@ import { apiClient } from '@/lib/api/client';
 import { searchItems, type Item } from '@/lib/api/items';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
 }
-import { ArrowLeft, CheckCircle2, Printer, ScanBarcode, Search, Send } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, ScanBarcode, Search, Send } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -288,11 +290,16 @@ export default function StockTakeDetailPage() {
     // inventory-api's GET /stock-counts/{id}/pdf. Mode left to the server's own status-based
     // default (blank pre-count vs variance post-count).
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewCount() {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock-counts/${countId}/pdf`),
-            { fileName: `${count?.reference || countId.slice(0, 8)}.pdf`, title: count?.reference || 'Stock Count' },
-        );
+    function previewCount(format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/stock-counts/${countId}/pdf`;
+        const filenameBase = count?.reference || countId.slice(0, 8);
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${filenameBase}.pdf`, title: count?.reference || 'Stock Count' });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${filenameBase}.${format}`))
+            .catch(() => toast.error('Could not export stock count. Please try again.'));
     }
 
     return (
@@ -312,9 +319,7 @@ export default function StockTakeDetailPage() {
                         </p>
                     </div>
                     {status && <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>}
-                    <Button variant="outline" size="sm" onClick={previewCount} disabled={!count}>
-                        <Printer className="h-4 w-4 mr-1.5" /> Print
-                    </Button>
+                    <DocFormatMenu label="Print / Export" disabled={!count} onSelect={(format) => previewCount(format)} />
                 </div>
 
                 {isLoading || !count ? (

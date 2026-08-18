@@ -3,6 +3,8 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { usePurchaseReturns, useCreatePurchaseReturn, useApprovePurchaseReturn } from '@/hooks/usePurchaseReturns';
 import { useSuppliers } from '@/hooks/useSuppliers';
@@ -74,11 +76,15 @@ export default function PurchaseReturnsPage() {
     // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
     // streaming inventory-api's GET /purchase-returns/{id}/pdf (debit-note style RTV document).
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewReturn(r: PurchaseReturn) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${org}/inventory/purchase-returns/${r.id}/pdf`),
-            { fileName: `${r.return_number}.pdf`, title: r.return_number },
-        );
+    function previewReturn(r: PurchaseReturn, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${org}/inventory/purchase-returns/${r.id}/pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${r.return_number}.pdf`, title: r.return_number });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${r.return_number}.${format}`))
+            .catch(() => toast.error('Could not export purchase return. Please try again.'));
     }
 
     const columns = useMemo(
@@ -220,7 +226,7 @@ export default function PurchaseReturnsPage() {
                 ] : []}
                 actions={viewing && (
                     <>
-                        <Button size="sm" variant="outline" onClick={() => previewReturn(viewing)}>Print</Button>
+                        <DocFormatMenu label="Print / Export" onSelect={(format) => previewReturn(viewing, format)} />
                         {canChange && viewing.payment_status !== 'paid' && (
                             <Button size="sm" onClick={() => approve.mutate(viewing.id, { onSuccess: () => { toast.success('Return approved — stock adjusted'); setViewing(null); }, onError: async (err) => toast.error(await apiErrorMessage(err, 'Failed to approve')) })}>Approve</Button>
                         )}

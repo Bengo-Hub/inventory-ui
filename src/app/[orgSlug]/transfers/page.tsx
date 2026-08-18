@@ -22,58 +22,16 @@ import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { apiClient } from '@/lib/api/client';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL } from './transfers-columns';
 import { TransferItemsEditor } from './transfer-items-editor';
 import { EditTransferDialog } from './edit-transfer-dialog';
 import { ReceiveTransferDialog } from './receive-transfer-dialog';
-import { ChevronDown, FileDown, FileSpreadsheet, FileText, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
-
-// Format picker for a document button — "Delivery Note" / "Goods Received Note" — opening a
-// small menu of PDF (preview) / Excel / CSV (download) instead of a single format. Self-contained
-// (no shared dropdown primitive exists in this app yet) with the same ref+mousedown click-outside
-// pattern used by TaxCodeCombobox/EtimsCodeSelect.
-function DocFormatMenu({ label, disabled, onSelect }: { label: string; disabled?: boolean; onSelect: (format: 'pdf' | 'xlsx' | 'csv') => void }) {
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        function onDoc(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        }
-        document.addEventListener('mousedown', onDoc);
-        return () => document.removeEventListener('mousedown', onDoc);
-    }, []);
-
-    function pick(format: 'pdf' | 'xlsx' | 'csv') {
-        setOpen(false);
-        onSelect(format);
-    }
-
-    return (
-        <div className="relative inline-block" ref={ref}>
-            <Button size="sm" variant="outline" disabled={disabled} onClick={() => setOpen((v) => !v)}>
-                {label}<ChevronDown className="h-3.5 w-3.5 ml-1.5" />
-            </Button>
-            {open && (
-                <div className="absolute right-0 z-20 mt-1 w-40 rounded-lg border border-border bg-popover shadow-lg py-1">
-                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('pdf')}>
-                        <FileText className="h-3.5 w-3.5" /> PDF
-                    </button>
-                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('xlsx')}>
-                        <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
-                    </button>
-                    <button type="button" className="flex w-full items-center gap-2 px-3 py-1.5 text-sm text-foreground hover:bg-accent" onClick={() => pick('csv')}>
-                        <FileDown className="h-3.5 w-3.5" /> CSV
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-}
 
 // Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
 // full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
@@ -83,7 +41,7 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
     const cancelMutation = useCancelTransfer(orgSlug);
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m) => toast.error(m) });
 
-    function openTransferDoc(type: 'delivery_note' | 'grn', title: string, format: 'pdf' | 'xlsx' | 'csv' = 'pdf') {
+    function openTransferDoc(type: 'transfer_order' | 'delivery_note' | 'grn', title: string, format: DocFormat = 'pdf') {
         if (!transferId || !transfer) return;
         const url = `/api/v1/${orgSlug}/inventory/transfers/${transferId}/pdf`;
         if (format === 'pdf') {
@@ -150,6 +108,9 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
                     {canShip && <Button size="sm" variant="outline" onClick={() => onEdit(transfer.id)} disabled={isBusy}>Edit</Button>}
                     {canShip && <Button size="sm" onClick={handleShip} disabled={isBusy}>Ship Transfer</Button>}
                     {canReceive && <Button size="sm" onClick={() => onReceive(transfer.id)} disabled={isBusy}>Mark Received</Button>}
+                    {transfer.status === 'draft' && (
+                        <DocFormatMenu label="Transfer Order" onSelect={(format) => openTransferDoc('transfer_order', 'Transfer Order', format)} />
+                    )}
                     {(transfer.status === 'in_transit' || transfer.status === 'received') && (
                         <DocFormatMenu label="Delivery Note" onSelect={(format) => openTransferDoc('delivery_note', 'Delivery Note', format)} />
                     )}

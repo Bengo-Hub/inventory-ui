@@ -8,6 +8,8 @@ import { WarehouseQuickCreateDialog } from '@/components/inventory/WarehouseQuic
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { ThreeWayMatchPanel } from '@/components/inventory/ThreeWayMatchPanel';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildPurchaseOrderColumns, STATUS_VARIANT, STATUS_LABEL } from './purchase-orders-columns';
@@ -27,7 +29,7 @@ import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
-import { BarChart3, DollarSign, Minus, Plus, Printer, Search, ShieldCheck, X } from 'lucide-react';
+import { BarChart3, DollarSign, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
@@ -206,11 +208,15 @@ export default function PurchaseOrdersPage() {
     // Document preview (Print/Export) — reuses the shared-ui-lib PDF previewer (same as treasury-ui),
     // streaming the PO PDF from inventory-api's GET /purchase-orders/{id}/pdf.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewPO(po: PurchaseOrder) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/purchase-orders/${po.id}/pdf`),
-            { fileName: `${po.po_number}.pdf`, title: po.po_number },
-        );
+    function previewPO(po: PurchaseOrder, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/purchase-orders/${po.id}/pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${po.po_number}.pdf`, title: po.po_number });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${po.po_number}.${format}`))
+            .catch(() => toast.error('Could not export purchase order. Please try again.'));
     }
 
     const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / pageSize));
@@ -743,9 +749,7 @@ export default function PurchaseOrdersPage() {
             ] : []}
             actions={poDetail && (
                 <>
-                    <Button size="sm" variant="outline" onClick={() => previewPO(poDetail)}>
-                        <Printer className="h-4 w-4 mr-2" /> Print / Export
-                    </Button>
+                    <DocFormatMenu label="Print / Export" onSelect={(format) => previewPO(poDetail, format)} />
                     {showSubmit && (
                         <Button size="sm" variant="outline" disabled={submitForApproval.isPending}
                             onClick={() => submitForApproval.mutate(poDetail.id, {

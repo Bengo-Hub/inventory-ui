@@ -20,6 +20,8 @@ import { type Bundle, type CreateBundleInput, type PackageType, type PriceBasis,
 import { searchItems, type Item, type CreateItemInput } from '@/lib/api/items';
 import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import type { DocFormat } from '@/components/inventory/DocFormatMenu';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
@@ -464,14 +466,18 @@ export default function BundlesPage() {
     // Document preview (Print/Export) — streams inventory-api's GET /bundles/{id}/spec.pdf
     // (an on-demand kit/package spec sheet — master data, not a numbered transactional document).
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewBundle(bundle: Bundle) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/bundles/${bundle.id}/spec.pdf`),
-            { fileName: `${bundle.name}.pdf`, title: bundle.name },
-        );
+    function previewBundle(bundle: Bundle, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/bundles/${bundle.id}/spec.pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${bundle.name}.pdf`, title: bundle.name });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${bundle.name}.${format}`))
+            .catch(() => toast.error('Could not export bundle spec. Please try again.'));
     }
 
-    const columns = useMemo(() => buildBundleColumns({ onEdit: openEdit, onDelete: setDeleteTarget, onPrint: (b) => previewBundle(b) }), []);
+    const columns = useMemo(() => buildBundleColumns({ onEdit: openEdit, onDelete: setDeleteTarget, onPrint: (b, format) => previewBundle(b, format) }), []);
 
     return (
         <div className="p-6 space-y-6 max-w-5xl mx-auto">

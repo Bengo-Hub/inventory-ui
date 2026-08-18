@@ -10,7 +10,9 @@ import { type CreateRequisitionInput, type Requisition, type RequisitionStatus }
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildRequisitionColumns } from './requisition-columns';
-import { ClipboardList, Plus, Printer } from 'lucide-react';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
+import { ClipboardList, Plus } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -61,19 +63,21 @@ export default function RequisitionsPage() {
     // Document preview (Print/Export) — same shared-ui-lib PDF previewer as Purchase Orders,
     // streaming inventory-api's GET /requisitions/{id}/pdf.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewRequisition(r: Requisition) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/requisitions/${r.id}/pdf`),
-            { fileName: `${r.reference_number}.pdf`, title: r.reference_number },
-        );
+    function previewRequisition(r: Requisition, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/requisitions/${r.id}/pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${r.reference_number}.pdf`, title: r.reference_number });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${r.reference_number}.${format}`))
+            .catch(() => toast.error('Could not export requisition. Please try again.'));
     }
 
     function workflowActions(r: Requisition) {
         return (
             <div className="flex gap-2 justify-end">
-                <Button variant="ghost" size="sm" aria-label="Print / Export" title="Print / Export PDF" onClick={() => previewRequisition(r)}>
-                    <Printer className="h-4 w-4" />
-                </Button>
+                <DocFormatMenu label="Export" onSelect={(format) => previewRequisition(r, format)} />
                 {canChange && r.status === 'draft' && <Button variant="outline" onClick={() => act('Submitted', submitReq.mutateAsync(r.id))}>Submit</Button>}
                 {canChange && r.status === 'submitted' && <Button variant="outline" onClick={() => act('In review', reviewReq.mutateAsync(r.id))}>Review</Button>}
                 {canChange && (r.status === 'submitted' || r.status === 'procurement_review') && (

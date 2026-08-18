@@ -3,6 +3,8 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DetailDrawer } from '@/components/inventory/DetailDrawer';
+import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
+import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { useRFQs, useRFQ, useCreateRFQ, useDeleteRFQ } from '@/hooks/useRFQs';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
@@ -72,11 +74,15 @@ export default function RFQListPage() {
     // streaming inventory-api's GET /rfqs/{id}/pdf (includes a supplier-quotation appendix once
     // responses exist).
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
-    function previewRfq(rfq: RFQ) {
-        openPreview(
-            () => apiClient.getBlob(`/api/v1/${orgSlug}/inventory/rfqs/${rfq.id}/pdf`),
-            { fileName: `${rfq.rfq_number}.pdf`, title: rfq.rfq_number },
-        );
+    function previewRfq(rfq: RFQ, format: DocFormat = 'pdf') {
+        const url = `/api/v1/${orgSlug}/inventory/rfqs/${rfq.id}/pdf`;
+        if (format === 'pdf') {
+            openPreview(() => apiClient.getBlob(url, { format }), { fileName: `${rfq.rfq_number}.pdf`, title: rfq.rfq_number });
+            return;
+        }
+        apiClient.getBlob(url, { format })
+            .then((blob) => downloadBlob(blob, `${rfq.rfq_number}.${format}`))
+            .catch(() => toast.error('Could not export RFQ. Please try again.'));
     }
 
     const columns = useMemo(
@@ -298,7 +304,7 @@ export default function RFQListPage() {
                 ] : []}
                 actions={viewRFQ && (
                     <>
-                        <Button size="sm" variant="outline" onClick={() => previewRfq(viewRFQ)}>Print</Button>
+                        <DocFormatMenu label="Print / Export" onSelect={(format) => previewRfq(viewRFQ, format)} />
                         <Button size="sm" onClick={() => router.push(`/${orgSlug}/rfqs/${viewRFQ.id}`)}>Open full RFQ</Button>
                     </>
                 )}
