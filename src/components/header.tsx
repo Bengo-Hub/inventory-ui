@@ -6,11 +6,8 @@ import { Bell, ChevronDown, Menu, Search, Settings, User } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { useBranding } from '@/providers/branding-provider';
 import { OutletFilter } from './outlet-filter';
-import { usePermissions } from '@/hooks/usePermissions';
-import { P } from '@/lib/rbac/permissions';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useSubscription } from '@/hooks/use-subscription';
 import { useVisibleServices, AppSwitcherGrid, AppSwitcherTrigger, type ServiceKey } from '@bengo-hub/shared-ui-lib/app-switcher';
 import { AccountPanel } from '@bengo-hub/shared-ui-lib/account-panel';
 
@@ -45,13 +42,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   const session = useAuthStore((state) => state.session);
   const logout = useAuthStore((state) => state.logout);
   const { getServiceTitle } = useBranding();
-  const { canAny } = usePermissions();
-  const canManageLinks = canAny([P.SETTINGS_MANAGE, P.CONFIG_MANAGE, P.CATALOG_MANAGE]);
-  // activeProducts is undefined while the subscription lookup is in flight/unknown — fails open
-  // (shows everything) until it resolves, matching this codebase's existing "never block the UI
-  // on a subscription-fetch failure" convention.
-  const { activeProducts } = useSubscription();
-  const services = useVisibleServices({ orgSlug, urls: SERVICE_URLS, canManageLinks, activeServiceTags: activeProducts });
+  // The App Store shows every real service to every authenticated user in the tenant — each
+  // destination service already enforces its own RBAC + subscription gating on arrival, so
+  // pre-filtering the directory here just hid apps that were actually reachable.
+  const services = useVisibleServices({ orgSlug, urls: SERVICE_URLS, canManageLinks: true });
   const [profileOpen, setProfileOpen] = useState(false);
   const isAuthenticated = !!user && !!session;
   const name = displayName(user);
@@ -93,7 +87,7 @@ export function Header({ onMenuClick }: HeaderProps) {
 
         <ThemeToggle />
 
-        {canManageLinks && <AppSwitcherTrigger services={services} />}
+        {isAuthenticated && <AppSwitcherTrigger services={services} />}
 
         <div className="h-8 w-[1px] bg-border mx-1 hidden sm:block" />
 
