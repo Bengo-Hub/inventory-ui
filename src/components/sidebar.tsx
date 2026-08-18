@@ -107,25 +107,19 @@ const MODULE_FEATURE: Record<string, string> = {
   events: 'events_module',
   assets: 'fixed_assets',
   warranties: 'warranties',
-  erp: 'hr_management',
 };
 
 // Procurement is a universal capability, not a use_case-specific one: any business — even a
 // pure-services or mixed goods+services tenant — can buy from suppliers and raise LPOs/RFQs.
 // These keys are therefore never hidden by use_case (they remain subject to subscription gating
-// via MODULE_FEATURE, e.g. purchase_orders). The ERP cross-service link is likewise available
-// to every use case (subscription-locked below tier 2 instead).
+// via MODULE_FEATURE, e.g. purchase_orders).
 const UNIVERSAL_MODULES = new Set<string>([
-  'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers', 'erp',
+  'requisitions', 'rfqs', 'purchase_orders', 'returns', 'contracts', 'suppliers',
   // Bundles spans retail kits, hospitality room-rate/board plans, and service sessions — not
   // scoped to one use case. Reservations is a stock concept underlying order fulfillment for
   // any use case that tracks stock (every use case already has 'stock' in its module list).
   'bundles', 'reservations',
 ]);
-
-// Cross-service ERP UI (linked, never duplicated). Code fallback is the safety net since
-// NEXT_PUBLIC URLs are baked at build time.
-const ERP_UI_URL = process.env.NEXT_PUBLIC_ERP_UI_URL || 'https://erp.codevertexafrica.com';
 
 // Gating is driven by the SELECTED outlet's use_case for everyone (admins included).
 // When no specific outlet is selected — the HQ "All Outlets" view, where useCase is
@@ -347,15 +341,6 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         // Warranty tracking for serialized items — retail use case only per the
         // use-case PowerSuite specs (tier 2+, `warranties` feature).
         { label: 'Warranties', icon: ShieldCheck, href: '/warranties', moduleKey: 'warranties' },
-      ],
-    },
-    {
-      label: 'ERP',
-      defaultCollapsed: true,
-      items: [
-        // Cross-service link (never duplicated here) — locked below tier 2 per the
-        // use-case PowerSuite matrix (no ERP access at Basic; hr_management unlocks at Pro).
-        { label: 'ERP', icon: Users, href: `${ERP_UI_URL}/${orgSlug}`, moduleKey: 'erp' },
       ],
     },
     {

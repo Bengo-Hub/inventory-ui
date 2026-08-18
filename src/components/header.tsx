@@ -11,7 +11,7 @@ import { P } from '@/lib/rbac/permissions';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSubscription } from '@/hooks/use-subscription';
-import { useVisibleServices, AppSwitcherGrid, type ServiceKey } from '@bengo-hub/shared-ui-lib/app-switcher';
+import { useVisibleServices, AppSwitcherGrid, AppSwitcherTrigger, type ServiceKey } from '@bengo-hub/shared-ui-lib/app-switcher';
 import { AccountPanel } from '@bengo-hub/shared-ui-lib/account-panel';
 
 // Canonical service list (labels/icons/coverage, incl. 'coming-soon' entries) lives in
@@ -92,6 +92,8 @@ export function Header({ onMenuClick }: HeaderProps) {
         </button>
 
         <ThemeToggle />
+
+        {canManageLinks && <AppSwitcherTrigger services={services} />}
 
         <div className="h-8 w-[1px] bg-border mx-1 hidden sm:block" />
 
