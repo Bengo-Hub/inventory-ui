@@ -9,9 +9,9 @@ import { expect, test } from '@playwright/test';
  * adjustment, so no backend cleanup is needed.
  */
 
-const EMAIL = process.env.E2E_LOGIN_EMAIL || 'demo@bengobox.dev';
-const PASSWORD = process.env.E2E_LOGIN_PASSWORD || 'DemoUser2024!';
-const ORG = process.env.E2E_ORG_SLUG || 'urban-loft';
+const EMAIL = process.env.E2E_LOGIN_EMAIL || 'admin@demo.codevertexafrica.com';
+const PASSWORD = process.env.E2E_LOGIN_PASSWORD || 'DemoAdmin2024!';
+const ORG = process.env.E2E_ORG_SLUG || 'codevertex-demo';
 
 async function ssoLogin(page: import('@playwright/test').Page) {
   await page.goto(`/${ORG}/`, { waitUntil: 'domcontentloaded' });
