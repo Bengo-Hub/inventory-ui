@@ -22,6 +22,7 @@ import { useOutletStore } from '@/store/outlet';
 import { useNotificationStream, type NotificationStreamMessage } from '@/hooks/use-notification-stream';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateBulkStockQueries } from '@/hooks/useStock';
+import { reportJobCompletion, labelForJobType } from '@/lib/bulk-job-alert-queue';
 import { toast } from 'sonner';
 
 // BUG FIX (live-reported): switching outlets — via the header's HQ-only OutletFilter, the
@@ -49,11 +50,6 @@ function OutletQuerySync() {
     return null;
 }
 
-const BULK_JOB_LABELS: Record<string, string> = {
-    item_relocation: 'Outlet update',
-    bulk_stock_adjust: 'Bulk stock adjustment',
-};
-
 // Real-time push (stock changes + background bulk-job completion) — mounted once for the whole
 // tenant session so a POS sale (or any other stock mutation) shows up live on the Stock page
 // instead of only on a manual refresh, and a background bulk job (item outlet-membership change,
@@ -74,12 +70,18 @@ function NotificationListener() {
         // they didn't run).
         invalidateBulkStockQueries(queryClient, orgSlug);
         if (msg.payload.created_by && userID && msg.payload.created_by !== userID) return;
-        const label = BULK_JOB_LABELS[msg.payload.job_type] ?? 'Bulk operation';
-        if (msg.payload.status === 'failed') {
+        const label = labelForJobType(msg.payload.job_type);
+        const { processed, failed, status } = msg.payload;
+        // If this job was queued from THIS tab (see useSetItemOutletMembership/
+        // useBulkAdjustStock), its toast is compiled with any other jobs still outstanding from
+        // the same batch and fires once the last one finishes — see bulk-job-alert-queue.ts.
+        // Untracked (a different tab/session, or queued before a reload) falls back to the
+        // original immediate per-event toast below.
+        if (reportJobCompletion(msg.payload.job_id, { status, processed, failed })) return;
+        if (status === 'failed') {
             toast.error(`${label} failed`, { duration: 8000 });
             return;
         }
-        const { processed, failed } = msg.payload;
         if (failed > 0) {
             toast.warning(`${label} complete — ${processed} applied, ${failed} skipped`, { duration: 8000 });
         } else {

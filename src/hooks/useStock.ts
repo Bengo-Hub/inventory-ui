@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stockApi, type CreateAdjustmentInput, type CreateBreakdownInput, type StockListParams, type AdjustmentListParams, type StockHistoryParams, type BulkAdjustStockInput, type SetItemOutletMembershipInput } from '@/lib/api/stock';
+import { registerPendingJob, labelForJobType } from '@/lib/bulk-job-alert-queue';
 
 const STOCK_KEY = 'stock';
 const ADJ_KEY = 'adjustments';
@@ -71,7 +72,10 @@ export function useSetItemOutletMembership(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: SetItemOutletMembershipInput) => stockApi.setMembership(orgSlug, data),
-    onSuccess: () => invalidateBulkStockQueries(queryClient, orgSlug),
+    onSuccess: (job) => {
+      registerPendingJob(job.job_id, labelForJobType('item_relocation'));
+      invalidateBulkStockQueries(queryClient, orgSlug);
+    },
   });
 }
 
@@ -83,7 +87,10 @@ export function useBulkAdjustStock(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: BulkAdjustStockInput) => stockApi.bulkAdjust(orgSlug, data),
-    onSuccess: () => invalidateBulkStockQueries(queryClient, orgSlug),
+    onSuccess: (job) => {
+      registerPendingJob(job.job_id, labelForJobType('bulk_stock_adjust'));
+      invalidateBulkStockQueries(queryClient, orgSlug);
+    },
   });
 }
 

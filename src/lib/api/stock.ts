@@ -119,12 +119,19 @@ export interface SetItemOutletMembershipInput {
   item_ids: string[];
   target_warehouse_ids: string[];
   notes?: string;
-  /** Only applies to a clean 1-dropped+1-added pair: moves exactly this amount, leaving the
-   * remainder active at the source, instead of the default full move. */
+  /** Only applies to a clean 1-dropped+1-added pair, and only takes effect when
+   * `move_with_stock` is set: moves exactly this amount, leaving the remainder active (hidden,
+   * never discarded) at the source, instead of moving everything. */
   move_quantity?: number;
-  /** Opt-in for the general many-to-many case: dropped outlets' stock is discarded rather than
-   * pooled, newly-added outlets start at zero. Confirm with the user before sending this. */
+  /** Opt-in: dropped outlets' stock is discarded rather than hidden, newly-added outlets start
+   * at zero. Confirm with the user before sending this (mutually exclusive with
+   * `move_with_stock`) — it's the one mode that makes real on-hand quantity vanish. */
   zero_stock_mode?: boolean;
+  /** Opt-in: dropped outlets' stock is carried to the newly-added outlet(s) instead of the
+   * default (just hide, quantity untouched). Requires `target_warehouse_ids` to include at
+   * least one new destination — the API rejects an empty target set with this flag set.
+   * Mutually exclusive with `zero_stock_mode`. */
+  move_with_stock?: boolean;
 }
 
 /** Returned by any endpoint that queues a background bulk job — see BulkJob below. */

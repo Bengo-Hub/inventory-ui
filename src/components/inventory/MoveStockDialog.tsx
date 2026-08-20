@@ -25,6 +25,9 @@ interface MoveStockDialogProps {
   onDone?: () => void;
 }
 
+/** Mutually exclusive outlet-removal modes — see MoveStockDialog's doc comment. */
+type RemovalMode = 'hide' | 'move' | 'zero';
+
 /**
  * MoveStockDialog — the catalog item-movement dialog: check the outlets an item should be
  * stocked in, uncheck the ones it shouldn't. Single-item mode pre-checks the item's current
@@ -32,11 +35,17 @@ interface MoveStockDialogProps {
  * check to every selected item uniformly, since a heterogeneous batch has no single "current"
  * state to pre-fill.
  *
- * NOT a stock transfer: there's no source/destination pair and no chosen quantity. Checking an
- * outlet adds an active balance there; unchecking marks the outlet's balance
- * removed_from_location so the item stops appearing there entirely (never lingers as a zero
- * row). Quantity pulled from unchecked outlets is pooled and split across newly-checked ones —
- * see stock.SetItemOutletMembership's doc comment (backend) for the full design.
+ * NOT a stock transfer: there's no source/destination pair and no chosen quantity. What happens
+ * to an UNCHECKED outlet's stock depends on the removal mode chosen below:
+ *   - Hide (default): the outlet's balance is untouched — only its removed_from_location flag
+ *     flips, so the item stops appearing there. Re-checking it later brings it back with the
+ *     exact quantity it had when hidden. Never moves or clears real stock.
+ *   - Move stock: carries the unchecked outlets' quantity to whichever outlet(s) you're
+ *     checking — requires at least one new destination, since otherwise there's nowhere for it
+ *     to go.
+ *   - Move with zero stock: an explicit write-off — dropped outlets' stock is discarded and
+ *     newly-checked outlets start at zero. Confirmed before it's sent.
+ * See stock.SetItemOutletMembership's doc comment (backend) for the full per-item design.
  *
  * Runs as a background job (queues instantly, processes off the request) — this dialog closes
  * the moment the job is accepted; a toast reports the real per-item result once it completes
@@ -48,9 +57,11 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
   const [touched, setTouched] = useState(false);
   const [notes, setNotes] = useState('');
   const [search, setSearch] = useState('');
-  const [zeroStockMode, setZeroStockMode] = useState(false);
+  const [removalMode, setRemovalMode] = useState<RemovalMode>('hide');
   const [moveQuantity, setMoveQuantity] = useState('');
   const [confirmingZeroStock, setConfirmingZeroStock] = useState(false);
+  const zeroStockMode = removalMode === 'zero';
+  const moveWithStock = removalMode === 'move';
 
   const isBatch = items.length > 1;
 
@@ -75,9 +86,14 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
     () => (isBatch ? [] : Array.from(checked).filter((id) => !originalIds.has(id))),
     [isBatch, checked],
   );
-  const isPartialPairEligible = !zeroStockMode && droppedIds.length === 1 && addedIds.length === 1;
+  const isPartialPairEligible = moveWithStock && droppedIds.length === 1 && addedIds.length === 1;
   const sourceStock = isPartialPairEligible ? currentStock.find((s) => s.warehouse_id === droppedIds[0]) : undefined;
   const sourceOnHand = sourceStock?.on_hand ?? 0;
+
+  // "Move stock" needs somewhere to land — single-item mode can check this exactly (a newly
+  // checked outlet); bulk mode has no per-item "current" set to diff against client-side, so it
+  // falls back to the same coarse check the API enforces (at least one outlet checked at all).
+  const hasMoveDestination = isBatch ? checked.size > 0 : addedIds.length > 0;
 
   useEffect(() => {
     // Reset any stale quantity the moment the pair shape changes (a different pair, or no
@@ -113,6 +129,7 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
         notes: notes.trim() || undefined,
         move_quantity: Number.isFinite(qty) && qty > 0 ? qty : undefined,
         zero_stock_mode: zeroStockMode || undefined,
+        move_with_stock: moveWithStock || undefined,
       });
       toast.info(
         isBatch
@@ -131,6 +148,10 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (moveWithStock && !hasMoveDestination) {
+      toast.error('Check at least one outlet to move the stock into.');
+      return;
+    }
     // Zero-stock mode discards real on-hand rather than carrying it anywhere — confirm with an
     // explicit warning before it ever reaches the API, same as any other destructive action.
     if (zeroStockMode) {
@@ -156,8 +177,8 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
             </div>
             <p className="text-xs text-muted-foreground">
               {isBatch
-                ? 'Check the outlets these items should be stocked in; unchecked outlets are removed for every item selected.'
-                : 'Check the outlets this item should be stocked in; unchecking removes it from that outlet entirely.'}
+                ? 'Check the outlets these items should be stocked in; unchecked outlets are hidden (not cleared) for every item selected.'
+                : 'Check the outlets this item should be stocked in; unchecking hides it there — its stock stays put unless you choose to move it below.'}
             </p>
           </CardHeader>
           <CardContent className="overflow-y-auto flex-1">
@@ -210,27 +231,67 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
                   />
                   <p className="text-[11px] text-muted-foreground">
                     {moveQuantity && Number(moveQuantity) < sourceOnHand
-                      ? `Moves ${moveQuantity} of ${sourceOnHand} — the remaining ${sourceOnHand - Number(moveQuantity)} stays at the current outlet.`
-                      : `Moving all ${sourceOnHand} — the item will stop appearing at the current outlet (today's default behaviour).`}
+                      ? `Moves ${moveQuantity} of ${sourceOnHand} — the remaining ${sourceOnHand - Number(moveQuantity)} stays (hidden) at the current outlet.`
+                      : `Moving all ${sourceOnHand} — the current outlet will be hidden, not cleared; it keeps nothing after the move.`}
                   </p>
                 </div>
               )}
 
-              <label className="flex items-start gap-3 rounded-lg border border-border p-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={zeroStockMode}
-                  onChange={(e) => setZeroStockMode(e.target.checked)}
-                  className="h-4 w-4 rounded border-input mt-0.5"
-                />
-                <span className="text-sm">
-                  <span className="font-medium">Move with zero stock</span>
-                  <span className="block text-[11px] text-muted-foreground mt-0.5">
-                    Drop the current stock instead of carrying it over — unchecked outlets lose their
-                    stock entirely, and newly-checked outlets start at zero.
+              <div className="space-y-1.5 rounded-lg border border-border p-1">
+                <label className="flex items-start gap-3 rounded-lg px-2 py-2 cursor-pointer hover:bg-accent/50">
+                  <input
+                    type="radio"
+                    name="removal-mode"
+                    checked={removalMode === 'hide'}
+                    onChange={() => setRemovalMode('hide')}
+                    className="h-4 w-4 mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Hide (keep stock)</span>
+                    <span className="block text-[11px] text-muted-foreground mt-0.5">
+                      Unchecked outlets stop showing this item but keep their current stock.
+                      Re-check the outlet later and it reappears with the same quantity.
+                    </span>
                   </span>
-                </span>
-              </label>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg px-2 py-2 cursor-pointer hover:bg-accent/50">
+                  <input
+                    type="radio"
+                    name="removal-mode"
+                    checked={removalMode === 'move'}
+                    onChange={() => setRemovalMode('move')}
+                    className="h-4 w-4 mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Move stock to the outlet(s) I'm adding</span>
+                    <span className="block text-[11px] text-muted-foreground mt-0.5">
+                      Carries the unchecked outlets' stock into whichever outlet(s) you check.
+                      Needs at least one new outlet checked — otherwise there's nowhere for it to go.
+                    </span>
+                    {removalMode === 'move' && !hasMoveDestination && (
+                      <span className="block text-[11px] text-destructive mt-1">
+                        Check a destination outlet to move stock into.
+                      </span>
+                    )}
+                  </span>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg px-2 py-2 cursor-pointer hover:bg-accent/50">
+                  <input
+                    type="radio"
+                    name="removal-mode"
+                    checked={removalMode === 'zero'}
+                    onChange={() => setRemovalMode('zero')}
+                    className="h-4 w-4 mt-0.5"
+                  />
+                  <span className="text-sm">
+                    <span className="font-medium">Move with zero stock</span>
+                    <span className="block text-[11px] text-muted-foreground mt-0.5">
+                      Drop the current stock instead of carrying it over — unchecked outlets lose their
+                      stock entirely, and newly-checked outlets start at zero.
+                    </span>
+                  </span>
+                </label>
+              </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Note</label>
@@ -245,7 +306,7 @@ export function MoveStockDialog({ orgSlug, items, onClose, onDone }: MoveStockDi
                 <Button type="button" variant="outline" className="flex-1" onClick={onClose} disabled={isBusy}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1" disabled={isBusy}>
+                <Button type="submit" className="flex-1" disabled={isBusy || (moveWithStock && !hasMoveDestination)}>
                   {isBusy ? 'Queuing...' : 'Apply'}
                 </Button>
               </div>

@@ -1,9 +1,10 @@
 // Shared stock-adjustment reason list — the manually-choosable subset of
 // stockadjustment.Reason (inventory-api). Excludes system-driven reasons that are never picked
 // by a human from a form (transfer_in/transfer_out/return/opening_balance/location_move/
-// count_variance) — those are set by their own flows (transfers, relocation, bulk import, stock
-// take), not this picker. Reused by the single Adjustments form and BulkAdjustStockDialog so the
-// two surfaces can never drift apart.
+// location_hidden/location_unhidden/count_variance) — those are set by their own flows
+// (transfers, relocation, the Set Outlets checkbox modal, bulk import, stock take), not this
+// picker. Reused by the single Adjustments form and BulkAdjustStockDialog so the two surfaces
+// can never drift apart.
 export const ADJUSTMENT_REASON_OPTIONS = [
   { value: 'correction', label: 'Count Correction' },
   { value: 'damaged', label: 'Damaged Goods' },

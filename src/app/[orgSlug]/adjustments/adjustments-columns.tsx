@@ -11,6 +11,19 @@ export interface AdjustmentColumnCallbacks {
   onPrint: (a: StockAdjustment, format: DocFormat) => void;
 }
 
+// Prettier labels for the reason enum instead of raw `capitalize` CSS on the wire value —
+// location_hidden/location_unhidden are 0-quantity visibility toggles (SetItemOutletMembership's
+// "hide" default), distinct from an actual location_move.
+const REASON_LABELS: Record<string, string> = {
+  location_move: 'Location move',
+  location_hidden: 'Outlet hidden',
+  location_unhidden: 'Outlet unhidden',
+};
+
+function reasonLabel(reason: string): string {
+  return REASON_LABELS[reason] ?? reason;
+}
+
 export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTableColumn<StockAdjustment>[] {
   return [
     {
@@ -56,7 +69,16 @@ export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTable
       hideBelow: 'sm',
       filterable: true,
       accessor: (a) => a.reason,
-      cellClassName: 'text-muted-foreground capitalize',
+      cellClassName: 'text-muted-foreground',
+      render: (a) => reasonLabel(a.reason),
+    },
+    {
+      key: 'notes',
+      header: 'Details',
+      hideBelow: 'lg',
+      accessor: (a) => a.notes || '',
+      cellClassName: 'text-muted-foreground text-xs max-w-[220px] truncate',
+      render: (a) => a.notes || '—',
     },
     {
       key: 'actions',
