@@ -142,6 +142,7 @@ export default function FoodCostVariancePage() {
                             rows={rows}
                             rowKey={(row) => row.recipe_sku}
                             loading={isLoading}
+                            loadingRows={8}
                             emptyText='No variance data for this period. Try "Recalculate" to generate fresh data.'
                         />
                     </div>

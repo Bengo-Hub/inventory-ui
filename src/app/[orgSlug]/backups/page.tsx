@@ -247,6 +247,7 @@ export default function BackupsPage() {
               rows={backups}
               rowKey={(b) => b.name}
               loading={isLoading}
+              loadingRows={8}
               emptyState={
                 <>
                   <HardDriveDownload className="h-8 w-8 mx-auto opacity-40 mb-2" />

@@ -231,6 +231,7 @@ export default function UnitsPage() {
                             rows={paginatedItems}
                             rowKey={(u) => u.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={

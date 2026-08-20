@@ -129,6 +129,7 @@ export default function ContractsPage() {
                             rows={rows}
                             rowKey={(c) => c.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(c) => setViewing(c)}

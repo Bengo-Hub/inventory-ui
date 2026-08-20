@@ -114,6 +114,7 @@ export default function ProductionBatchesPage() {
                             rows={rows}
                             rowKey={(r) => r.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={

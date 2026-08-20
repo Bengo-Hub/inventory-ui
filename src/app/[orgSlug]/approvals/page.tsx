@@ -129,6 +129,7 @@ export default function ApprovalsInboxPage() {
                                 rows={rows}
                                 rowKey={(req) => req.id}
                                 loading={isLoading}
+                                loadingRows={8}
                                 error={isError}
                                 onRetry={() => refetch()}
                                 onRowClick={(req) => { setSelected(req); setComment(''); }}

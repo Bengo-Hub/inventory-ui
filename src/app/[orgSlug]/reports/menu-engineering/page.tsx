@@ -122,6 +122,7 @@ export default function MenuEngineeringPage() {
                             rows={rows}
                             rowKey={(row) => row.recipe_sku}
                             loading={isLoading}
+                            loadingRows={8}
                             emptyText='No data for this period. Click "Analyze" to load the matrix.'
                         />
                     </div>

@@ -126,6 +126,7 @@ export default function AssetsPage() {
                             rows={rows}
                             rowKey={(a) => a.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(a) => setViewing(a)}

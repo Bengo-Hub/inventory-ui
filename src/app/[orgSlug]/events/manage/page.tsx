@@ -173,6 +173,7 @@ export default function ManageEventsPage() {
                             rows={filtered}
                             rowKey={(event) => event.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={

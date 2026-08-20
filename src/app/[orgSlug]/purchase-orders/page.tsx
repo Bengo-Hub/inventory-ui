@@ -423,6 +423,7 @@ export default function PurchaseOrdersPage() {
                             rows={paginatedItems}
                             rowKey={(po) => po.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(po) => setSelectedPO(po.id)}

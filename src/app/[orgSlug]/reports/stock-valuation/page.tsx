@@ -86,6 +86,7 @@ export default function StockValuationPage() {
                             rows={data?.by_category ?? []}
                             rowKey={(c) => c.category_name}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No stock on hand."
@@ -103,6 +104,7 @@ export default function StockValuationPage() {
                             rows={data?.top_items ?? []}
                             rowKey={(it) => it.item_id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No valued items."

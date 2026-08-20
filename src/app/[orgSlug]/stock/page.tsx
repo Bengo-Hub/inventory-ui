@@ -681,6 +681,7 @@ export default function StockPage() {
                             rows={paginatedItems}
                             rowKey={(item) => item.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(item) => openItem(item)}
@@ -733,6 +734,7 @@ export default function StockPage() {
                                 rows={eolItems?.data ?? []}
                                 rowKey={(it) => it.id}
                                 loading={eolLoading}
+                                loadingRows={8}
                                 emptyState={
                                     <>
                                         <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />

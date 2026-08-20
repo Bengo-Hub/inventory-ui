@@ -106,6 +106,7 @@ export default function GoodsReceiptsPage() {
                             rows={rows}
                             rowKey={(g) => g.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(g) => setViewId(g.id)}

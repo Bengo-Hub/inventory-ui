@@ -205,6 +205,7 @@ export default function WarrantiesPage() {
                                 rows={rows}
                                 rowKey={(w) => w.id}
                                 loading={isLoading}
+                                loadingRows={8}
                                 error={isError}
                                 onRetry={() => refetch()}
                                 onRowClick={(w) => setViewing(w)}

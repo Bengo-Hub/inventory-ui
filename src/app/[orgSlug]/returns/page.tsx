@@ -133,6 +133,7 @@ export default function PurchaseReturnsPage() {
                             rows={rows}
                             rowKey={(r) => r.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(r) => setViewing(r)}

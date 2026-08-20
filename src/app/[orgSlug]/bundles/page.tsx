@@ -505,6 +505,7 @@ export default function BundlesPage() {
                             rows={bundles}
                             rowKey={(b) => b.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={

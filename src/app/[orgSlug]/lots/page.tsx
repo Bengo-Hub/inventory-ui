@@ -298,6 +298,7 @@ export default function LotsPage() {
                             rows={paginatedItems}
                             rowKey={(l) => l.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No lots found — lots are created on PO receive or manually here"

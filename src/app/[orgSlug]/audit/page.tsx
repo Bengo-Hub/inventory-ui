@@ -84,6 +84,7 @@ export default function AuditPage() {
               rows={rows}
               rowKey={(e) => e.id}
               loading={isLoading}
+              loadingRows={8}
               emptyText="No audit entries for these filters."
               storageKey="audit-col-prefs"
               page={page + 1}

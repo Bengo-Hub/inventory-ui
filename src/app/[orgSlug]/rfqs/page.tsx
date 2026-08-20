@@ -182,6 +182,7 @@ export default function RFQListPage() {
                                 rows={filtered ?? []}
                                 rowKey={(rfq) => rfq.id}
                                 loading={isLoading}
+                                loadingRows={8}
                                 error={isError}
                                 onRetry={() => refetch()}
                                 onRowClick={(rfq) => setViewId(rfq.id)}

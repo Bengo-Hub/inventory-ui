@@ -213,6 +213,7 @@ export default function RecipesPage() {
                             rows={paginatedItems}
                             rowKey={(r) => r.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={

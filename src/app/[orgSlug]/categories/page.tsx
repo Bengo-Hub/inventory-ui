@@ -278,6 +278,7 @@ function CategoriesTab() {
                             rows={paginatedItems}
                             rowKey={(cat) => cat.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No categories defined yet — add categories to organise your inventory items"
@@ -518,6 +519,7 @@ function BrandsTab() {
                             rows={paginatedItems}
                             rowKey={(b) => b.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No brands defined yet — add brands to tag your GOODS items (e.g. HP, Samsung)"

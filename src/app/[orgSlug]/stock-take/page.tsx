@@ -490,6 +490,7 @@ export default function StockTakePage() {
                                 rows={counts ?? []}
                                 rowKey={(c) => c.id}
                                 loading={isLoading}
+                                loadingRows={8}
                                 onRowClick={(c) => openCount(c.id)}
                                 emptyText="No stock takes yet. Start one to count physical stock and post variances."
                                 storageKey="stock-take-col-prefs"

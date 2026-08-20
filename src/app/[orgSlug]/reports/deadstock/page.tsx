@@ -98,6 +98,7 @@ export default function DeadstockPage() {
                             rows={data?.items ?? []}
                             rowKey={(it) => it.item_id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No deadstock — everything is moving."

@@ -217,6 +217,7 @@ export default function ApprovalRulesPage() {
                                 rows={rows}
                                 rowKey={(rule) => rule.id}
                                 loading={isLoading}
+                                loadingRows={8}
                                 error={isError}
                                 onRetry={() => refetch()}
                                 emptyState={

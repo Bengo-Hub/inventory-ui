@@ -392,6 +392,7 @@ export default function AdjustmentsPage() {
                             rows={paginated}
                             rowKey={(a) => a.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No adjustments recorded yet"

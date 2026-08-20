@@ -314,6 +314,7 @@ export default function TransfersPage() {
                             rows={paginatedItems}
                             rowKey={(t) => t.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             onRowClick={(t) => setViewId(t.id)}

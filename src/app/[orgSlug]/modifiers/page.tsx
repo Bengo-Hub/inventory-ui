@@ -145,6 +145,7 @@ export default function ModifiersPage() {
                             rows={paginatedItems}
                             rowKey={(g) => g.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             renderExpanded={(group) => <ModifierOptionsPanel group={group} />}

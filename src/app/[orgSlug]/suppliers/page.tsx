@@ -121,6 +121,7 @@ export default function SuppliersPage() {
                             rows={paginatedItems}
                             rowKey={(s) => s.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyText="No suppliers found"

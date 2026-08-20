@@ -94,6 +94,7 @@ export default function ReservationsPage() {
                             rows={paginatedItems}
                             rowKey={(res) => res.id}
                             loading={isLoading}
+                            loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
                             emptyState={
