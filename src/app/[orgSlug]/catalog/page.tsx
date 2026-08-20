@@ -31,7 +31,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradeBadge } from '@bengo-hub/shared-ui-lib/subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal } from '@/lib/utils';
@@ -152,14 +152,20 @@ function PriceCell({ value, editable, saving, onSave }: {
   );
 }
 
-// ItemLocationsPanel — per-warehouse balance breakdown for one item. Takes the already-fetched
-// locations/isLoading from ItemDrawer (one GET /inventory/stock?item_id= call shared with the
-// Stock panel above it) rather than fetching its own copy, so the two panels can never disagree
-// about what's where. activeWarehouseId (when resolved) highlights "here" — the same warehouse
-// Move Stock and Adjust Stock default to — so it's obvious which row the Stock panel's headline
-// number came from.
+// ItemLocationsPanel — per-warehouse balance breakdown for one item, INCLUDING outlets it's
+// currently hidden at (frozen quantity, not cleared — see membership.go's "hide" default).
+// Takes the already-fetched locations/isLoading from ItemDrawer (one GET
+// /inventory/stock?item_id=&include_hidden=true call) rather than fetching its own copy, so
+// this panel and the Stock headline can never disagree about what's where. activeWarehouseId
+// (when resolved) highlights "here" — the same warehouse Move Stock and Adjust Stock default
+// to — so it's obvious which row the Stock panel's headline number came from. Hidden outlets
+// sort after active ones (their stock isn't sellable there right now), active ones by
+// available desc as before.
 function ItemLocationsPanel({ locations, isLoading, activeWarehouseId }: { locations: StockLevel[]; isLoading: boolean; activeWarehouseId?: string }) {
-  const sorted = [...locations].sort((a, b) => b.available - a.available);
+  const sorted = [...locations].sort((a, b) => {
+    if (!!a.removed_from_location !== !!b.removed_from_location) return a.removed_from_location ? 1 : -1;
+    return b.available - a.available;
+  });
   return (
     <div className="rounded-xl border border-border p-4">
       <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-3">Locations</p>
@@ -173,20 +179,28 @@ function ItemLocationsPanel({ locations, isLoading, activeWarehouseId }: { locat
         <p className="text-sm text-muted-foreground">Not stocked at any location yet.</p>
       ) : (
         <ul className="space-y-1.5">
-          {sorted.map((loc) => (
-            <li key={loc.id} className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1.5">
-                {loc.warehouse_name}
-                {loc.warehouse_id === activeWarehouseId && <Badge variant="outline" className="text-[10px]">Here</Badge>}
-              </span>
-              <span className="font-mono font-semibold tabular-nums">
-                {loc.available.toLocaleString()}
-                {loc.reserved > 0 && (
-                  <span className="text-muted-foreground font-normal"> ({loc.reserved.toLocaleString()} reserved)</span>
-                )}
-              </span>
-            </li>
-          ))}
+          {sorted.map((loc) => {
+            const hidden = !!loc.removed_from_location;
+            return (
+              <li key={loc.id} className={`flex items-center justify-between text-sm ${hidden ? 'opacity-60' : ''}`}>
+                <span className="flex items-center gap-1.5">
+                  {loc.warehouse_name}
+                  {loc.warehouse_id === activeWarehouseId && <Badge variant="outline" className="text-[10px]">Here</Badge>}
+                  {hidden ? (
+                    <Badge variant="outline" className="text-[10px] text-amber-600 dark:text-amber-400 border-amber-600/40">Hidden</Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] text-muted-foreground">Active</Badge>
+                  )}
+                </span>
+                <span className="font-mono font-semibold tabular-nums">
+                  {loc.available.toLocaleString()}
+                  {loc.reserved > 0 && (
+                    <span className="text-muted-foreground font-normal"> ({loc.reserved.toLocaleString()} reserved)</span>
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
@@ -250,7 +264,12 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
   // here would actually see (fixes a live-reported mismatch: the item list's aggregate is a
   // cross-outlet total for HQ/admin sessions, which silently disagreed with "available here").
   const activeWH = useActiveWarehouse(orgSlug);
-  const { data: locations = [], isLoading: locationsLoading } = useStock(orgSlug, { item_id: item.id });
+  // include_hidden so the Locations panel below can show outlets the item is currently hidden
+  // at too (frozen quantity, not cleared); the headline "Stock at X" numbers derive from
+  // `locations` (active-only, filtered client-side) so they're unaffected — identical to what
+  // the plain active-only query returned before.
+  const { data: allLocations = [], isLoading: locationsLoading } = useStock(orgSlug, { item_id: item.id, include_hidden: true });
+  const locations = useMemo(() => allLocations.filter((l) => !l.removed_from_location), [allLocations]);
   const hereBalance = locations.find((l) => l.warehouse_id === activeWH.warehouseId);
   const hereName = activeWH.allWarehouses.find((w) => w.id === activeWH.warehouseId)?.name;
 
@@ -422,11 +441,13 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
         </div>
       )}
 
-      {/* Locations — every warehouse/outlet this item currently has a balance in. An item
-          moved out of a location via a stock transfer stops appearing here the instant the
-          transfer ships (see MoveStockDialog / transfers.Service.adjustBalance). */}
+      {/* Locations — every warehouse/outlet this item has a balance at, active or hidden (see
+          MoveStockDialog's Hide/Move-stock/Move-with-zero-stock modes) — a hidden outlet still
+          shows here, badged, with its frozen quantity, so it's never a silent gap. Only a full
+          relocation via RelocateItemLocation's wholesale move (not reachable from this UI today)
+          drops a row entirely. */}
       {isStockable && (
-        <ItemLocationsPanel locations={locations} isLoading={locationsLoading} activeWarehouseId={activeWH.warehouseId || undefined} />
+        <ItemLocationsPanel locations={allLocations} isLoading={locationsLoading} activeWarehouseId={activeWH.warehouseId || undefined} />
       )}
 
       {/* Movement history — a compact preview of the same per-item ledger (sales, transfers,
@@ -775,9 +796,14 @@ export default function CatalogPage() {
         const out = i.on_hand <= 0;
         const low = !out && i.reorder_level != null && i.on_hand <= i.reorder_level;
         return (
-          <span className={out ? 'font-semibold text-destructive' : low ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-foreground'}>
+          <button
+            type="button"
+            onClick={() => setViewItem(i)}
+            title="Cross-outlet total — click to see the per-outlet breakdown, including any hidden outlets"
+            className={`hover:underline underline-offset-2 ${out ? 'font-semibold text-destructive' : low ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-foreground'}`}
+          >
             {i.on_hand.toLocaleString()}
-          </span>
+          </button>
         );
       },
     },

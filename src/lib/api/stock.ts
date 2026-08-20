@@ -15,6 +15,10 @@ export interface StockLevel {
   category_id?: string;
   category_name?: string;
   type?: string;
+  /** true when this outlet's copy of the item was hidden via the Set Outlets checkbox modal
+   *  (SetItemOutletMembership) — quantity is frozen, not cleared. Only ever true when the
+   *  request was sent with `include_hidden: true`; the default list excludes these rows. */
+  removed_from_location?: boolean;
 }
 
 export interface StockAdjustment {
@@ -76,6 +80,11 @@ export interface StockListParams {
   /** Scope to a single item's balances across every warehouse — the item drawer's Locations
    *  panel and the Move Stock dialog's "available at source" lookup both use this. */
   item_id?: string;
+  /** Also return balances hidden via the Set Outlets modal (removed_from_location=true),
+   *  tagged with `removed_from_location: true` on those rows. Default false everywhere except
+   *  the item drawer's outlet breakdown — the main Stock Levels list/export and Move Stock's
+   *  "current outlets" pre-check must keep seeing only active balances. */
+  include_hidden?: boolean;
 }
 
 export interface StockExportParams extends StockListParams {
