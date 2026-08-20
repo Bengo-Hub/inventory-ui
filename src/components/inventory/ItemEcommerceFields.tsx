@@ -5,6 +5,7 @@ import { InfoHint } from '@/components/ui/info-hint';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import type { CreateItemInput, Item } from '@/lib/api/items';
+import { CountrySelect } from '@bengo-hub/shared-ui-lib/contact';
 
 // Form-local shape for the e-commerce / marketplace attributes. Text fields are held as
 // strings (empty = unset) and return_window_days is a string so an empty box means
@@ -176,7 +177,12 @@ export function ItemEcommerceFields({ value, onChange }: Props) {
               <label className="text-sm font-medium">
                 Country of Origin <span className="text-muted-foreground font-normal">(optional)</span>
               </label>
-              <Input placeholder="e.g. Kenya" value={value.country_of_origin} onChange={(e) => set('country_of_origin', e.target.value)} />
+              {/* Schema field is explicitly "ISO country of origin — customs / marketplace
+                  compliance" (item.go), so this stores the ISO-2 code directly — no name
+                  conversion, unlike the free-text-name fields elsewhere in this sweep. A
+                  pre-existing free-text value (e.g. "Kenya") shows via CountrySelect's own
+                  valueLabel fallback until re-picked. */}
+              <CountrySelect value={value.country_of_origin} onChange={(iso) => set('country_of_origin', iso)} />
             </div>
           </div>
 
