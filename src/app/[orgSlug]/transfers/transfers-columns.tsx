@@ -32,6 +32,34 @@ export interface TransferColumnCallbacks {
   onEdit: (t: TransferSummary) => void;
 }
 
+// effectiveTransferDate returns the calendar day a transfer counts toward in reports/lists — the
+// staff-set transfer_date override (backdated or postdated via the New/Edit Transfer form) when
+// present, else created_at. Mirrors the backend's transfers.EffectiveTransferDate so this list
+// never shows "today" for a transfer that was deliberately entered under a different date.
+export function effectiveTransferDate(t: { transfer_date?: string; created_at: string }): string {
+  return t.transfer_date || t.created_at;
+}
+
+// isOverriddenTransferDate reports whether a transfer's displayed date was overridden away from
+// the day it was actually entered — used to show a small "(entered ...)" note so the real
+// creation timestamp is never fully hidden, just no longer the misleading headline.
+export function isOverriddenTransferDate(t: { transfer_date?: string; created_at: string }): boolean {
+  return !!t.transfer_date && t.transfer_date.slice(0, 10) !== t.created_at.slice(0, 10);
+}
+
+// isoDateOffset/TODAY_STR/TRANSFER_DATE_MIN/MAX back the New/Edit Transfer dialogs' date input —
+// bounds mirror the backend's maxTransferDateBackDays/maxTransferDateForwardDays (inventory-api
+// transfers/service.go); the input's min/max just gives immediate feedback, the server is the
+// real enforcement point.
+export function isoDateOffset(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+export const TODAY_STR = isoDateOffset(0);
+export const TRANSFER_DATE_MIN = isoDateOffset(-366);
+export const TRANSFER_DATE_MAX = isoDateOffset(366);
+
 export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColumn<TransferSummary>[] {
   return [
     {
@@ -81,9 +109,18 @@ export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColu
       header: 'Date',
       sortable: true,
       hideBelow: 'md',
-      accessor: (t) => t.created_at,
+      accessor: (t) => effectiveTransferDate(t),
       cellClassName: 'text-muted-foreground',
-      render: (t) => new Date(t.created_at).toLocaleDateString(),
+      render: (t) => (
+        <div>
+          <div>{new Date(effectiveTransferDate(t)).toLocaleDateString()}</div>
+          {isOverriddenTransferDate(t) && (
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(t.created_at).toLocaleString()}`}>
+              entered {new Date(t.created_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: 'actions',

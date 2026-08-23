@@ -19,6 +19,11 @@ export interface TransferSummary {
   line_count: number;
   shipped_at?: string;
   received_at?: string;
+  // transfer_date optionally overrides which calendar day this transfer counts toward in
+  // reports/lists — set when staff backdated (entered late) or postdated (scheduled ahead) it via
+  // the New/Edit Transfer form. Absent = display/report under created_at, same as before this
+  // field existed. See effectiveTransferDate in transfers-columns.tsx.
+  transfer_date?: string;
   created_at: string;
 }
 
@@ -54,6 +59,7 @@ export interface Transfer {
   lines: TransferItem[];
   shipped_at?: string;
   received_at?: string;
+  transfer_date?: string;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +73,9 @@ export interface CreateTransferInput {
   carrier?: string;
   freight_notes?: string;
   items: { item_id: string; quantity: number }[];
+  // transfer_date optionally backdates or postdates this transfer ("YYYY-MM-DD"). Omit to report
+  // under today/created_at, same as before this field existed.
+  transfer_date?: string;
 }
 
 // Amends a DRAFT transfer's line items + header fields — source/destination warehouse are
@@ -78,6 +87,9 @@ export interface UpdateTransferInput {
   carrier?: string;
   freight_notes?: string;
   items: { item_id: string; quantity: number }[];
+  // transfer_date mirrors CreateTransferInput's field — full-replace: omit/empty clears the
+  // override back to reporting under created_at.
+  transfer_date?: string;
 }
 
 export interface TransferListParams {

@@ -23,7 +23,7 @@ import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documen
 import { apiClient } from '@/lib/api/client';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
-import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL } from './transfers-columns';
+import { buildTransferColumns, STATUS_VARIANT, STATUS_LABEL, effectiveTransferDate, isOverriddenTransferDate, TODAY_STR, TRANSFER_DATE_MIN, TRANSFER_DATE_MAX } from './transfers-columns';
 import { TransferItemsEditor } from './transfer-items-editor';
 import { EditTransferDialog } from './edit-transfer-dialog';
 import { ReceiveTransferDialog } from './receive-transfer-dialog';
@@ -98,6 +98,12 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
             fields={transfer ? [
                 { label: 'From', value: transfer.source_warehouse?.name || '—' },
                 { label: 'To', value: transfer.destination_warehouse?.name || '—' },
+                {
+                    label: 'Transfer Date',
+                    value: isOverriddenTransferDate(transfer)
+                        ? `${new Date(effectiveTransferDate(transfer)).toLocaleDateString()} (entered ${new Date(transfer.created_at).toLocaleDateString()})`
+                        : new Date(effectiveTransferDate(transfer)).toLocaleDateString(),
+                },
                 { label: 'Reference', value: transfer.reference_no, hideIfEmpty: true },
                 { label: 'Carrier', value: transfer.carrier, hideIfEmpty: true },
                 { label: 'Shipping', value: (transfer.shipping_charges ?? 0) > 0 ? transfer.shipping_charges?.toLocaleString() : '—', hideIfEmpty: true },
@@ -178,6 +184,10 @@ export default function TransfersPage() {
     // required under "All Outlets"). Destination stays an unscoped explicit pick.
     const sourceWarehouse = useActiveWarehouse(orgSlug);
     const [toWarehouse, setToWarehouse] = useState('');
+    // Defaults to today; staff may back-date (stock physically moved days ago, only logged today)
+    // or push it forward (schedule ahead for a planned future shipment) — client request: "WEKA
+    // DATE... back date au tupeleke date mbele".
+    const [transferDate, setTransferDate] = useState(TODAY_STR);
     const [note, setNote] = useState('');
     const [referenceNo, setReferenceNo] = useState('');
     const [shippingCharges, setShippingCharges] = useState('');
@@ -214,6 +224,7 @@ export default function TransfersPage() {
     function openCreate() {
         sourceWarehouse.reset();
         setToWarehouse('');
+        setTransferDate(TODAY_STR);
         setNote('');
         setReferenceNo('');
         setShippingCharges('');
@@ -259,6 +270,7 @@ export default function TransfersPage() {
             shipping_charges: parseDecimal(shippingCharges) > 0 ? parseDecimal(shippingCharges) : undefined,
             carrier: carrier.trim() || undefined,
             items: validItems,
+            transfer_date: transferDate || undefined,
         }, {
             onSuccess: () => {
                 toast.success('Transfer created');
@@ -365,6 +377,20 @@ export default function TransfersPage() {
                                                 addLabel="Add warehouse"
                                             />
                                         </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Transfer Date</label>
+                                        <Input
+                                            type="date"
+                                            value={transferDate}
+                                            min={TRANSFER_DATE_MIN}
+                                            max={TRANSFER_DATE_MAX}
+                                            onChange={(e) => setTransferDate(e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Defaults to today — back-date if the stock already moved, or set a future date to schedule this transfer ahead.
+                                        </p>
                                     </div>
 
                                     <div className="space-y-2">

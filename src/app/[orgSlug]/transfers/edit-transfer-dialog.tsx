@@ -11,6 +11,7 @@ import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/ba
 import { X } from 'lucide-react';
 import { useTransfer, useUpdateTransfer } from '@/hooks/useTransfers';
 import { TransferItemsEditor, type TransferItemRow } from './transfer-items-editor';
+import { TRANSFER_DATE_MIN, TRANSFER_DATE_MAX } from './transfers-columns';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
@@ -23,6 +24,9 @@ export function EditTransferDialog({ orgSlug, transferId, onClose }: { orgSlug: 
     const [referenceNo, setReferenceNo] = useState('');
     const [carrier, setCarrier] = useState('');
     const [shippingCharges, setShippingCharges] = useState('');
+    // Defaults to the transfer's current effective date (transfer_date override, else the day it
+    // was entered) once loaded — staff may back-date or push it forward, same as at creation.
+    const [transferDate, setTransferDate] = useState('');
     const [hydrated, setHydrated] = useState(false);
 
     // Prefill once the transfer loads — guarded so a background refetch (e.g. from another tab)
@@ -38,6 +42,7 @@ export function EditTransferDialog({ orgSlug, transferId, onClose }: { orgSlug: 
         setReferenceNo(transfer.reference_no ?? '');
         setCarrier(transfer.carrier ?? '');
         setShippingCharges(transfer.shipping_charges ? String(transfer.shipping_charges) : '');
+        setTransferDate((transfer.transfer_date || transfer.created_at).slice(0, 10));
         setHydrated(true);
     }, [transfer, hydrated]);
 
@@ -62,6 +67,7 @@ export function EditTransferDialog({ orgSlug, transferId, onClose }: { orgSlug: 
                 shipping_charges: parseDecimal(shippingCharges) > 0 ? parseDecimal(shippingCharges) : undefined,
                 carrier: carrier.trim() || undefined,
                 items: validItems,
+                transfer_date: transferDate || undefined,
             },
         }, {
             onSuccess: () => {
@@ -106,6 +112,20 @@ export function EditTransferDialog({ orgSlug, transferId, onClose }: { orgSlug: 
                                         <p className="text-muted-foreground text-xs">To Warehouse</p>
                                         <p className="font-medium">{transfer.destination_warehouse?.name || '—'}</p>
                                     </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Transfer Date</label>
+                                    <Input
+                                        type="date"
+                                        value={transferDate}
+                                        min={TRANSFER_DATE_MIN}
+                                        max={TRANSFER_DATE_MAX}
+                                        onChange={(e) => setTransferDate(e.target.value)}
+                                    />
+                                    <p className="text-xs text-muted-foreground">
+                                        Back-date if the stock already moved, or set a future date to schedule this transfer ahead.
+                                    </p>
                                 </div>
 
                                 <div className="space-y-2">
