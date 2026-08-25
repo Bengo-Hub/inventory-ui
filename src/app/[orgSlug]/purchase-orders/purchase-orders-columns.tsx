@@ -48,6 +48,12 @@ export function buildPurchaseOrderColumns(cb: PurchaseOrderColumnCallbacks): Dat
       accessor: (po) => po.supplier_name,
     },
     {
+      key: 'warehouse_name',
+      header: 'Outlet/Warehouse',
+      hideBelow: 'md',
+      accessor: (po) => po.warehouse_name || '—',
+    },
+    {
       key: 'status',
       header: 'Status',
       sortable: true,

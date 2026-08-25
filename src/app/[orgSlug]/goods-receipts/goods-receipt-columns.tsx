@@ -42,6 +42,12 @@ export function buildGoodsReceiptColumns(cb: GoodsReceiptColumnCallbacks): DataT
       cellClassName: 'font-mono text-xs',
     },
     {
+      key: 'warehouse_name',
+      header: 'Outlet/Warehouse',
+      hideBelow: 'md',
+      accessor: (g) => g.warehouse_name || '—',
+    },
+    {
       key: 'status',
       header: 'Status',
       sortable: true,

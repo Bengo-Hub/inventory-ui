@@ -25,6 +25,8 @@ export interface GoodsReceipt {
   purchase_order_id: string;
   supplier_id?: string | null;
   warehouse_id?: string | null;
+  /** Receiving outlet/warehouse's human name — enriched by the API. */
+  warehouse_name?: string;
   status: GRNStatus;
   notes?: string;
   received_date: string;
