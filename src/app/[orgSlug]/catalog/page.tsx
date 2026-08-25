@@ -14,9 +14,12 @@ import type { StockLevel } from '@/lib/api/stock';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useCategories } from '@/hooks/useCategories';
+import { useBrands } from '@/hooks/useBrands';
+import { useItemModels } from '@/components/inventory/ModelCombobox';
 import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
@@ -514,6 +517,10 @@ export default function CatalogPage() {
 
   const [search, setSearch] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  // Brand/Model — GOODS-only master + free-text pairing (see BrandCombobox/ModelCombobox);
+  // clearing the brand also clears model since the model suggestion list is brand-scoped.
+  const [brandId, setBrandId] = useState('');
+  const [modelFilter, setModelFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   // Preselect the outlet's default item use_case (e.g. pharmacy → PHARMACY) so the
   // page opens on its own items. Mixed-use outlets (hospitality) and HQ have no
@@ -558,6 +565,8 @@ export default function CatalogPage() {
   const hardDeleteAdmin = useHardDeleteItemAdmin(orgSlug);
   const bulkStatus = useBulkItemStatus(orgSlug);
   const { data: categories } = useCategories(orgSlug);
+  const { data: brands } = useBrands(orgSlug);
+  const { data: modelSuggestions } = useItemModels(orgSlug, brandId || undefined);
   const [importResult, setImportResult] = useState<BulkImportResult | null>(null);
   const [selectedWarehouseCode, setSelectedWarehouseCode] = useState('');
   const [warehouseCodeTouched, setWarehouseCodeTouched] = useState(false);
@@ -636,6 +645,8 @@ export default function CatalogPage() {
   const { data: itemsPage, isLoading, isError, refetch } = useItems(orgSlug, {
     ...(search ? { search } : {}),
     ...(categoryId ? { category_id: categoryId } : {}),
+    ...(brandId ? { brand_id: brandId } : {}),
+    ...(modelFilter ? { model: modelFilter } : {}),
     ...(typeFilter ? { type: typeFilter } : {}),
     ...(useCaseFilter ? { use_case: useCaseFilter } : {}),
     ...(notForSaleOnly ? { not_for_sale: 'only' as const } : {}),
@@ -1061,7 +1072,7 @@ export default function CatalogPage() {
                 />
               </div>
             </div>
-            {/* Status + Type filter row */}
+            {/* Status + not-for-selling row */}
             <div className="flex flex-wrap items-center gap-3">
               {/* Status tabs */}
               <div className="flex items-center gap-1 rounded-lg border border-border p-0.5 bg-muted/30">
@@ -1090,59 +1101,77 @@ export default function CatalogPage() {
                 />
                 Not for selling
               </label>
-              {/* Type filter — scoped to the item types relevant to this outlet's use_case */}
-              <div className="flex items-center gap-1 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-                {['', ...scope.itemTypes].map((t) => (
-                  <Button
-                    key={t || 'all'}
-                    variant={typeFilter === t ? 'primary' : 'outline'}
-                    size="sm"
-                    className="shrink-0 text-xs"
-                    onClick={() => { setTypeFilter(t); setPage(1); }}
-                  >
-                    {t || 'All Types'}
-                  </Button>
-                ))}
+            </div>
+
+            {/* Filter combobox row — Category/Brand/Model/Type/Use-case all share the
+                shared-ui-lib SearchableCombobox so a growing category or brand master stays
+                a compact, searchable control instead of an unbounded pill/scroll row. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
+              <div className="w-44">
+                <SearchableCombobox
+                  options={(categories ?? []).map((cat) => ({ value: cat.id, label: cat.name }))}
+                  value={categoryId}
+                  onChange={(v) => { setCategoryId(v); setPage(1); }}
+                  placeholder="All Categories"
+                  searchPlaceholder="Search categories…"
+                  emptyText="No matching categories"
+                />
               </div>
+              {/* Brand/Model — GOODS-only master; hidden entirely for tenants with no brand
+                  rows (hospitality/services outlets never populate ItemBrand). */}
+              {(brands ?? []).length > 0 && (
+                <>
+                  <div className="w-44">
+                    <SearchableCombobox
+                      options={(brands ?? []).map((b) => ({ value: b.id, label: b.name, hint: b.code || undefined }))}
+                      value={brandId}
+                      onChange={(v) => { setBrandId(v); setModelFilter(''); setPage(1); }}
+                      placeholder="All Brands"
+                      searchPlaceholder="Search brands…"
+                      emptyText="No matching brands"
+                    />
+                  </div>
+                  <div className="w-44">
+                    <SearchableCombobox
+                      options={(modelSuggestions ?? []).map((m) => ({ value: m, label: m }))}
+                      value={modelFilter}
+                      onChange={(v) => { setModelFilter(v); setPage(1); }}
+                      placeholder="All Models"
+                      searchPlaceholder="Search models…"
+                      emptyText="No matching models"
+                    />
+                  </div>
+                </>
+              )}
+              {/* Type filter — scoped to the item types relevant to this outlet's use_case;
+                  hidden when there's only one (nothing to choose). */}
+              {scope.itemTypes.length > 1 && (
+                <div className="w-40">
+                  <SearchableCombobox
+                    options={scope.itemTypes.map((t) => ({ value: t, label: t }))}
+                    value={typeFilter}
+                    onChange={(v) => { setTypeFilter(v); setPage(1); }}
+                    placeholder="All Types"
+                    searchPlaceholder="Search types…"
+                    emptyText="No matching types"
+                  />
+                </div>
+              )}
               {/* Use-case filter — options scoped to this outlet's use_case. Hidden when the
                   outlet has a single use-case (already preselected, nothing to choose). */}
               {scope.itemUseCases.length > 1 && (
-                <select
-                  value={useCaseFilter}
-                  onChange={(e) => { setUseCaseFilter(e.target.value); setPage(1); }}
-                  className="shrink-0 rounded-lg border border-input bg-transparent px-3 py-1.5 text-xs focus:ring-1 focus:ring-ring focus:outline-none"
-                  title="Filter by use-case"
-                >
-                  <option value="">All Use Cases</option>
-                  {scope.itemUseCases.map((uc) => (
-                    <option key={uc} value={uc}>{ITEM_USE_CASE_LABEL[uc]}</option>
-                  ))}
-                </select>
+                <div className="w-48">
+                  <SearchableCombobox
+                    options={scope.itemUseCases.map((uc) => ({ value: uc, label: ITEM_USE_CASE_LABEL[uc] }))}
+                    value={useCaseFilter}
+                    onChange={(v) => { setUseCaseFilter(v); setPage(1); }}
+                    placeholder="All Use Cases"
+                    searchPlaceholder="Search use cases…"
+                    emptyText="No matching use cases"
+                  />
+                </div>
               )}
-            </div>
-
-            {/* Category filter pills row */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
-              <Filter className="h-4 w-4 text-muted-foreground shrink-0" />
-              <Button
-                variant={categoryId === '' ? 'primary' : 'outline'}
-                size="sm"
-                className="shrink-0"
-                onClick={() => { setCategoryId(''); setPage(1); }}
-              >
-                All
-              </Button>
-              {(categories ?? []).map((cat) => (
-                <Button
-                  key={cat.id}
-                  variant={categoryId === cat.id ? 'primary' : 'outline'}
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => { setCategoryId(cat.id); setPage(1); }}
-                >
-                  {cat.name}
-                </Button>
-              ))}
             </div>
           </CardHeader>
 

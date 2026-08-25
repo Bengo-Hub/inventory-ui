@@ -341,6 +341,10 @@ export interface ListItemsParams {
   limit?: number;
   unit_id?: string;
   category_id?: string;
+  /** ItemBrand master row — pairs with `model` below (Brand/Model filter comboboxes). */
+  brand_id?: string;
+  /** Exact-match free-text Model filter, same value space as ModelCombobox's suggestions. */
+  model?: string;
   use_case?: string;
   /** 'only' = the "Not for selling" filter checkbox; 'exclude' = sales surfaces. */
   not_for_sale?: 'only' | 'exclude';

@@ -19,6 +19,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { apiClient } from '@/lib/api/client';
 import { searchItems, type Item } from '@/lib/api/items';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
@@ -389,26 +390,28 @@ export default function StockTakeDetailPage() {
                                 <Input placeholder="Filter by name, SKU or barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
                             </div>
                             {categoryOptions.length > 0 && (
-                                <select
-                                    value={categoryFilter}
-                                    onChange={(e) => setCategoryFilter(e.target.value)}
-                                    className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                    title="Show only one category — count your section, others count theirs"
-                                >
-                                    <option value="">All categories</option>
-                                    {categoryOptions.map((c) => <option key={c} value={c}>{c}</option>)}
-                                </select>
+                                <div className="w-44" title="Show only one category — count your section, others count theirs">
+                                    <SearchableCombobox
+                                        options={categoryOptions.map((c) => ({ value: c, label: c }))}
+                                        value={categoryFilter}
+                                        onChange={(v) => setCategoryFilter(v)}
+                                        placeholder="All categories"
+                                        searchPlaceholder="Search categories…"
+                                        emptyText="No matching categories"
+                                    />
+                                </div>
                             )}
                             {typeOptions.length > 1 && (
-                                <select
-                                    value={typeFilter}
-                                    onChange={(e) => setTypeFilter(e.target.value)}
-                                    className="h-9 rounded-lg border border-input bg-transparent px-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                                    title="Show only one item type"
-                                >
-                                    <option value="">All types</option>
-                                    {typeOptions.map((t2) => <option key={t2} value={t2}>{t2}</option>)}
-                                </select>
+                                <div className="w-40" title="Show only one item type">
+                                    <SearchableCombobox
+                                        options={typeOptions.map((t2) => ({ value: t2, label: t2 }))}
+                                        value={typeFilter}
+                                        onChange={(v) => setTypeFilter(v)}
+                                        placeholder="All types"
+                                        searchPlaceholder="Search types…"
+                                        emptyText="No matching types"
+                                    />
+                                </div>
                             )}
                             <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
                                 <input type="checkbox" checked={onlyUncounted} onChange={(e) => setOnlyUncounted(e.target.checked)} className="rounded" />

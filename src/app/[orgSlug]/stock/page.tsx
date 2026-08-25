@@ -14,6 +14,7 @@ import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
 import { DataTable, type BulkAction } from '@bengo-hub/shared-ui-lib/data-table';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { buildStockColumns, stockStatus, stockLabel } from './stock-columns';
 import { buildEOLColumns } from './eol-columns';
@@ -642,35 +643,38 @@ export default function StockPage() {
                             />
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            <select
-                                value={statusFilter}
-                                onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                                className="rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                            >
-                                <option value="all">All status</option>
-                                <option value="low">Low stock</option>
-                                <option value="out">Out of stock</option>
-                            </select>
-                            <select
-                                value={categoryId}
-                                onChange={(e) => setCategoryId(e.target.value)}
-                                className="rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                            >
-                                <option value="">All categories</option>
-                                {categories?.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.name}</option>
-                                ))}
-                            </select>
-                            <select
-                                value={typeFilter}
-                                onChange={(e) => setTypeFilter(e.target.value)}
-                                className="rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                            >
-                                <option value="">All types</option>
-                                {STOCKABLE_TYPES.map((t) => (
-                                    <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
-                                ))}
-                            </select>
+                            <div className="w-36">
+                                <SearchableCombobox
+                                    options={[
+                                        { value: 'all', label: 'All status' },
+                                        { value: 'low', label: 'Low stock' },
+                                        { value: 'out', label: 'Out of stock' },
+                                    ]}
+                                    value={statusFilter}
+                                    onChange={(v) => setStatusFilter((v || 'all') as StatusFilter)}
+                                    clearable={false}
+                                />
+                            </div>
+                            <div className="w-44">
+                                <SearchableCombobox
+                                    options={(categories ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                                    value={categoryId}
+                                    onChange={(v) => setCategoryId(v)}
+                                    placeholder="All categories"
+                                    searchPlaceholder="Search categories…"
+                                    emptyText="No matching categories"
+                                />
+                            </div>
+                            <div className="w-40">
+                                <SearchableCombobox
+                                    options={STOCKABLE_TYPES.map((t) => ({ value: t, label: t.charAt(0) + t.slice(1).toLowerCase() }))}
+                                    value={typeFilter}
+                                    onChange={(v) => setTypeFilter(v)}
+                                    placeholder="All types"
+                                    searchPlaceholder="Search types…"
+                                    emptyText="No matching types"
+                                />
+                            </div>
                         </div>
                     </div>
                 </CardHeader>
