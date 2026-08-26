@@ -12,6 +12,7 @@
 // Outlets" view) the full superset is shown.
 
 import { useOutletStore } from '@/store/outlet';
+import { useSubscription } from '@/hooks/use-subscription';
 import type { ItemUseCase } from '@/lib/api/items';
 
 export interface CatalogNomenclature {
@@ -114,11 +115,17 @@ const SCOPES: Record<string, CatalogScope> = {
     showShelfLife: true,
   },
   retail: {
-    itemTypes: ['GOODS', 'EQUIPMENT', 'VOUCHER'],
+    // RECIPE/INGREDIENT + showRecipe cover two paid use cases: selling a stocked item
+    // fractionally at a different price (e.g. a bottle sold whole, but also decanted/refilled
+    // by the ml) and in-house production (e.g. a shop baking its own cupcakes) — both reuse
+    // the existing recipe/BOM engine. Actual access is feature-gated behind the "manufacturing"
+    // subscription feature via gatedCatalogScope() below (Duka Basic tenants stay locked, same
+    // as Production Batches already are) — this raw scope is the fully-entitled shape.
+    itemTypes: ['GOODS', 'EQUIPMENT', 'VOUCHER', 'RECIPE', 'INGREDIENT'],
     itemUseCases: ['RETAIL'],
     defaultItemUseCase: 'RETAIL',
     showHospitality: false,
-    showRecipe: false,
+    showRecipe: true,
     showSerialTracking: true,
     showWeightDimensions: true,
     showBarcodeType: true,
@@ -170,6 +177,21 @@ const SCOPES: Record<string, CatalogScope> = {
 export function catalogScopeFor(useCase?: string | null): CatalogScope {
   if (!useCase) return DEFAULT_SCOPE;
   return SCOPES[useCase] ?? DEFAULT_SCOPE;
+}
+
+// Retail's RECIPE/INGREDIENT item types + recipe UI are a paid `manufacturing` feature
+// (mirrors the existing gate on Production Batches) — every other use_case's recipe access
+// stays exactly as it already was (unconditional, no feature check). Any caller building
+// item-type options or recipe-only affordances for a possibly-retail outlet should go through
+// this instead of raw catalogScopeFor, so the entitlement check lives in one place.
+export function gatedCatalogScope(useCase: string | null | undefined, hasManufacturingFeature: boolean): CatalogScope {
+  const scope = catalogScopeFor(useCase);
+  if (useCase !== 'retail' || hasManufacturingFeature) return scope;
+  return {
+    ...scope,
+    itemTypes: scope.itemTypes.filter((t) => t !== 'RECIPE' && t !== 'INGREDIENT'),
+    showRecipe: false,
+  };
 }
 
 // Outlet use_cases relevant to inventory (those that get a warehouse mirror) — mirrors the
@@ -251,5 +273,6 @@ export function useNomenclature(): CatalogNomenclature {
 
 export function useCatalogScope(): CatalogScope {
   const outlet = useOutletStore((s) => s.outlet);
-  return catalogScopeFor(outlet?.use_case);
+  const { hasFeature } = useSubscription();
+  return gatedCatalogScope(outlet?.use_case, hasFeature('manufacturing'));
 }

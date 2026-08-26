@@ -25,7 +25,8 @@ import { ItemEcommerceFields, ecommerceValuesFromItem, ecommercePayload, type Ec
 import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
-import { catalogScopeFor, nomenclatureFor } from '@/lib/use-case-nomenclature';
+import { gatedCatalogScope, nomenclatureFor } from '@/lib/use-case-nomenclature';
+import { useSubscription } from '@/hooks/use-subscription';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { DECIMAL_STEP, parseDecimal, roundDecimal } from '@/lib/utils';
@@ -128,7 +129,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Selected-outlet use_case drives which item types / use-cases / sections are offered.
   // Event mode (the Events pages) is unrestricted: type is fixed to SERVICE regardless.
   const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
-  const scope = catalogScopeFor(lockToEvent ? null : outletUseCase);
+  const { hasFeature } = useSubscription();
+  const scope = gatedCatalogScope(lockToEvent ? null : outletUseCase, hasFeature('manufacturing'));
   const itemNoun = nomenclatureFor(outletUseCase).item;
   // Type options scoped to the outlet; always keep the item's own type when editing so an
   // out-of-scope legacy item stays editable.
@@ -140,7 +142,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   const [sku, setSku] = useState(item?.sku ?? '');
   const [description, setDescription] = useState(item?.description ?? '');
   const [type, setType] = useState<string>(
-    item?.type ?? (lockToEvent ? 'SERVICE' : (catalogScopeFor(useOutletStore.getState().outlet?.use_case).itemTypes[0] ?? 'GOODS')),
+    item?.type ?? (lockToEvent ? 'SERVICE' : (scope.itemTypes[0] ?? 'GOODS')),
   );
   const [categoryId, setCategoryId] = useState(item?.category_id ?? '');
   const [unitId, setUnitId] = useState(item?.unit_id ?? '');
@@ -239,7 +241,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Hospitality fields (SERVICE items: rooms / facilities / amenities). Default to the
   // outlet's item use_case (e.g. services → SALON_SERVICE) so new entries are scoped.
   const [useCase, setUseCase] = useState<ItemUseCase>(
-    item?.use_case ?? (catalogScopeFor(useOutletStore.getState().outlet?.use_case).defaultItemUseCase ?? 'RETAIL'),
+    item?.use_case ?? (scope.defaultItemUseCase ?? 'RETAIL'),
   );
   const [mealPlan, setMealPlan] = useState<string>(item?.meal_plan ?? '');
   const [occupancyBasis, setOccupancyBasis] = useState<string>(item?.occupancy_basis ?? '');

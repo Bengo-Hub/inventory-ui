@@ -81,7 +81,7 @@ interface NavGroup {
 const USE_CASE_MODULES: Record<string, string[]> = {
   hospitality:   ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'modifiers', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'events', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
   quick_service: ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'stock_take', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
-  retail:        ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'warranties', 'settings'],
+  retail:        ['dashboard', 'catalog', 'categories', 'units', 'recipes', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'warranties', 'production_batches', 'settings'],
   pharmacy:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'suppliers', 'requisitions', 'approvals','assets', 'settings'],
   services:      ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'events', 'assets', 'requisitions', 'approvals','settings'],
   warehouse:     ['dashboard', 'catalog', 'categories', 'units', 'warehouses', 'stock', 'adjustments', 'stock_take', 'transfers', 'lots', 'purchase_orders', 'rfqs','returns', 'contracts', 'production_batches', 'assets', 'requisitions', 'approvals','settings'],
@@ -267,7 +267,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Categories', icon: Tag, href: '/categories', moduleKey: 'categories' },
         { label: 'Units', icon: Ruler, href: '/units', moduleKey: 'units' },
         // Manufacturing outlets get "Bill of Materials" under the Manufacturing group instead.
-        ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes' }]),
+        // Retail's recipe/BOM access is the paid `manufacturing` feature (fractional/refill
+        // pricing + in-house production, e.g. cupcakes) — same gate Production Batches already
+        // uses, applied here via the item-level `feature` override so hospitality/quick_service/
+        // warehouse keep their existing unconditional (no feature check) access untouched.
+        ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes', ...(useCase === 'retail' ? { feature: 'manufacturing' } : {}) }]),
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
         { label: 'Bundles & Packages', icon: PackagePlus, href: '/bundles', moduleKey: 'bundles' },
       ],
