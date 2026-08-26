@@ -82,6 +82,15 @@ export function buildPurchaseOrderColumns(cb: PurchaseOrderColumnCallbacks): Dat
       render: (po) => new Date(po.created_at).toLocaleDateString(),
     },
     {
+      // Who raised this PO — critical for auditing procurement alongside adjustments.
+      key: 'created_by_name',
+      header: 'User',
+      hideBelow: 'lg',
+      accessor: (po) => po.created_by_name || '',
+      cellClassName: 'text-muted-foreground text-xs',
+      render: (po) => po.created_by_name || '—',
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

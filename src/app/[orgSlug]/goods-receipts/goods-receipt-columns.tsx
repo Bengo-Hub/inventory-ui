@@ -64,6 +64,15 @@ export function buildGoodsReceiptColumns(cb: GoodsReceiptColumnCallbacks): DataT
       render: (g) => (g.received_date ? new Date(g.received_date).toLocaleDateString() : '—'),
     },
     {
+      // Who received this stock — critical for auditing purchases alongside adjustments.
+      key: 'received_by_name',
+      header: 'User',
+      hideBelow: 'lg',
+      accessor: (g) => g.received_by_name || '',
+      cellClassName: 'text-muted-foreground text-xs',
+      render: (g) => g.received_by_name || '—',
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',

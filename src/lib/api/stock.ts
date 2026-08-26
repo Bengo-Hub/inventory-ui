@@ -31,6 +31,9 @@ export interface StockAdjustment {
   reason: string;
   reference?: string;
   notes?: string;
+  adjusted_by?: string;
+  /** Resolved display name for adjusted_by — who made this correction. */
+  adjusted_by_name?: string;
   adjusted_at: string;
   created_at: string;
 }
@@ -226,6 +229,14 @@ export const stockApi = {
       `/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(sku)}/stock-history`,
       params as Record<string, string | number | undefined>,
     ),
+
+  // Branded PDF/CSV/XLSX export of the stock-history ledger — same filters as itemHistory(),
+  // streamed from inventory-api's docs report engine (mirrors stockApi.exportDoc).
+  exportItemHistoryDoc: (orgSlug: string, sku: string, params?: StockHistoryParams & { format?: 'pdf' | 'csv' | 'xlsx' }): Promise<Blob> =>
+    apiClient.getBlob(
+      `/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(sku)}/stock-history/document`,
+      params as Record<string, string | number | undefined>,
+    ),
 };
 
 // ── Product stock history ─────────────────────────────────────────────────────
@@ -235,6 +246,8 @@ export interface StockHistoryParams {
   /** RFC3339 or YYYY-MM-DD. */
   date_from?: string;
   date_to?: string;
+  /** Comma-separated movement types (see StockMovementRow['type']). */
+  type?: string;
   page?: number;
   limit?: number;
 }
@@ -258,7 +271,9 @@ export interface StockMovementRow {
   warehouse_id?: string;
   warehouse_name?: string;
   actor_id?: string;
-  /** Supplier name (purchases) or order reference (sales). */
+  /** ActorID resolved to a display name — who performed this movement. */
+  actor_name?: string;
+  /** Customer name (sales/sell returns) or supplier name (purchases/purchase returns). */
   counterparty?: string;
 }
 

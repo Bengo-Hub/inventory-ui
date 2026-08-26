@@ -73,6 +73,16 @@ export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTable
       render: (a) => reasonLabel(a.reason),
     },
     {
+      // Who made this correction — critical for auditing adjustments (damage/shrinkage/
+      // count-correction write-offs affect stock value, so knowing the actor matters).
+      key: 'adjusted_by_name',
+      header: 'User',
+      hideBelow: 'lg',
+      accessor: (a) => a.adjusted_by_name || '',
+      cellClassName: 'text-muted-foreground text-xs',
+      render: (a) => a.adjusted_by_name || '—',
+    },
+    {
       key: 'notes',
       header: 'Details',
       hideBelow: 'lg',

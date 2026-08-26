@@ -30,6 +30,9 @@ export interface GoodsReceipt {
   status: GRNStatus;
   notes?: string;
   received_date: string;
+  received_by?: string;
+  /** Resolved display name for received_by — who received this stock. */
+  received_by_name?: string;
   lines?: GRNLine[];
 }
 

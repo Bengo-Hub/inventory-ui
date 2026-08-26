@@ -25,7 +25,6 @@ import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardEdit, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
-import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { MoveStockDialog, type MoveStockItem } from '@/components/inventory/MoveStockDialog';
 import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { useOutletStore } from '@/store/outlet';
@@ -210,9 +209,9 @@ function ItemLocationsPanel({ locations, isLoading, activeWarehouseId }: { locat
   );
 }
 
-// ItemHistoryPreview — a compact last-5-movements preview of the exact same ledger
-// ProductStockHistoryModal renders in full (same hook, same data), so the drawer shows
-// movement history inline without duplicating the ledger-building logic.
+// ItemHistoryPreview — a compact last-5-movements preview of the exact same ledger the
+// full Stock History page (/stock-history/[sku]) renders (same hook, same data), so the
+// drawer shows movement history inline without duplicating the ledger-building logic.
 function ItemHistoryPreview({ orgSlug, sku, onViewFull }: { orgSlug: string; sku: string; onViewFull: () => void }) {
   const { data, isLoading } = useItemStockHistory(orgSlug, sku, { limit: 5 });
   const rows = data?.data ?? [];
@@ -454,8 +453,8 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
       )}
 
       {/* Movement history — a compact preview of the same per-item ledger (sales, transfers,
-          purchases, adjustments) ProductStockHistoryModal shows in full, reused rather than
-          duplicated; "View full history" opens that exact modal. */}
+          purchases, adjustments) the full Stock History page shows; "View full history"
+          navigates there. */}
       {isStockable && <ItemHistoryPreview orgSlug={orgSlug} sku={item.sku} onViewFull={onViewHistory} />}
 
       {/* Compliance flags + tags. */}
@@ -553,7 +552,7 @@ export default function CatalogPage() {
   const [moveStockItems, setMoveStockItems] = useState<MoveStockItem[] | null>(null);
   const [bulkAdjustItems, setBulkAdjustItems] = useState<BulkAdjustStockItem[] | null>(null);
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
-  const [historySku, setHistorySku] = useState<string | null>(null);
+  const openHistory = (sku: string) => router.push(`/${orgSlug}/stock-history/${encodeURIComponent(sku)}`);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
@@ -843,7 +842,7 @@ export default function CatalogPage() {
           <div className="flex items-center justify-end gap-0.5" onClick={(e) => e.stopPropagation()}>
             <button title="View details" aria-label="View item details" onClick={() => setViewItem(item)}
               className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Eye className="h-4 w-4" /></button>
-            <button title="Product stock history" aria-label="Product stock history" onClick={() => setHistorySku(item.sku)}
+            <button title="Product stock history" aria-label="Product stock history" onClick={() => openHistory(item.sku)}
               className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><History className="h-4 w-4" /></button>
             <button title="Show / print barcode" aria-label="Show item barcode" onClick={() => setBarcodeItem(item)}
               className="p-1.5 rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors"><Barcode className="h-4 w-4" /></button>
@@ -1249,7 +1248,7 @@ export default function CatalogPage() {
           onEdit={() => { setEditItem(viewItem); setViewItem(null); }}
           canEdit={canChange}
           onMoveStock={() => setMoveStockItems([{ itemId: viewItem.id, name: viewItem.name, sku: viewItem.sku }])}
-          onViewHistory={() => setHistorySku(viewItem.sku)}
+          onViewHistory={() => openHistory(viewItem.sku)}
         />
       )}
 
@@ -1327,11 +1326,6 @@ export default function CatalogPage() {
           }}
           onClose={() => setExportOpen(false)}
         />
-      )}
-
-      {/* Product stock history ledger (per-row button) */}
-      {historySku && (
-        <ProductStockHistoryModal orgSlug={orgSlug} sku={historySku} onClose={() => setHistorySku(null)} />
       )}
 
       {/* Bulk action confirmation */}

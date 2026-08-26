@@ -19,9 +19,8 @@ import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/in
 import { buildStockColumns, stockStatus, stockLabel } from './stock-columns';
 import { buildEOLColumns } from './eol-columns';
 import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, Plus, RefreshCw, Search, Split } from 'lucide-react';
-import { ProductStockHistoryModal } from '@/components/inventory/ProductStockHistoryModal';
 import { StockExportDialog } from '@/components/inventory/ExportDialogs';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -456,6 +455,7 @@ function StockDrawer({
 export default function StockPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
+    const router = useRouter();
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [categoryId, setCategoryId] = useState('');
@@ -465,7 +465,7 @@ export default function StockPage() {
     const [selectedItem, setSelectedItem] = useState<StockLevel | null>(null);
     const [drawerAction, setDrawerAction] = useState<'adjust' | 'breakdown' | undefined>(undefined);
     // Centralized per-item stock ledger modal (Go-Digital "Product stock history").
-    const [historySku, setHistorySku] = useState<string | null>(null);
+    const openHistory = (sku: string) => router.push(`/${orgSlug}/stock-history/${encodeURIComponent(sku)}`);
     const [exportOpen, setExportOpen] = useState(false);
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [bulkAdjustItems, setBulkAdjustItems] = useState<BulkAdjustStockItem[] | null>(null);
@@ -550,7 +550,7 @@ export default function StockPage() {
         () => buildStockColumns({
             canAdjust,
             canManageEOL,
-            onHistory: (item) => setHistorySku(item.sku),
+            onHistory: (item) => openHistory(item.sku),
             onAdjust: (item) => openItem(item, 'adjust'),
             onBreakdown: (item) => openItem(item, 'breakdown'),
             onMarkEOL: (item) => setEolConfirm({ sku: item.sku, name: item.item_name, action: 'mark' }),
@@ -775,13 +775,8 @@ export default function StockPage() {
                     onClose={() => { setSelectedItem(null); setDrawerAction(undefined); }}
                     canAdjust={canAdjust}
                     initialAction={drawerAction}
-                    onViewHistory={() => setHistorySku(selectedItem.sku)}
+                    onViewHistory={() => openHistory(selectedItem.sku)}
                 />
-            )}
-
-            {/* Centralized Product stock history ledger (per-row button + drawer link) */}
-            {historySku && (
-                <ProductStockHistoryModal orgSlug={orgSlug} sku={historySku} onClose={() => setHistorySku(null)} />
             )}
 
             {/* Branded PDF/CSV export */}

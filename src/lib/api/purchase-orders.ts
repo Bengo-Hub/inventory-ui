@@ -38,6 +38,9 @@ export interface PurchaseOrder {
   additional_shipping_charges?: number;
   line_items: POLineItem[];
   total_amount: number;
+  created_by?: string;
+  /** Resolved display name for created_by — who raised this purchase order. */
+  created_by_name?: string;
   created_at: string;
   updated_at: string;
 }
