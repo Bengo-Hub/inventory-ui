@@ -8,7 +8,8 @@ import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
 import { useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
-import { ITEM_USE_CASE_LABEL } from '@/lib/use-case-nomenclature';
+import { ITEM_USE_CASE_LABEL, usesFoodCostLanguage } from '@/lib/use-case-nomenclature';
+import { useOutletStore } from '@/store/outlet';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useQuery } from '@tanstack/react-query';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
@@ -49,6 +50,8 @@ export default function ItemDetailPage() {
   const orgSlug = params?.orgSlug as string;
   const id = params?.id as string;
   const [editOpen, setEditOpen] = useState(false);
+  const outletUseCase = useOutletStore((s) => s.outlet?.use_case);
+  const foodCostLanguage = usesFoodCostLanguage(outletUseCase);
 
   const { can } = usePermissions();
   const canEdit = can(P.CATALOG_CHANGE);
@@ -306,7 +309,7 @@ export default function ItemDetailPage() {
                       <Field label="Yield" value={`${recipe.output_qty ?? 1} portion(s)`} />
                       <Field label="Batch Cost" value={KES(recipe.total_cost)} />
                       <Field label="Cost / Portion" value={KES(recipe.cost_per_portion)} />
-                      <Field label="Food Cost" value={recipe.food_cost_pct != null ? `${(recipe.food_cost_pct * 100).toFixed(1)}%` : '—'} />
+                      <Field label={foodCostLanguage ? 'Food Cost' : 'Cost %'} value={recipe.food_cost_pct != null ? `${(recipe.food_cost_pct * 100).toFixed(1)}%` : '—'} />
                     </div>
                     {recipe.ingredients?.length > 0 ? (
                       <div className="divide-y divide-border border-t border-border">

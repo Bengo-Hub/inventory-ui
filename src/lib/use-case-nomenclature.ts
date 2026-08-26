@@ -242,6 +242,17 @@ export interface ReportNomenclature {
   hasRecipes: boolean;
 }
 
+// "Food Cost %" is hospitality/quick_service (menu recipe) language specifically. Now that
+// retail can have recipes too (fractional refills, e.g. a bottle sold whole and by the ml —
+// see gatedCatalogScope above), a retail recipe's cost-vs-price ratio needs generic "Cost %"
+// wording instead; showing "Food Cost 30.0%" on a perfume refill's recipe card reads as a
+// literal mistake, not just an odd label. Manufacturing (BOM) recipes use their own "Material
+// Cost" framing elsewhere and aren't food-cost language either. Reuse this anywhere a recipe/
+// BOM detail view shows the cost_per_portion/selling_price ratio.
+export function usesFoodCostLanguage(useCase?: string | null): boolean {
+  return useCase === 'hospitality' || useCase === 'quick_service';
+}
+
 export function reportNomenclatureFor(useCase?: string | null): ReportNomenclature {
   const scope = catalogScopeFor(useCase);
   if (scope.showRecipe) {
