@@ -36,6 +36,7 @@ const NOMENCLATURE: Record<string, CatalogNomenclature> = {
   pharmacy:      { catalog: 'Drugs', item: 'Drug', itemPlural: 'Drugs' },
   services:      { catalog: 'Services', item: 'Service', itemPlural: 'Services' },
   warehouse:     { catalog: 'Items', item: 'Item', itemPlural: 'Items' },
+  hospital:      { catalog: 'Items', item: 'Item', itemPlural: 'Items' },
 };
 
 export function nomenclatureFor(useCase?: string | null): CatalogNomenclature {
@@ -199,7 +200,7 @@ export function gatedCatalogScope(useCase: string | null | undefined, hasManufac
 // keep non-inventory outlets (logistics, commercial_weighing, axle_load_enforcement) out of
 // the outlet picker. Empty/unknown use_case is treated as applicable (don't hide).
 export const INVENTORY_APPLICABLE_USE_CASES = new Set([
-  'hospitality', 'retail', 'quick_service', 'pharmacy', 'services', 'warehouse', 'manufacturing',
+  'hospitality', 'retail', 'quick_service', 'pharmacy', 'services', 'warehouse', 'manufacturing', 'hospital',
 ]);
 
 export function isInventoryApplicableUseCase(useCase?: string | null): boolean {
