@@ -23,6 +23,7 @@ export interface CreatePurchaseReturnInput {
   purchase_order_id?: string;
   supplier_id?: string;
   reason?: string;
+  date_returned?: string;
   lines: PurchaseReturnLineInput[];
 }
 

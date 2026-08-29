@@ -38,6 +38,7 @@ export default function PurchaseReturnsPage() {
 
     const [supplierId, setSupplierId] = useState('');
     const [reason, setReason] = useState('');
+    const [dateReturned, setDateReturned] = useState(() => new Date().toISOString().slice(0, 10));
     const [lines, setLines] = useState<Line[]>([emptyLine()]);
 
     const { data, isLoading, isError, refetch } = usePurchaseReturns(org, { payment_status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: pageSize });
@@ -102,8 +103,8 @@ export default function PurchaseReturnsPage() {
         e.preventDefault();
         const payloadLines = lines.filter((l) => l.itemId).map((l) => ({ item_id: l.itemId, quantity: parseDecimal(l.quantity, 1), sub_total: parseDecimal(l.subTotal) }));
         if (payloadLines.length === 0) { toast.error('Add at least one item'); return; }
-        create.mutate({ supplier_id: supplierId || undefined, reason: reason.trim() || undefined, lines: payloadLines }, {
-            onSuccess: () => { toast.success('Return created'); setOpen(false); setSupplierId(''); setReason(''); setLines([emptyLine()]); },
+        create.mutate({ supplier_id: supplierId || undefined, reason: reason.trim() || undefined, date_returned: dateReturned || undefined, lines: payloadLines }, {
+            onSuccess: () => { toast.success('Return created'); setOpen(false); setSupplierId(''); setReason(''); setDateReturned(new Date().toISOString().slice(0, 10)); setLines([emptyLine()]); },
             onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create return')),
         });
     }
@@ -173,6 +174,10 @@ export default function PurchaseReturnsPage() {
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Reason</label>
                                         <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Damaged on arrival" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Date Returned</label>
+                                        <Input type="date" value={dateReturned} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setDateReturned(e.target.value)} />
                                     </div>
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
