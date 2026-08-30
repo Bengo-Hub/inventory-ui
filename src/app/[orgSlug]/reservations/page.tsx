@@ -2,28 +2,14 @@
 
 import { Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Button } from '@/components/ui/base';
-import { apiClient } from '@/lib/api/client';
-import { useQuery } from '@tanstack/react-query';
+import { useReservations } from '@/hooks/useReservations';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildReservationColumns, STATUS_LABEL } from './reservation-columns';
 import { Filter, Package, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 
-export interface Reservation {
-    id: string;
-    orderId: string;
-    orderRef?: string;
-    itemId: string;
-    itemSku: string;
-    itemName: string;
-    quantityReserved: number;
-    warehouseName: string;
-    status: 'confirmed' | 'consumed' | 'released';
-    createdAt: string;
-}
-
-const STATUS_FILTERS = ['All', 'confirmed', 'consumed', 'released'];
+const STATUS_FILTERS = ['All', 'pending', 'confirmed', 'consumed', 'released'];
 
 export default function ReservationsPage() {
     const params = useParams();
@@ -33,19 +19,18 @@ export default function ReservationsPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
 
-    const { data: reservations, isLoading, isError, refetch } = useQuery<Reservation[]>({
-        queryKey: ['reservations', orgSlug, search, statusFilter],
-        queryFn: () => {
-            const p: Record<string, string> = {};
-            if (search) p.search = search;
-            if (statusFilter !== 'All') p.status = statusFilter;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/reservations`, p);
-        },
-        placeholderData: [],
+    // Search/status/page all go straight to the backend — GetReservationsByOrder (without an
+    // order_id) now returns a real, paginated tenant-wide list instead of 400ing unconditionally
+    // (MISSING_ORDER_ID), which is why this page could never load anything before.
+    const { data: reservationsPage, isLoading, isError, refetch } = useReservations(orgSlug, {
+        ...(search ? { search } : {}),
+        ...(statusFilter !== 'All' ? { status: statusFilter } : {}),
+        page,
+        limit: pageSize,
     });
 
-    const totalPages = Math.max(1, Math.ceil((reservations?.length ?? 0) / pageSize));
-    const paginatedItems = reservations?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+    const paginatedItems = reservationsPage?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((reservationsPage?.total ?? 0) / pageSize));
 
     useMemo(() => { setPage(1); }, [search, statusFilter, pageSize]);
 
@@ -66,7 +51,7 @@ export default function ReservationsPage() {
                         <div className="relative flex-1">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
-                                placeholder="Search by order ID or item SKU..."
+                                placeholder="Search by order ID..."
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
                                 className="pl-10"
@@ -89,7 +74,7 @@ export default function ReservationsPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">
-                        <DataTable<Reservation>
+                        <DataTable
                             columns={columns}
                             rows={paginatedItems}
                             rowKey={(res) => res.id}
@@ -107,7 +92,7 @@ export default function ReservationsPage() {
                             page={page}
                             totalPages={totalPages}
                             onPageChange={setPage}
-                            total={reservations?.length}
+                            total={reservationsPage?.total}
                             pageSize={pageSize}
                             onPageSizeChange={setPageSize}
                         />
