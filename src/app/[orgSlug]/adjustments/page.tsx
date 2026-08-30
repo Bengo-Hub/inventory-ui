@@ -272,7 +272,7 @@ export default function AdjustmentsPage() {
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
-    const [page] = useState(1);
+    const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(25);
     const [showModal, setShowModal] = useState(false);
     const [prefillSku, setPrefillSku] = useState('');
@@ -294,23 +294,24 @@ export default function AdjustmentsPage() {
     const { canAny } = usePermissions();
     const canAdjust = canAny([P.ADJUSTMENTS_ADD, P.ADJUSTMENTS_MANAGE]);
 
-    const { data: adjustments, isLoading, isError, refetch, isFetching } = useAdjustments(orgSlug, {
+    // Search/date-range/page all go straight to the backend — it now supports a real DB-level
+    // `search` (matches the reference/batch number, or the linked item's/warehouse's name) plus
+    // `page`/`limit` with a true `total` count. Previously this only sent date_from/date_to, so
+    // the backend's own hard-coded 200-row cap silently truncated every load, and the on-screen
+    // "search" box + pager only ever filtered/sliced that already-capped set in memory, making
+    // any adjustment past the 200 most recent permanently unfindable.
+    const { data: adjustmentsPage, isLoading, isError, refetch, isFetching } = useAdjustments(orgSlug, {
+        ...(search ? { search } : {}),
         date_from: range.from || undefined,
         date_to: range.to || undefined,
+        page,
+        limit: pageSize,
     });
 
-    const filtered = useMemo(() => {
-        if (!search) return adjustments;
-        const q = search.toLowerCase();
-        return adjustments?.filter((a) =>
-            (a.item_name ?? '').toLowerCase().includes(q) ||
-            (a.reason ?? '').toLowerCase().includes(q) ||
-            (a.warehouse_name ?? '').toLowerCase().includes(q)
-        );
-    }, [adjustments, search]);
+    const paginated = adjustmentsPage?.data ?? [];
+    const totalPages = Math.max(1, Math.ceil((adjustmentsPage?.total ?? 0) / pageSize));
 
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
-    const paginated = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+    useMemo(() => { setPage(1); }, [search, range, pageSize]);
 
     // Document preview (Print/Export) — streams inventory-api's GET /adjustments/document?
     // reference=… . An adjustment isn't its own document (one audit-trail row per item/warehouse
@@ -397,13 +398,17 @@ export default function AdjustmentsPage() {
                             onRetry={() => refetch()}
                             emptyText="No adjustments recorded yet"
                             storageKey="adjustments-col-prefs"
+                            page={page}
+                            totalPages={totalPages}
+                            onPageChange={setPage}
+                            total={adjustmentsPage?.total}
                             pageSize={pageSize}
                             onPageSizeChange={setPageSize}
                         />
                     </div>
                     {!isLoading && totalPages > 1 && (
                         <div className="px-6 py-3 text-xs text-muted-foreground border-t border-border">
-                            {filtered?.length ?? 0} adjustments
+                            {adjustmentsPage?.total ?? 0} adjustments
                         </div>
                     )}
                 </CardContent>

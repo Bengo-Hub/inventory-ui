@@ -101,10 +101,19 @@ export interface StockExportParams extends StockListParams {
 export interface AdjustmentListParams {
   warehouse_id?: string;
   item_id?: string;
+  /** Matches the adjustment's reference/batch number, or the linked item's/warehouse's name —
+   *  real DB-level filtering (see ListAdjustments), not the client-side substring match this
+   *  used to fall back to. */
+  search?: string;
   date_from?: string;
   date_to?: string;
   page?: number;
   limit?: number;
+}
+
+export interface AdjustmentListResult {
+  data: StockAdjustment[];
+  total: number;
 }
 
 export interface RelocateItemLocationInput {
@@ -177,11 +186,16 @@ export const stockApi = {
   exportDoc: (orgSlug: string, params?: StockExportParams): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/stock/export`, params as Record<string, string | boolean | undefined>),
 
-  listAdjustments: async (orgSlug: string, params?: AdjustmentListParams): Promise<StockAdjustment[]> => {
+  // Real server-side search/pagination — the backend now supports `search` (matches the
+  // reference/batch number or the linked item's/warehouse's name) plus `page`/`limit`, and
+  // returns the true `total`. A caller that omits page/limit gets the backend's own default page
+  // size (previously a hard-coded, un-pageable 200-row cap), NOT the full list — always pass
+  // them for a list meant to page through everything (see adjustments/page.tsx).
+  listAdjustments: async (orgSlug: string, params?: AdjustmentListParams): Promise<AdjustmentListResult> => {
     const res = await apiClient.get<{ data: StockAdjustment[]; total: number } | StockAdjustment[]>(
       `/api/v1/${orgSlug}/inventory/adjustments`, params
     );
-    return Array.isArray(res) ? res : (res as { data: StockAdjustment[] }).data ?? [];
+    return Array.isArray(res) ? { data: res, total: res.length } : { data: res.data ?? [], total: res.total ?? 0 };
   },
 
   createAdjustment: (orgSlug: string, data: CreateAdjustmentInput) =>

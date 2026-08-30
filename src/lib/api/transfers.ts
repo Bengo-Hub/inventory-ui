@@ -94,6 +94,7 @@ export interface UpdateTransferInput {
 
 export interface TransferListParams {
   status?: TransferStatus;
+  search?: string;
   warehouse_id?: string;
   from?: string;
   to?: string;
@@ -101,10 +102,19 @@ export interface TransferListParams {
   limit?: number;
 }
 
+export interface TransferListResult {
+  items: TransferSummary[];
+  total: number;
+}
+
 export const transfersApi = {
-  list: async (orgSlug: string, params?: TransferListParams): Promise<TransferSummary[]> => {
+  // Real server-side search/pagination — the backend fully supports `search` (DB-level, matches
+  // the transfer number) plus `page`/`limit`, and returns the true `total`. A caller that omits
+  // page/limit gets the backend's own default page size, NOT the full list, so always pass them
+  // for a list that's meant to page through everything (see transfers/page.tsx).
+  list: async (orgSlug: string, params?: TransferListParams): Promise<TransferListResult> => {
     const res = await apiClient.get<{ items: TransferSummary[]; total: number }>(`/api/v1/${orgSlug}/inventory/transfers`, params);
-    return res.items ?? [];
+    return { items: res.items ?? [], total: res.total ?? 0 };
   },
 
   get: (orgSlug: string, id: string) =>

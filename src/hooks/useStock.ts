@@ -23,7 +23,7 @@ export function useAdjustments(orgSlug: string, params?: AdjustmentListParams) {
     queryKey: [ADJ_KEY, orgSlug, params],
     queryFn: () => stockApi.listAdjustments(orgSlug, params),
     enabled: !!orgSlug,
-    placeholderData: [],
+    placeholderData: (previous) => previous,
     staleTime: 30_000,
   });
 }

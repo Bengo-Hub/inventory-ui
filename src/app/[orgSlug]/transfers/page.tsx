@@ -196,23 +196,24 @@ export default function TransfersPage() {
         { itemId: '', itemName: '', quantity: '' },
     ]);
 
-    const { data: transfers, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug, {
+    // Search/date-range/page all go straight to the backend — it already supports a real DB-level
+    // `search` (matches transfer_number) plus `page`/`limit` with a true `total` count. Previously
+    // this only sent `from`/`to`, so the backend's own page-size default silently capped every load
+    // at its first page ordered by effective date; the on-screen "search" box and pager then only
+    // ever filtered/sliced that already-truncated set in memory, making any older transfer
+    // permanently unfindable once the tenant had more transfers than that one page could hold.
+    const { data: transfersPage, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug, {
+        ...(search ? { search } : {}),
         from: range.from || undefined,
         to: range.to || undefined,
+        page,
+        limit: pageSize,
     });
     const { data: warehouses } = useWarehouses(orgSlug);
     const createTransfer = useCreateTransfer(orgSlug);
 
-    const filtered = search
-        ? transfers?.filter((t: TransferSummary) =>
-            t.source_warehouse_name.toLowerCase().includes(search.toLowerCase()) ||
-            t.destination_warehouse_name.toLowerCase().includes(search.toLowerCase()) ||
-            t.transfer_number.toLowerCase().includes(search.toLowerCase())
-          )
-        : transfers;
-
-    const totalPages = Math.max(1, Math.ceil((filtered?.length ?? 0) / pageSize));
-    const paginatedItems = filtered?.slice((page - 1) * pageSize, page * pageSize) ?? [];
+    const paginatedItems = transfersPage?.items ?? [];
+    const totalPages = Math.max(1, Math.ceil((transfersPage?.total ?? 0) / pageSize));
 
     useMemo(() => { setPage(1); }, [search, range, pageSize]);
 
@@ -335,7 +336,7 @@ export default function TransfersPage() {
                             page={page}
                             totalPages={totalPages}
                             onPageChange={setPage}
-                            total={filtered?.length}
+                            total={transfersPage?.total}
                             pageSize={pageSize}
                             onPageSizeChange={setPageSize}
                         />

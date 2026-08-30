@@ -83,7 +83,8 @@ function StockDrawer({
     // for a single-location mutation; the row's own warehouse is still the default below).
     const { options: warehouseOptions } = useActiveWarehouse(orgSlug);
     const { data: units } = useUnits(orgSlug);
-    const { data: itemAdj } = useAdjustments(orgSlug, { item_id: item.id, limit: 5 });
+    const { data: itemAdjPage } = useAdjustments(orgSlug, { item_id: item.id, limit: 5 });
+    const itemAdj = itemAdjPage?.data;
     const createAdj = useCreateAdjustment(orgSlug);
     const createBreakdown = useCreateBreakdown(orgSlug);
 
