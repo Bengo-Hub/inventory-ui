@@ -57,6 +57,19 @@ export const ADMIN_ROLE_ALIASES = new Set([
 const SSO_BASE_URL = process.env.NEXT_PUBLIC_SSO_URL || 'https://sso.codevertexafrica.com';
 const SSO_CLIENT_ID = process.env.NEXT_PUBLIC_SSO_CLIENT_ID || 'inventory-ui';
 
+// fetchProfile (below) gates the app's full-screen "Initializing session..." blocker (see
+// providers/auth-provider.tsx) — unlike apiClient calls, which carry a 15s axios timeout, a
+// bare fetch() here has no timeout at all, so a flaky/dead network left a user stuck on that
+// blocker indefinitely (reported as the app "loading for 30 minutes"). Same 15s ceiling as
+// apiClient, enforced via AbortController since fetch() has no built-in timeout option.
+const AUTH_FETCH_TIMEOUT_MS = 15000;
+
+function fetchWithTimeout(input: string, init: RequestInit = {}, timeoutMs = AUTH_FETCH_TIMEOUT_MS): Promise<Response> {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
+}
+
 export interface AuthorizeParams {
     codeChallenge: string;
     state: string;
@@ -114,7 +127,7 @@ export async function exchangeCodeForTokens(params: TokenExchangeParams) {
         code_verifier: params.codeVerifier,
     });
 
-    const response = await fetch(`${SSO_BASE_URL}/api/v1/token`, {
+    const response = await fetchWithTimeout(`${SSO_BASE_URL}/api/v1/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: body.toString(),
@@ -133,7 +146,7 @@ export async function refreshTokens(refreshToken: string): Promise<{
     refresh_token?: string;
     expires_in?: number;
 }> {
-    const response = await fetch(`${SSO_BASE_URL}/api/v1/auth/refresh`, {
+    const response = await fetchWithTimeout(`${SSO_BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken, client_id: SSO_CLIENT_ID }),
@@ -162,7 +175,7 @@ export async function fetchProfile(accessToken?: string): Promise<{
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${SSO_BASE_URL}/api/v1/auth/me`, { headers });
+    const res = await fetchWithTimeout(`${SSO_BASE_URL}/api/v1/auth/me`, { headers });
     if (!res.ok) {
         const err: any = new Error(res.status === 401 ? 'Unauthorized' : 'SSO /me failed');
         err.response = { status: res.status };

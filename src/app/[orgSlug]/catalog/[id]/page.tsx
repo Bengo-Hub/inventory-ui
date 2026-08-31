@@ -277,12 +277,20 @@ export default function ItemDetailPage() {
               <CardContent>
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <p className="text-2xl font-black text-foreground tabular-nums">{item.on_hand ?? '—'}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">On hand</p>
+                    <p className="text-2xl font-black text-foreground tabular-nums">
+                      {item.on_hand ?? '—'}{item.unit_abbreviation ? <span className="text-sm font-medium text-muted-foreground ml-1">{item.unit_abbreviation}</span> : null}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      On hand{item.on_hand_content_qty != null && item.unit_content_uom ? ` (≈${item.on_hand_content_qty} ${item.unit_content_uom})` : ''}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-2xl font-black text-foreground tabular-nums">{item.available ?? '—'}</p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">Available</p>
+                    <p className="text-2xl font-black text-foreground tabular-nums">
+                      {item.available ?? '—'}{item.unit_abbreviation ? <span className="text-sm font-medium text-muted-foreground ml-1">{item.unit_abbreviation}</span> : null}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      Available{item.available_content_qty != null && item.unit_content_uom ? ` (≈${item.available_content_qty} ${item.unit_content_uom})` : ''}
+                    </p>
                   </div>
                   <div>
                     <p className="text-2xl font-black text-foreground tabular-nums">{item.reorder_level ?? '—'}</p>

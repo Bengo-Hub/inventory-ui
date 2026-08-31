@@ -94,6 +94,14 @@ export interface Item {
   // Current stock levels (sum across all warehouses, from ListItems).
   available?: number | null;
   on_hand?: number | null;
+  // Display text for unit_id (e.g. "btl"/"BOTTLE") — on_hand/available are counted in this
+  // unit, which is NOT necessarily the unit_content_uom below.
+  unit_abbreviation?: string;
+  unit_name?: string;
+  // on_hand/available re-expressed in unit_content_uom (e.g. a 0.86 btl balance with
+  // unit_content_qty=50/uom=ml -> 43 ml) — present only when the item has a content bridge.
+  available_content_qty?: number | null;
+  on_hand_content_qty?: number | null;
   // Event capacity fields — SERVICE type only
   total_capacity?: number | null;
   booked_capacity?: number | null;
