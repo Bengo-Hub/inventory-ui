@@ -10,11 +10,17 @@ import { assetPath } from './lib/paths';
 
 const OUT = (name: string) => assetPath('warehouses-and-stock', name);
 
+async function waitForSettled(page: Page, timeout = 8_000) {
+  await page.locator('.animate-pulse, .animate-spin').first().waitFor({ state: 'hidden', timeout }).catch(() => {});
+  await page.waitForTimeout(500);
+}
+
 test.describe('Docs capture: Warehouses & Stock', () => {
   test('New Warehouse + Locations (retail outlet)', async ({ page }) => {
     await pinLogin(page);
     await selectOutlet(page, DEMO_OUTLETS.retail);
     await goToViaSidebar(page, 'Warehouses');
+    await waitForSettled(page);
 
     const newWarehouseBtn = page.getByRole('button', { name: /new warehouse|add your first warehouse/i }).first();
     await newWarehouseBtn.click();
@@ -22,21 +28,25 @@ test.describe('Docs capture: Warehouses & Stock', () => {
     const codeInput = page.getByPlaceholder('e.g. WH-MAIN');
     const addressInput = page.getByPlaceholder('Street address (optional)');
     await expect(nameInput).toBeVisible();
+    await page.waitForTimeout(400);
 
     await nameInput.fill('Docs Example Warehouse');
     await codeInput.fill('DOCS-WH');
+    await page.waitForTimeout(300);
     await screenshotWithCallouts(page, OUT('01-new-warehouse.png'), [
       { locator: nameInput, number: 1 },
       { locator: codeInput, number: 2 },
       { locator: addressInput, number: 3 },
     ]);
     await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.waitForTimeout(400);
 
     // Open Locations on the first existing warehouse card (no data created).
     const manageLocations = page.getByRole('button', { name: /manage locations/i }).first();
     if (await manageLocations.isVisible().catch(() => false)) {
       await manageLocations.click();
       await expect(page.getByText('Warehouse Locations')).toBeVisible({ timeout: 10_000 });
+      await waitForSettled(page);
       await screenshotWithCallouts(page, OUT('02-locations-tree.png'), []);
 
       const addLocation = page.getByRole('button', { name: /add location|add first location/i }).first();
@@ -46,6 +56,7 @@ test.describe('Docs capture: Warehouses & Stock', () => {
         const zoneCode = page.getByPlaceholder('e.g. ZONE-A');
         await zoneName.fill('Docs Example Zone');
         await zoneCode.fill('DOCS-ZONE');
+        await page.waitForTimeout(300);
         await screenshotWithCallouts(page, OUT('03-add-location.png'), [
           { locator: zoneName, number: 1 },
           { locator: zoneCode, number: 2 },
@@ -60,6 +71,7 @@ test.describe('Docs capture: Warehouses & Stock', () => {
     await selectOutlet(page, DEMO_OUTLETS.retail);
     await goToViaSidebar(page, 'Stock Levels');
     await expect(page).toHaveURL(/\/stock(\/)?($|\?)/, { timeout: 10_000 });
+    await waitForSettled(page);
     await screenshotWithCallouts(page, OUT('04-stock-levels.png'), []);
   });
 
@@ -67,9 +79,11 @@ test.describe('Docs capture: Warehouses & Stock', () => {
     await pinLogin(page);
     await selectOutlet(page, DEMO_OUTLETS.retail);
     await goToViaSidebar(page, 'Adjustments');
+    await waitForSettled(page);
 
     await page.getByRole('button', { name: 'New Adjustment' }).click();
     await expect(page.getByText('New Stock Adjustment')).toBeVisible();
+    await page.waitForTimeout(500);
     const addBtn = page.getByRole('button', { name: 'Add Stock' });
     const removeBtn = page.getByRole('button', { name: 'Remove Stock' });
     await screenshotWithCallouts(page, OUT('05-adjustment-add-remove-toggle.png'), [
@@ -77,17 +91,21 @@ test.describe('Docs capture: Warehouses & Stock', () => {
       { locator: removeBtn, number: 2 },
     ]);
 
+    // "Sugar" doesn't match anything real in this outlet's seeded catalog — search a real seeded
+    // item's name instead ("Hair Accessories Set," confirmed present for Demo City Supermarket).
     const itemSearch = page.getByPlaceholder('Search by name or SKU...');
-    await itemSearch.fill('Sugar');
-    await page.waitForTimeout(600);
-    const firstResult = page.getByRole('option').first().or(page.getByRole('button').filter({ hasText: /sugar/i }).first());
-    if (await firstResult.isVisible({ timeout: 3000 }).catch(() => false)) {
+    await itemSearch.fill('Hair');
+    await page.waitForTimeout(900);
+    const firstResult = page.getByRole('option').first().or(page.getByRole('button').filter({ hasText: /hair/i }).first());
+    if (await firstResult.isVisible({ timeout: 5000 }).catch(() => false)) {
       await firstResult.click();
+      await page.waitForTimeout(400);
     }
     await screenshotWithCallouts(page, OUT('06-adjustment-item-search.png'), [{ locator: itemSearch, number: 1 }]);
 
     const qtyInput = page.getByPlaceholder('0').first();
     await qtyInput.fill('10');
+    await page.waitForTimeout(400);
     await screenshotWithCallouts(page, OUT('07-adjustment-quantity-warehouse.png'), [{ locator: qtyInput, number: 1 }]);
 
     const reasonSelect = page.locator('select').filter({ has: page.locator('option', { hasText: 'Initial Stock Count' }) });

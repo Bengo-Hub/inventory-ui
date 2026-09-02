@@ -180,4 +180,16 @@ export async function goToViaSidebar(page: Page, linkName: string) {
   // the main content area (e.g. "Stock Levels" as both a sidebar item and a dashboard shortcut
   // button) — an unscoped getByRole('link', ...) matches both and throws a strict-mode violation.
   await page.getByRole('navigation').getByRole('link', { name: linkName, exact: true }).click();
+  // Confirmed live, more than once: several docs-capture screenshots turned out to show the
+  // PREVIOUS page (usually the dashboard) instead of the page this call navigated to. Root cause
+  // — a caller's own "did it load" assertion often uses the target's bare display name (e.g.
+  // "Approvals," "Goods Receipts"), which is ALSO the sidebar link's own text, so it's already
+  // "visible" (the link itself, still on screen) the instant this click resolves, before the
+  // route's real content has swapped in. Rather than trust every call site to pick a page-unique
+  // assertion, wait here: give the network a beat to go quiet (catches the new route's own data
+  // fetch) plus a fixed settle buffer, so callers see the real destination by the time this
+  // returns. Short networkidle timeout since some pages poll/hold a live connection and would
+  // never truly go idle.
+  await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => {});
+  await page.waitForTimeout(600);
 }

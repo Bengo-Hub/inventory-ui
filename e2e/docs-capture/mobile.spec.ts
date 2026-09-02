@@ -79,10 +79,12 @@ test.describe('Docs capture: Mobile PWA', () => {
     await page.getByRole('button', { name: 'New Adjustment' }).click();
     await expect(page.getByText('New Stock Adjustment')).toBeVisible();
 
+    // "Sugar" doesn't match anything real in this outlet's seeded catalog — search a real seeded
+    // item's name instead ("Hair Accessories Set," confirmed present for Demo City Supermarket).
     const itemSearch = page.getByPlaceholder('Search by name or SKU...');
-    await itemSearch.fill('Sugar');
-    await page.waitForTimeout(600);
-    const firstResult = page.getByRole('option').first().or(page.getByRole('button').filter({ hasText: /sugar/i }).first());
+    await itemSearch.fill('Hair');
+    await page.waitForTimeout(900);
+    const firstResult = page.getByRole('option').first().or(page.getByRole('button').filter({ hasText: /hair/i }).first());
     if (await firstResult.isVisible({ timeout: 3000 }).catch(() => false)) {
       await firstResult.click();
     }
