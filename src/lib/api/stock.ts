@@ -289,6 +289,12 @@ export interface StockMovementRow {
   actor_name?: string;
   /** Customer name (sales/sell returns) or supplier name (purchases/purchase returns). */
   counterparty?: string;
+  /**
+   * The real ship/receive event timestamp — present only when occurred_at was overridden by a
+   * transfer's backdated/postdated transfer_date. Mirrors transfers-columns.tsx's "entered ..."
+   * note convention; never hides the real audit timestamp, just isn't the primary Date shown.
+   */
+  entered_at?: string;
 }
 
 export interface StockHistorySummary {

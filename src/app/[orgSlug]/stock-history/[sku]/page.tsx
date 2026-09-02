@@ -133,7 +133,16 @@ export default function StockHistoryPage() {
         header: 'Date',
         accessor: (r) => r.occurred_at,
         sortable: true,
-        render: (r) => new Date(r.occurred_at).toLocaleString(),
+        render: (r) => (
+          <div>
+            <div>{new Date(r.occurred_at).toLocaleString()}</div>
+            {r.entered_at && (
+              <div className="text-[10px] text-amber-600" title={`Entered ${new Date(r.entered_at).toLocaleString()}`}>
+                entered {new Date(r.entered_at).toLocaleDateString()}
+              </div>
+            )}
+          </div>
+        ),
       },
       { key: 'reference', header: 'Reference No', accessor: (r) => r.reference, filterable: true },
       {
