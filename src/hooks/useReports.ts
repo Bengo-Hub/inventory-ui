@@ -36,10 +36,10 @@ export function useMenuEngineering(orgSlug: string, params?: MenuEngineeringPara
   });
 }
 
-export function useStockValuation(orgSlug: string) {
+export function useStockValuation(orgSlug: string, warehouseId?: string) {
   return useQuery<StockValuation>({
-    queryKey: [REPORTS_KEY, 'stock-valuation', orgSlug],
-    queryFn: () => reportsApi.stockValuation(orgSlug),
+    queryKey: [REPORTS_KEY, 'stock-valuation', orgSlug, warehouseId ?? 'all'],
+    queryFn: () => reportsApi.stockValuation(orgSlug, warehouseId),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
   });

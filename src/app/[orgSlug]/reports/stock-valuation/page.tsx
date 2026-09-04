@@ -1,17 +1,21 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useStockValuation } from '@/hooks/useReports';
+import { useWarehouses } from '@/hooks/useWarehouses';
 import { reportsApi } from '@/lib/api/reports';
 import type { StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildStockValuationCategoryColumns, buildStockValuationTopItemColumns } from './stock-valuation-columns';
-import { Boxes, DollarSign, ArrowLeft, Layers, Printer, RefreshCw } from 'lucide-react';
+import { Boxes, DollarSign, ArrowLeft, Layers, Printer, RefreshCw, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+
+const ALL_LOCATIONS_ID = '__all__';
 
 function fmt(n: number) {
     return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -19,17 +23,30 @@ function fmt(n: number) {
 
 // StockValuationPage shows total inventory value (on-hand × unit cost), broken down by category
 // and the highest-value items. Read-only admin report.
+//
+// Location-scoped (2026-09-04): used to always blend every warehouse into one tenant-wide
+// number, so a multi-outlet tenant comparing locations always saw the SAME figure regardless of
+// which outlet they cared about — reported live as "everything shows as [the dominant location]
+// instead of its own numbers." Defaults to "All Locations" (the prior behaviour, still useful for
+// an HQ overview) with an explicit picker to drill into exactly one warehouse's own valuation.
 export default function StockValuationPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
-    const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org);
+    const { data: warehouses } = useWarehouses(org);
+    const [warehouseId, setWarehouseId] = useState('');
+    const locationOptions = useMemo(
+        () => [{ id: ALL_LOCATIONS_ID, name: 'All Locations' }, ...(warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))],
+        [warehouses],
+    );
+    const scopedWarehouseId = warehouseId && warehouseId !== ALL_LOCATIONS_ID ? warehouseId : undefined;
+    const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org, scopedWarehouseId);
     const cur = data?.currency ?? 'KES';
 
     // Print / Export — streams the branded PDF from inventory-api into the shared previewer.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
     function printReport() {
         openPreview(
-            () => reportsApi.stockValuationDoc(org, 'pdf'),
+            () => reportsApi.stockValuationDoc(org, 'pdf', scopedWarehouseId),
             { fileName: 'stock-valuation.pdf', title: 'Stock Valuation' },
         );
     }
@@ -51,7 +68,12 @@ export default function StockValuationPage() {
                 </Link>
                 <div className="flex-1">
                     <h1 className="text-2xl font-bold tracking-tight">Stock Valuation</h1>
-                    <p className="text-muted-foreground text-sm">On-hand × unit cost, by category and top items</p>
+                    <p className="text-muted-foreground text-sm">
+                        On-hand × unit cost, by category and top items
+                        {scopedWarehouseId && (
+                            <> &middot; <span className="font-medium text-foreground">{locationOptions.find((o) => o.id === scopedWarehouseId)?.name}</span></>
+                        )}
+                    </p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={printReport}>
@@ -62,6 +84,28 @@ export default function StockValuationPage() {
                     </Button>
                 </div>
             </div>
+
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="w-full sm:w-64">
+                            <CreatableSelect
+                                value={warehouseId || ALL_LOCATIONS_ID}
+                                onChange={(v) => setWarehouseId(v === ALL_LOCATIONS_ID ? '' : v)}
+                                options={locationOptions}
+                                placeholder="All Locations"
+                                required
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground hidden sm:block">
+                            {scopedWarehouseId
+                                ? "Showing this location's own valuation only."
+                                : 'Showing every location blended together — pick one to see its own numbers.'}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {kpis.map((k) => (
