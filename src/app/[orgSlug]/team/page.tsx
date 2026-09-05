@@ -21,8 +21,9 @@ import {
 import { useAuthStore } from '@/store/auth';
 import { usePermissions as useAuthPermissions } from '@/hooks/usePermissions';
 import { userHasPermission } from '@/lib/auth/permissions';
-import { purgeUserAccount, adminResetPassword, adminSendPasswordResetEmail } from '@/lib/auth/admin-actions';
+import { purgeUserAccount } from '@/lib/auth/admin-actions';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { ResetPasswordDialog } from '@/components/team/reset-password-dialog';
 import type { Permission } from '@/lib/api/rbac';
 import type { InventoryUserRow } from '@/lib/api/rbac';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -139,6 +140,7 @@ function AccountsTab({
   const [pinTarget, setPinTarget] = useState<InventoryUserRow | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<InventoryUserRow | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [resetPasswordTarget, setResetPasswordTarget] = useState<InventoryUserRow | null>(null);
 
   async function confirmHardDelete() {
     if (!deleteTarget) return;
@@ -202,6 +204,16 @@ function AccountsTab({
                     </Button>
                   )}
                   {canManage && (
+                    <Button
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      title="Reset password"
+                      onClick={() => setResetPasswordTarget(u)}
+                    >
+                      <Lock className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                  {canManage && (
                     <div className="flex items-center gap-1.5" title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
                       <span className="text-xs text-muted-foreground hidden sm:inline">
                         {u.status === 'active' ? 'Active' : 'Inactive'}
@@ -249,6 +261,12 @@ function AccountsTab({
         confirmLabel={deleting ? 'Deleting…' : 'Delete permanently'}
         onConfirm={confirmHardDelete}
         onCancel={() => !deleting && setDeleteTarget(null)}
+      />
+      <ResetPasswordDialog
+        user={resetPasswordTarget}
+        open={!!resetPasswordTarget}
+        onClose={() => setResetPasswordTarget(null)}
+        accessToken={accessToken}
       />
     </Card>
   );
