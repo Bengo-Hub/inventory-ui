@@ -485,6 +485,33 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   });
   const dupMatches = useDuplicateNameWarning(dupCandidates, name, { excludeId: item?.id });
 
+  // Duplicate-SKU check — unlike the name warning above this is a hard block, not just an
+  // informational banner: (tenant_id, sku) is a real unique DB constraint (see inventory-api's
+  // items.Service.CreateItem / DuplicateSKUError), so submitting a taken SKU always 409s. Found
+  // live on boi-enterprises' Add Product (raw "duplicate key value violates unique constraint
+  // item_tenant_id_sku" reaching the UI) — this catches it before submit instead. Exact lookup
+  // (not the fuzzy name search above) since SKU matching is exact-or-nothing.
+  const [skuCheckValue, setSkuCheckValue] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setSkuCheckValue(sku.trim()), 300);
+    return () => clearTimeout(t);
+  }, [sku]);
+  const { data: skuConflict, isFetching: skuCheckLoading } = useQuery<Item | null>({
+    queryKey: ['item-sku-check', orgSlug, skuCheckValue],
+    queryFn: async () => {
+      try {
+        return await apiClient.get<Item>(`/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(skuCheckValue)}`);
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } })?.response?.status;
+        if (status === 404) return null;
+        throw err;
+      }
+    },
+    enabled: !!orgSlug && skuCheckValue.length > 0,
+    staleTime: 10_000,
+  });
+  const skuTaken = !!skuConflict && skuConflict.id !== item?.id;
+
   // In event mode show only event categories; fall back to all if the tenant has none seeded.
   // Otherwise filter to the selected item type's kind (goods/service) so the dropdown only offers
   // categories that apply to that type — matching treasury-ui. Freeform categories are "both" and
@@ -751,7 +778,18 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">SKU</label>
-                  <Input placeholder="Auto-generated if blank" value={sku} onChange={(e) => setSku(e.target.value)} />
+                  <Input
+                    placeholder="Auto-generated if blank"
+                    value={sku}
+                    onChange={(e) => setSku(e.target.value)}
+                    className={skuTaken ? 'border-red-400 focus-visible:ring-red-400' : undefined}
+                    aria-invalid={skuTaken}
+                  />
+                  {skuTaken && (
+                    <p className="text-xs text-red-600 dark:text-red-400">
+                      SKU already used by &quot;{skuConflict!.name}&quot; — choose a different one.
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -1607,7 +1645,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
               <div className="flex gap-3 pt-2">
                 <Button type="button" variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
-                <Button type="submit" className="flex-1" disabled={isPending || tiersOverCapacity || minMaxInvalid}>
+                <Button type="submit" className="flex-1" disabled={isPending || tiersOverCapacity || minMaxInvalid || skuTaken || skuCheckLoading}>
                   {isPending ? 'Saving...' : item ? 'Update' : 'Create'}
                 </Button>
               </div>
