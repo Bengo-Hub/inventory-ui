@@ -27,6 +27,8 @@ export interface RoleAssignment {
 
 export interface InventoryUserRow {
   id: string;
+  /** Real auth-service account id — needed for account-level admin actions (hard delete, password reset). */
+  auth_service_user_id: string;
   email: string;
   status: string;
   sync_status?: string;

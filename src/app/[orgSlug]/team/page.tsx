@@ -19,7 +19,10 @@ import {
   useUserOutlets,
 } from '@/hooks/useRBAC';
 import { useAuthStore } from '@/store/auth';
+import { usePermissions as useAuthPermissions } from '@/hooks/usePermissions';
 import { userHasPermission } from '@/lib/auth/permissions';
+import { purgeUserAccount, adminResetPassword, adminSendPasswordResetEmail } from '@/lib/auth/admin-actions';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { Permission } from '@/lib/api/rbac';
 import type { InventoryUserRow } from '@/lib/api/rbac';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -32,12 +35,14 @@ import {
   Save,
   Shield,
   Store,
+  Trash2,
   UserCog,
   Users,
   X,
 } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 type Tab = 'accounts' | 'roles' | 'permissions';
@@ -65,9 +70,11 @@ export default function TeamPage() {
   const params = useParams();
   const orgSlug = params?.orgSlug as string;
   const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.session?.accessToken);
   const [tab, setTab] = useState<Tab>('accounts');
 
   const canManage = userHasPermission(user as any, ['inventory.users.manage']);
+  const { isPlatformOwner } = useAuthPermissions();
 
   const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'accounts', label: 'Accounts', icon: Users },
@@ -100,7 +107,9 @@ export default function TeamPage() {
         ))}
       </div>
 
-      {tab === 'accounts' && <AccountsTab orgSlug={orgSlug} canManage={canManage} />}
+      {tab === 'accounts' && (
+        <AccountsTab orgSlug={orgSlug} canManage={canManage} isPlatformOwner={isPlatformOwner} accessToken={accessToken} />
+      )}
       {tab === 'roles' && <RolesTab orgSlug={orgSlug} canManage={canManage} />}
       {tab === 'permissions' && <PermissionsTab orgSlug={orgSlug} />}
     </div>
@@ -109,14 +118,45 @@ export default function TeamPage() {
 
 /* ----------------------------- Accounts tab ----------------------------- */
 
-function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boolean }) {
+function AccountsTab({
+  orgSlug,
+  canManage,
+  isPlatformOwner,
+  accessToken,
+}: {
+  orgSlug: string;
+  canManage: boolean;
+  isPlatformOwner: boolean;
+  accessToken: string | null | undefined;
+}) {
   const { data: users = [], isLoading } = useInventoryUsers(orgSlug);
   const { data: roles = [] } = useRoles(orgSlug);
   const { data: assignments = [] } = useRoleAssignments(orgSlug);
   const updateStatus = useUpdateUserStatus(orgSlug);
+  const queryClient = useQueryClient();
   const [expanded, setExpanded] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [pinTarget, setPinTarget] = useState<InventoryUserRow | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<InventoryUserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  async function confirmHardDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await purgeUserAccount(accessToken, deleteTarget.auth_service_user_id);
+      toast.success('User permanently deleted');
+      setDeleteTarget(null);
+      // The purge cascades back to this service via the auth.user.deleted event; refresh
+      // the list once that's had a moment to land rather than optimistically removing the
+      // row (avoids showing "deleted" if the purge itself actually failed server-side).
+      setTimeout(() => queryClient.invalidateQueries({ queryKey: ['rbac-users', orgSlug] }), 1500);
+    } catch (e) {
+      toast.error(await apiErrorMessage(e, 'Failed to delete user'));
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   const roleName = useMemo(() => {
     const m = new Map(roles.map((r) => [r.id, r.name]));
@@ -162,14 +202,30 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
                     </Button>
                   )}
                   {canManage && (
+                    <div className="flex items-center gap-1.5" title={u.status === 'active' ? 'Deactivate user' : 'Activate user'}>
+                      <span className="text-xs text-muted-foreground hidden sm:inline">
+                        {u.status === 'active' ? 'Active' : 'Inactive'}
+                      </span>
+                      <Toggle
+                        checked={u.status === 'active'}
+                        disabled={updateStatus.isPending}
+                        onChange={(v) =>
+                          updateStatus.mutate({ userId: u.id, status: v ? 'active' : 'inactive' }, {
+                            onSuccess: () => toast.success(v ? 'User activated' : 'User deactivated'),
+                            onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update status')),
+                          })
+                        }
+                      />
+                    </div>
+                  )}
+                  {isPlatformOwner && (
                     <Button
                       variant="outline"
-                      onClick={() => updateStatus.mutate({ userId: u.id, status: u.status === 'active' ? 'inactive' : 'active' }, {
-                        onSuccess: () => toast.success('User status updated'),
-                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to update status')),
-                      })}
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      title="Permanently delete this user (platform admin only)"
+                      onClick={() => setDeleteTarget(u)}
                     >
-                      {u.status === 'active' ? 'Deactivate' : 'Activate'}
+                      <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -185,6 +241,15 @@ function AccountsTab({ orgSlug, canManage }: { orgSlug: string; canManage: boole
         </div>
       </CardContent>
       {pinTarget && <SetPinDialog orgSlug={orgSlug} member={pinTarget} onClose={() => setPinTarget(null)} />}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Permanently delete this user?"
+        description={`This deletes ${deleteTarget?.email ?? 'this user'}'s account everywhere on the platform — every tenant, every service. This cannot be undone. If you only want to remove their access here, use the Active/Inactive toggle instead.`}
+        variant="danger"
+        confirmLabel={deleting ? 'Deleting…' : 'Delete permanently'}
+        onConfirm={confirmHardDelete}
+        onCancel={() => !deleting && setDeleteTarget(null)}
+      />
     </Card>
   );
 }
