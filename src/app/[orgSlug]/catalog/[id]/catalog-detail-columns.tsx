@@ -8,9 +8,15 @@ import { Badge } from '@/components/ui/base';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { ItemPricing } from '@/lib/api/pricing';
 import type { SerialRow } from './page';
+import { Trash2 } from 'lucide-react';
 
-export function buildItemPricingColumns(outletName?: (id: string) => string | undefined): DataTableColumn<ItemPricing>[] {
-  return [
+export function buildItemPricingColumns(
+  outletName?: (id: string) => string | undefined,
+  /** Only outlet-scoped rows get a delete action — the all-outlets default row can't be
+   *  deleted this way (there's nothing to "revert" it to; edit it via the Edit modal instead). */
+  onDelete?: (row: ItemPricing) => void,
+): DataTableColumn<ItemPricing>[] {
+  const columns: DataTableColumn<ItemPricing>[] = [
     {
       key: 'tier',
       header: 'Pricing Tier',
@@ -41,6 +47,29 @@ export function buildItemPricingColumns(outletName?: (id: string) => string | un
       render: (p) => `${p.currency ?? 'KES'} ${p.price.toLocaleString()}`,
     },
   ];
+
+  if (onDelete) {
+    columns.push({
+      key: 'actions',
+      header: '',
+      align: 'right',
+      exportable: false,
+      render: (p) =>
+        p.outlet_id ? (
+          <button
+            type="button"
+            onClick={() => onDelete(p)}
+            className="text-muted-foreground hover:text-destructive transition-colors"
+            title="Delete this outlet's price — reverts to the all-outlets price"
+            aria-label="Delete outlet price"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        ) : null,
+    });
+  }
+
+  return columns;
 }
 
 export function buildSerialColumns(): DataTableColumn<SerialRow>[] {

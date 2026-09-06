@@ -68,6 +68,18 @@ export function useUpsertItemPricing(orgSlug: string) {
   });
 }
 
+export function useDeleteItemPricing(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ itemId, pricingId }: { itemId: string; pricingId: string }) =>
+      pricingApi.deleteItemPricing(orgSlug, itemId, pricingId),
+    onSuccess: (_, { itemId }) => {
+      queryClient.invalidateQueries({ queryKey: [PRICING_KEY, orgSlug, itemId] });
+      queryClient.invalidateQueries({ queryKey: [PRICING_KEY, orgSlug] });
+    },
+  });
+}
+
 export function useGenerateTierPricing(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

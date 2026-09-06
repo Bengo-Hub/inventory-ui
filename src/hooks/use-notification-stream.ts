@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
+import { useAuthStore } from '@/store/auth';
 
 // Stream against the API host (matches REST), not the UI host.
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.codevertexafrica.com';
@@ -27,6 +28,12 @@ export type NotificationStreamMessage =
         created_by?: string;
       };
     }
+  // Pushed by inventory-api's subscription CacheSubscriber the instant a platform admin
+  // grants/revokes a TenantFeatureGrant add-on, or the tenant's subscription plan/status
+  // otherwise changes — see internal/platform/subscriptions/subscriber.go. Payload is a thin
+  // nudge only (the real data still comes from a normal entitlements re-fetch, never trusted
+  // from the push itself).
+  | { type: 'entitlements_changed'; payload: { tenant_id: string } }
   | { type: 'ping' | 'pong'; payload?: { ts: number } };
 
 interface UseNotificationStreamOptions {
@@ -96,6 +103,13 @@ export function useNotificationStream({ tenantID, outletID, onMessage }: UseNoti
 
       if (msg.type === 'stock_changed') {
         qc.invalidateQueries({ queryKey: ['stock'] });
+      }
+
+      if (msg.type === 'entitlements_changed') {
+        // Re-arm useSubscription's fetch effect (it's guarded by "already have a value, skip" —
+        // see hooks/use-subscription.ts — so flipping this back to undefined is what makes it
+        // actually re-fetch) instead of trusting anything from the push payload itself.
+        useAuthStore.getState().setSubscriptionInfo(undefined as any);
       }
 
       onMessage?.(msg);

@@ -22,6 +22,7 @@ export const TIER_BASES: { value: TierBasis; label: string }[] = [
 ];
 
 export interface ItemPricing {
+  id: string;
   item_id: string;
   item_name?: string;
   item_sku?: string;
@@ -70,6 +71,12 @@ export const pricingApi = {
 
   upsertItemPricing: (orgSlug: string, itemId: string, entries: UpsertItemPricingEntry[]) =>
     apiClient.put<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/${itemId}/pricing`, entries),
+
+  // Deletes ONE outlet-scoped price row, reverting that outlet back to the all-outlets price for
+  // its tier. Cascades server-side to clear any stale pos-api/ordering-backend override for the
+  // same (item, outlet) — the all-outlets default row itself can't be deleted this way (422).
+  deleteItemPricing: (orgSlug: string, itemId: string, pricingId: string) =>
+    apiClient.delete<void>(`/api/v1/${orgSlug}/inventory/items/${itemId}/pricing/${pricingId}`),
 
   listAllItemPricing: (orgSlug: string) =>
     apiClient.get<ItemPricing[]>(`/api/v1/${orgSlug}/inventory/items/pricing`),

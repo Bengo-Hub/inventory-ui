@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api/client';
 import { itemsApi, type Item } from '@/lib/api/items';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
-import { useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
+import { useDeleteItemPricing, useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
 import { useInventorySettings } from '@/hooks/useInventorySettings';
 import { useAllOutlets } from '@/hooks/useAllOutlets';
@@ -101,6 +101,7 @@ export default function ItemDetailPage() {
   const { data: itemPricing } = useItemPricing(orgSlug, id);
   const { data: pricingTiers } = usePricingTiers(orgSlug);
   const upsertPricing = useUpsertItemPricing(orgSlug);
+  const deletePricing = useDeleteItemPricing(orgSlug);
   const { data: inventorySettings } = useInventorySettings(orgSlug);
   const perOutletPricingEnabled = inventorySettings?.per_outlet_pricing_enabled ?? false;
   const { data: outlets } = useAllOutlets(perOutletPricingEnabled);
@@ -146,8 +147,23 @@ export default function ItemDetailPage() {
     );
   }
 
+  function handleDeletePricing(p: import('@/lib/api/pricing').ItemPricing) {
+    const outletLabel = (p.outlet_id && outlets?.find((o) => o.id === p.outlet_id)?.name) || 'this outlet';
+    if (!confirm(
+      `Delete this price for ${outletLabel}? It will also clear any POS/online price override ` +
+      `already set for ${outletLabel}, reverting the item to the all-outlets price everywhere.`,
+    )) return;
+    deletePricing.mutate(
+      { itemId: id, pricingId: p.id },
+      {
+        onSuccess: () => toast.success('Outlet price deleted — reverted to the all-outlets price'),
+        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete outlet price')),
+      },
+    );
+  }
+
   const pricingColumns = useMemo(
-    () => buildItemPricingColumns((outletId) => outlets?.find((o) => o.id === outletId)?.name),
+    () => buildItemPricingColumns((outletId) => outlets?.find((o) => o.id === outletId)?.name, handleDeletePricing),
     [outlets],
   );
   const serialColumns = useMemo(() => buildSerialColumns(), []);

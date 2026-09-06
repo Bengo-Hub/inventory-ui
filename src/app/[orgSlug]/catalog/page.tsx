@@ -8,6 +8,8 @@ import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
 import { ProductsExportDialog } from '@/components/inventory/ExportDialogs';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
+import { useAllOutlets } from '@/hooks/useAllOutlets';
+import { useInventorySettings } from '@/hooks/useInventorySettings';
 import { useBulkItemStatus, useCreateItem, useHardDeleteItemAdmin, useItems, useMarkItemEOL, useRestoreItemEOL, useSetItemPrice, useUpdateItem } from '@/hooks/useItems';
 import { useStock, useItemStockHistory } from '@/hooks/useStock';
 import type { StockLevel } from '@/lib/api/stock';
@@ -278,6 +280,13 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
   const { data: pricing = [], isLoading: pricingLoading } = useItemPricing(orgSlug, item.id);
   const { data: tiers = [] } = usePricingTiers(orgSlug);
   const tierMeta = new Map(tiers.map((t) => [t.id, t]));
+  // Resolve each outlet-scoped price row's real outlet name instead of a generic "Outlet"
+  // badge — only fetched when the add-on is actually on, matching the item detail page's
+  // Item Pricing tab (catalog/[id]/page.tsx), which resolves the same way.
+  const { data: inventorySettings } = useInventorySettings(orgSlug);
+  const perOutletPricingEnabled = inventorySettings?.per_outlet_pricing_enabled ?? false;
+  const { data: outlets } = useAllOutlets(perOutletPricingEnabled);
+  const outletName = (outletId: string) => outlets?.find((o) => o.id === outletId)?.name;
   // Default tier first, then alphabetical; all-outlet rows before outlet-specific overrides.
   const profiles = [...pricing].sort((a, b) => {
     const ad = tierMeta.get(a.pricing_tier_id)?.is_default ? 0 : 1;
@@ -385,7 +394,11 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
                     <span className="flex items-center gap-1.5">
                       {p.tier_name ?? meta?.name ?? 'Tier'}
                       {meta?.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
-                      {p.outlet_id && <Badge variant="outline" className="text-[10px]">Outlet</Badge>}
+                      {p.outlet_id && (
+                        <Badge variant="outline" className="text-[10px]">
+                          {outletName(p.outlet_id) ?? 'Outlet'}
+                        </Badge>
+                      )}
                     </span>
                     <span className="font-mono font-semibold">
                       {(p.currency ?? 'KES')} {p.price.toLocaleString(undefined, { maximumFractionDigits: 2 })}
