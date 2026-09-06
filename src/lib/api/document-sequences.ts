@@ -25,6 +25,7 @@ export const DOC_TYPE_LABELS: Record<string, string> = {
   stock_transfer: 'Stock Transfer',
   stock_adjustment: 'Stock Adjustment',
   event_ticket: 'Event Ticket',
+  item_sku: 'Item SKU',
 };
 
 export const DATE_FORMATS: { value: string; label: string }[] = [

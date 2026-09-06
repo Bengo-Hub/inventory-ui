@@ -743,6 +743,10 @@ const SEQ_SUGGESTED_PREFIX: Record<string, string> = {
 function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentSequence }) {
   const update = useUpdateDocumentSequence(orgSlug);
   const suggested = SEQ_SUGGESTED_PREFIX[seq.doc_type] ?? '';
+  // Item SKU is the one doc type where "Prefixed" doesn't inject a literal string into the
+  // value — it switches to the legacy category+type-coded format (e.g. GEN-GDS-001), where the
+  // prefix varies per item. The Prefix field here is just the on/off switch for that.
+  const isItemSku = seq.doc_type === 'item_sku';
   // 'numeric' → pure sequential number (000001); 'prefixed' → prefix/date/separator style.
   const [format, setFormat] = useState<'numeric' | 'prefixed'>(seq.prefix || seq.date_format ? 'prefixed' : 'numeric');
   const [prefix, setPrefix] = useState(seq.prefix);
@@ -753,12 +757,14 @@ function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentS
   const selectNumeric = () => { setFormat('numeric'); setPrefix(''); setDateFormat(''); };
   const selectPrefixed = () => {
     setFormat('prefixed');
-    setPrefix((p) => p || suggested);
-    setDateFormat((d) => d || 'YYMMDD');
+    setPrefix((p) => p || suggested || (isItemSku ? 'ON' : ''));
+    if (!isItemSku) setDateFormat((d) => d || 'YYMMDD');
   };
 
-  // Live local preview mirrors the backend formatter.
+  // Live local preview mirrors the backend formatter — except item_sku's prefixed mode, whose
+  // real output (category+type-coded, per item) can't be previewed from tenant-wide config.
   const preview = (() => {
+    if (isItemSku && format === 'prefixed') return 'varies by category';
     const parts: string[] = [];
     if (format === 'prefixed' && prefix.trim()) parts.push(prefix.trim());
     const now = new Date();
@@ -798,29 +804,40 @@ function DocumentSequenceRow({ orgSlug, seq }: { orgSlug: string; seq: DocumentS
         {toggleBtn('numeric', 'Numeric', selectNumeric)}
         {toggleBtn('prefixed', 'Prefixed', selectPrefixed)}
       </div>
+      {isItemSku && format === 'prefixed' && (
+        <p className="text-xs text-muted-foreground">
+          New SKUs will use the category+type-coded format instead (e.g. <span className="font-mono">GEN-GDS-001</span>) — the prefix below just switches this on, it isn't part of the generated code itself.
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {format === 'prefixed' && (
           <>
             <div>
-              <label className={labelClass}>Prefix</label>
-              <input className={inputClass} value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} placeholder={suggested || 'PO'} />
+              <label className={labelClass}>{isItemSku ? 'Category-coded' : 'Prefix'}</label>
+              <input className={inputClass} value={prefix} onChange={(e) => setPrefix(e.target.value.toUpperCase())} placeholder={suggested || (isItemSku ? 'ON' : 'PO')} />
             </div>
-            <div>
-              <label className={labelClass}>Separator</label>
-              <input className={inputClass} value={separator} maxLength={3} onChange={(e) => setSeparator(e.target.value)} placeholder="-" />
-            </div>
-            <div>
-              <label className={labelClass}>Date format</label>
-              <select className={inputClass} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
-                {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-              </select>
-            </div>
+            {!isItemSku && (
+              <>
+                <div>
+                  <label className={labelClass}>Separator</label>
+                  <input className={inputClass} value={separator} maxLength={3} onChange={(e) => setSeparator(e.target.value)} placeholder="-" />
+                </div>
+                <div>
+                  <label className={labelClass}>Date format</label>
+                  <select className={inputClass} value={dateFormat} onChange={(e) => setDateFormat(e.target.value)}>
+                    {DATE_FORMATS.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </div>
+              </>
+            )}
           </>
         )}
-        <div>
-          <label className={labelClass}>Padding</label>
-          <input className={inputClass} type="number" min={1} max={12} value={padding} onChange={(e) => setPadding(e.target.value)} />
-        </div>
+        {!(isItemSku && format === 'prefixed') && (
+          <div>
+            <label className={labelClass}>Padding</label>
+            <input className={inputClass} type="number" min={1} max={12} value={padding} onChange={(e) => setPadding(e.target.value)} />
+          </div>
+        )}
       </div>
       <div className="flex justify-end">
         <Button size="sm" onClick={save} disabled={update.isPending}>
