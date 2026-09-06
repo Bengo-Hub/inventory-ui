@@ -315,6 +315,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Stock Valuation', icon: BarChart3, href: '/reports/stock-valuation', moduleKey: 'stock' },
         { label: 'Deadstock', icon: Boxes, href: '/reports/deadstock', moduleKey: 'stock' },
+        // Add-on (platform-admin grant required): batch-age-driven clearance pricing, distinct
+        // from Deadstock (sales-velocity based) — this is receiving-batch-age based.
+        { label: 'Aging Stock', icon: Tag, href: '/aging-stock', moduleKey: 'stock', feature: 'batch_period_pricing' },
         // Renamed from "Ingredient Utilization" per the use-case PowerSuite specs (route unchanged).
         { label: 'Stock Reconciliation', icon: Gauge, href: '/reports/ingredient-utilization', moduleKey: 'stock', feature: 'report_stock_reconciliation' },
         { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes', feature: 'report_food_cost_variance' },

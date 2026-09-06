@@ -233,6 +233,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     autoAdjustOnTransfer: true,
     recipeItemsNonDepletingDefault: false,
     recordTheoreticalUsage: true,
+    perOutletPricingEnabled: false,
+    batchPeriodPricingEnabled: false,
+    stockAgingThresholdDays: 90,
   });
   const [unitDefaults, setUnitDefaults] = useState<Record<string, number>>({});
   const [newUnitAbbr, setNewUnitAbbr] = useState('');
@@ -252,6 +255,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         autoAdjustOnTransfer: settings.auto_adjust_on_transfer,
         recipeItemsNonDepletingDefault: settings.recipe_items_non_depleting_default ?? false,
         recordTheoreticalUsage: settings.record_theoretical_usage ?? true,
+        perOutletPricingEnabled: settings.per_outlet_pricing_enabled ?? false,
+        batchPeriodPricingEnabled: settings.batch_period_pricing_enabled ?? false,
+        stockAgingThresholdDays: settings.stock_aging_threshold_days ?? 90,
       });
       setUnitDefaults(settings.unit_reorder_defaults ?? {});
     }
@@ -271,6 +277,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       auto_adjust_on_transfer: form.autoAdjustOnTransfer,
       recipe_items_non_depleting_default: form.recipeItemsNonDepletingDefault,
       record_theoretical_usage: form.recordTheoreticalUsage,
+      per_outlet_pricing_enabled: form.perOutletPricingEnabled,
+      batch_period_pricing_enabled: form.batchPeriodPricingEnabled,
+      stock_aging_threshold_days: form.stockAgingThresholdDays,
     } as Parameters<typeof update.mutate>[0]);
   };
 
@@ -442,6 +451,9 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
             { key: 'autoAdjustOnTransfer' as const, label: 'Auto-Adjust Stock on Transfer', desc: 'Automatically deduct source and credit destination on transfer completion.' },
             { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.' },
             { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).' },
+            // Add-on (platform-admin grant required, see subscriptions-api's TenantFeatureGrant):
+            { key: 'perOutletPricingEnabled' as const, label: 'Per-Branch / Outlet Pricing', desc: 'Set a different base price for the same item at different outlets. Once on, the Item Pricing tab shows an outlet picker.', feature: 'multi_branch_pricing' },
+            { key: 'batchPeriodPricingEnabled' as const, label: 'Stock-Age / Batch Markdown Pricing', desc: 'Mark down old stock by receiving-batch age. Once on, the Aging Stock page and Start Clearance action become available.', feature: 'batch_period_pricing' },
           ].map((item) => (
             <GatedRow key={item.key} feature={'feature' in item ? item.feature : undefined}>
               <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
@@ -457,6 +469,23 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
               </div>
             </GatedRow>
           ))}
+
+          {form.batchPeriodPricingEnabled && (
+            <div className="space-y-2 max-w-xs">
+              <label className={labelClass}>Aging Stock Threshold (days)</label>
+              <input
+                type="number"
+                min={1}
+                value={form.stockAgingThresholdDays}
+                onChange={(e) => setForm((f) => ({ ...f, stockAgingThresholdDays: parseInt(e.target.value, 10) || 90 }))}
+                disabled={!canEdit}
+                className={`${inputClass} font-mono`}
+              />
+              <p className="text-xs text-muted-foreground">
+                An item whose oldest received stock is older than this surfaces on the Aging Stock page as a clearance candidate.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-center justify-end gap-3">
             {!canEdit && (

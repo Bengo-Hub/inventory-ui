@@ -33,6 +33,13 @@ export interface InventorySettings {
   recipes_module_enabled: boolean;
   purchase_orders_enabled: boolean;
   supplier_management_enabled: boolean;
+  // Add-on: requires a platform-admin TenantFeatureGrant ("multi_branch_pricing") before it can
+  // be switched on here. When on, the Item Pricing tab exposes a per-outlet price override.
+  per_outlet_pricing_enabled: boolean;
+  // Add-on: requires a platform-admin TenantFeatureGrant ("batch_period_pricing"). When on, the
+  // Aging Stock page and "Start Clearance" action become available.
+  batch_period_pricing_enabled: boolean;
+  stock_aging_threshold_days: number;
   // Hospitality modules
   enable_room_pricing: boolean;
   enable_facility_booking: boolean;
@@ -66,6 +73,9 @@ export interface UpdateInventorySettingsInput {
   enable_room_pricing?: boolean;
   enable_facility_booking?: boolean;
   enable_conference_packages?: boolean;
+  per_outlet_pricing_enabled?: boolean;
+  batch_period_pricing_enabled?: boolean;
+  stock_aging_threshold_days?: number;
   prices_inclusive_of_tax?: boolean;
   default_tax_code?: string;
   label_print_defaults?: LabelPrintDefaults;

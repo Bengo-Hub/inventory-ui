@@ -9,7 +9,7 @@ import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { ItemPricing } from '@/lib/api/pricing';
 import type { SerialRow } from './page';
 
-export function buildItemPricingColumns(): DataTableColumn<ItemPricing>[] {
+export function buildItemPricingColumns(outletName?: (id: string) => string | undefined): DataTableColumn<ItemPricing>[] {
   return [
     {
       key: 'tier',
@@ -17,7 +17,11 @@ export function buildItemPricingColumns(): DataTableColumn<ItemPricing>[] {
       primary: true,
       accessor: (p) => p.tier_name ?? p.tier_code ?? p.pricing_tier_id,
       cellClassName: 'font-medium',
-      render: (p) => `${p.tier_name ?? p.tier_code ?? p.pricing_tier_id}${p.outlet_id ? ' (outlet)' : ''}`,
+      render: (p) => {
+        const label = p.tier_name ?? p.tier_code ?? p.pricing_tier_id;
+        if (!p.outlet_id) return label;
+        return `${label} (${outletName?.(p.outlet_id) ?? 'outlet'})`;
+      },
     },
     {
       key: 'tier_basis',

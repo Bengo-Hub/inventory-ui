@@ -8,6 +8,8 @@ import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
 import { useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
+import { useInventorySettings } from '@/hooks/useInventorySettings';
+import { useAllOutlets } from '@/hooks/useAllOutlets';
 import { ITEM_USE_CASE_LABEL, usesFoodCostLanguage } from '@/lib/use-case-nomenclature';
 import { useOutletStore } from '@/store/outlet';
 import { usePermissions, P } from '@/hooks/usePermissions';
@@ -99,21 +101,37 @@ export default function ItemDetailPage() {
   const { data: itemPricing } = useItemPricing(orgSlug, id);
   const { data: pricingTiers } = usePricingTiers(orgSlug);
   const upsertPricing = useUpsertItemPricing(orgSlug);
+  const { data: inventorySettings } = useInventorySettings(orgSlug);
+  const perOutletPricingEnabled = inventorySettings?.per_outlet_pricing_enabled ?? false;
+  const { data: outlets } = useAllOutlets(perOutletPricingEnabled);
   const [pricingEditOpen, setPricingEditOpen] = useState(false);
   const [tierPrices, setTierPrices] = useState<Record<string, string>>({});
+  // '' = all outlets (the default, tenant-wide row). Only shown/usable when the tenant has
+  // switched on the multi_branch_pricing add-on in Settings.
+  const [pricingOutletId, setPricingOutletId] = useState('');
 
-  function openPricingEditor() {
+  function seedTierPricesForOutlet(outletId: string) {
     const seed: Record<string, string> = {};
     for (const p of itemPricing ?? []) {
-      if (p.price > 0) seed[p.pricing_tier_id] = String(p.price);
+      if (p.price > 0 && (p.outlet_id ?? '') === outletId) seed[p.pricing_tier_id] = String(p.price);
     }
     setTierPrices(seed);
+  }
+
+  function openPricingEditor() {
+    setPricingOutletId('');
+    seedTierPricesForOutlet('');
     setPricingEditOpen(true);
   }
 
   function savePricing() {
     const entries = Object.entries(tierPrices)
-      .map(([pricing_tier_id, v]) => ({ pricing_tier_id, price: parseDecimal(v), currency: 'KES' }))
+      .map(([pricing_tier_id, v]) => ({
+        pricing_tier_id,
+        price: parseDecimal(v),
+        currency: 'KES',
+        outlet_id: pricingOutletId || null,
+      }))
       .filter((e) => Number.isFinite(e.price) && e.price > 0);
     if (entries.length === 0) {
       toast.error('Enter at least one tier price');
@@ -128,7 +146,10 @@ export default function ItemDetailPage() {
     );
   }
 
-  const pricingColumns = useMemo(() => buildItemPricingColumns(), []);
+  const pricingColumns = useMemo(
+    () => buildItemPricingColumns((outletId) => outlets?.find((o) => o.id === outletId)?.name),
+    [outlets],
+  );
   const serialColumns = useMemo(() => buildSerialColumns(), []);
 
   if (isLoading) {
@@ -483,6 +504,24 @@ export default function ItemDetailPage() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                  {perOutletPricingEnabled && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-muted-foreground">Applies to</label>
+                      <select
+                        value={pricingOutletId}
+                        onChange={(e) => { setPricingOutletId(e.target.value); seedTierPricesForOutlet(e.target.value); }}
+                        className="flex h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm"
+                      >
+                        <option value="">All outlets (default)</option>
+                        {(outlets ?? []).map((o) => (
+                          <option key={o.id} value={o.id}>{o.name}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-muted-foreground">
+                        A price set for one outlet overrides the all-outlets price there only; other outlets keep using the all-outlets price.
+                      </p>
+                    </div>
+                  )}
                   {((pricingTiers ?? []) as PricingTier[]).filter((t) => t.is_active).length === 0 ? (
                     <p className="text-sm text-muted-foreground">No pricing profiles defined yet. Create them under Pricing Profiles first.</p>
                   ) : (
