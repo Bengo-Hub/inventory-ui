@@ -18,6 +18,8 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { isPlatformOwner as checkPlatformOwner, userHasPermission } from '@/lib/auth/permissions';
 import type { UserProfile as AuthUserProfile } from '@/lib/auth/types';
 import { useAuthStore } from '@/store/auth';
+import { useOutletStore } from '@/store/outlet';
+import { hasModule } from '@/lib/use-case-modules';
 import {
   Bell,
   BookOpen,
@@ -47,6 +49,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { parseDecimal } from '@/lib/utils';
 import { FeatureLock } from '@bengo-hub/shared-ui-lib/subscription';
+import { useSubscription } from '@/hooks/use-subscription';
 
 /** Wraps a plan-gated settings toggle row: unlocked plans render children as-is; locked
  *  plans dim the row and clicking opens the shared UpgradeDialog (show-don't-hide). */
@@ -56,6 +59,32 @@ function GatedRow({ feature, children }: { feature?: string; children: React.Rea
     <FeatureLock feature={feature} mode="overlay">
       {children}
     </FeatureLock>
+  );
+}
+
+/** Wraps a platform-admin-grant-only ADD-ON toggle row (multi_branch_pricing,
+ *  batch_period_pricing — see subscriptions-api's TenantFeatureGrant). Deliberately NOT
+ *  GatedRow/FeatureLock: that component's "upgrade to a higher plan" messaging is correct for
+ *  real subscription-tier features, but actively wrong here — these codes are never included in
+ *  ANY plan tier at any price, so a tenant already on the top tier (confirmed live: BOI
+ *  Enterprises, 2026-09-07) sees a nonsensical "upgrade" prompt for something no plan unlocks.
+ *  Shows an honest "Add-on" badge instead; clicking explains the real unlock path. */
+function AddonRow({ feature, children }: { feature: string; children: React.ReactNode }) {
+  const { hasFeature } = useSubscription();
+  if (hasFeature(feature)) return <>{children}</>;
+  return (
+    <div className="relative">
+      <div className="opacity-60 pointer-events-none">{children}</div>
+      <button
+        type="button"
+        onClick={() => toast.info('This is a platform add-on, not part of any subscription plan — ask your account manager to enable it for your account.')}
+        className="absolute inset-0 rounded-xl cursor-pointer"
+        aria-label="Add-on not yet enabled for this account"
+      />
+      <span className="absolute top-3 right-16 flex items-center gap-1 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/30 px-2 py-0.5 text-[10px] font-semibold pointer-events-none">
+        <Lock className="h-2.5 w-2.5" /> Add-on
+      </span>
+    </div>
   );
 }
 
@@ -220,6 +249,10 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
   const update = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
   const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
+  // Same source of truth the sidebar nav uses to gate the "Recipes / BOM" nav item — the
+  // outlet's use_case. Recipe-only toggles below (non-depleting menu items, theoretical usage
+  // for food-cost variance) don't apply to use cases that don't have recipes at all.
+  const useCase = useOutletStore((s) => s.outlet?.use_case);
 
   const [form, setForm] = useState({
     lowStockPct: 20,
@@ -449,13 +482,16 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
             { key: 'enableExpiryTracking' as const, label: 'Expiry Date Tracking', desc: 'Track expiry dates and enforce FEFO (First Expired, First Out).', feature: 'batch_expiry_tracking' },
             { key: 'purchaseOrderApprovalRequired' as const, label: 'Purchase Order Approval Required', desc: 'Require manager approval before a PO can be issued.' },
             { key: 'autoAdjustOnTransfer' as const, label: 'Auto-Adjust Stock on Transfer', desc: 'Automatically deduct source and credit destination on transfer completion.' },
-            { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.' },
-            { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).' },
+            // Recipe-only: hidden for use cases that don't have a recipes/BOM module at all
+            // (pharmacy, services, warehouse, logistics — see USE_CASE_MODULES), matching the
+            // sidebar's own "Recipes / BOM" nav gating.
+            { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.', moduleKey: 'recipes' },
+            { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).', moduleKey: 'recipes' },
             // Add-on (platform-admin grant required, see subscriptions-api's TenantFeatureGrant):
-            { key: 'perOutletPricingEnabled' as const, label: 'Per-Branch / Outlet Pricing', desc: 'Set a different base price for the same item at different outlets. Once on, the Item Pricing tab shows an outlet picker.', feature: 'multi_branch_pricing' },
-            { key: 'batchPeriodPricingEnabled' as const, label: 'Stock-Age / Batch Markdown Pricing', desc: 'Mark down old stock by receiving-batch age. Once on, the Aging Stock page and Start Clearance action become available.', feature: 'batch_period_pricing' },
-          ].map((item) => (
-            <GatedRow key={item.key} feature={'feature' in item ? item.feature : undefined}>
+            { key: 'perOutletPricingEnabled' as const, label: 'Per-Branch / Outlet Pricing', desc: 'Set a different base price for the same item at different outlets. Once on, the Item Pricing tab shows an outlet picker.', feature: 'multi_branch_pricing', isAddon: true },
+            { key: 'batchPeriodPricingEnabled' as const, label: 'Stock-Age / Batch Markdown Pricing', desc: 'Mark down old stock by receiving-batch age. Once on, the Aging Stock page and Start Clearance action become available.', feature: 'batch_period_pricing', isAddon: true },
+          ].filter((item) => !('moduleKey' in item) || hasModule(item.moduleKey, useCase)).map((item) => {
+            const row = (
               <div className="flex items-center justify-between p-4 rounded-xl bg-accent/10 border border-border">
                 <div>
                   <h4 className="text-sm font-bold">{item.label}</h4>
@@ -467,8 +503,16 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
                   disabled={!canEdit}
                 />
               </div>
-            </GatedRow>
-          ))}
+            );
+            if ('isAddon' in item && item.isAddon) {
+              return <AddonRow key={item.key} feature={item.feature}>{row}</AddonRow>;
+            }
+            return (
+              <GatedRow key={item.key} feature={'feature' in item ? item.feature : undefined}>
+                {row}
+              </GatedRow>
+            );
+          })}
 
           {form.batchPeriodPricingEnabled && (
             <div className="space-y-2 max-w-xs">
@@ -539,6 +583,9 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
   const updateSettings = useUpdateInventorySettings(orgSlug);
   const user = useAuthStore((s) => s.user);
   const canEdit = userHasPermission(user as unknown as AuthUserProfile, ['inventory.settings.change', 'inventory.settings.manage']) || checkPlatformOwner(user);
+  // Same outlet-use_case source of truth the sidebar nav uses (useOutletStore), so this tab
+  // hides the same use-case-inapplicable toggles the nav already hides as pages.
+  const useCase = useOutletStore((s) => s.outlet?.use_case);
 
   const [modules, setModules] = useState({
     lots_module_enabled: false,
@@ -615,15 +662,17 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
         disabled={!canEdit}
         saving={saving === 'lots_module_enabled'}
       />
-      <ModuleCard
-        icon={ChefHat}
-        name="Recipes / Bill of Materials"
-        description="Define recipes and BOMs so production/sales automatically consume component stock."
-        checked={modules.recipes_module_enabled}
-        onChange={toggle('recipes_module_enabled')}
-        disabled={!canEdit}
-        saving={saving === 'recipes_module_enabled'}
-      />
+      {hasModule('recipes', useCase) && (
+        <ModuleCard
+          icon={ChefHat}
+          name="Recipes / Bill of Materials"
+          description="Define recipes and BOMs so production/sales automatically consume component stock."
+          checked={modules.recipes_module_enabled}
+          onChange={toggle('recipes_module_enabled')}
+          disabled={!canEdit}
+          saving={saving === 'recipes_module_enabled'}
+        />
+      )}
       <ModuleCard
         icon={Package}
         name="Purchase Orders"
@@ -643,36 +692,44 @@ function ModulesTab({ orgSlug }: { orgSlug: string }) {
         saving={saving === 'supplier_management_enabled'}
       />
 
-      <div className="pt-2 pb-1">
-        <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Hospitality</h3>
-      </div>
-      <ModuleCard
-        icon={Building2}
-        name="Room Pricing"
-        description="Enable hotel room-type SERVICE items with nightly rate plans and occupancy-based pricing."
-        checked={hosp.enable_room_pricing}
-        onChange={hospToggle('enable_room_pricing')}
-        disabled={!canEdit}
-        saving={saving === 'enable_room_pricing'}
-      />
-      <ModuleCard
-        icon={CalendarDays}
-        name="Facility Booking"
-        description="Enable facility/conference-hall SERVICE items with session-based rates."
-        checked={hosp.enable_facility_booking}
-        onChange={hospToggle('enable_facility_booking')}
-        disabled={!canEdit}
-        saving={saving === 'enable_facility_booking'}
-      />
-      <ModuleCard
-        icon={BookOpen}
-        name="Conference Packages"
-        description="Enable conference/event bundle packages (DDR/RDR) with meals included."
-        checked={hosp.enable_conference_packages}
-        onChange={hospToggle('enable_conference_packages')}
-        disabled={!canEdit}
-        saving={saving === 'enable_conference_packages'}
-      />
+      {/* Hospitality-only (hotel rooms / conference halls / DDR-RDR event packages): hidden for
+          every other use_case — pure-retail/pharmacy/etc. tenants never had a use for these, per
+          catalogScopeFor(...).itemUseCases in use-case-nomenclature.ts, where HOSPITALITY_ROOM /
+          HOSPITALITY_FACILITY / CONFERENCE appear only under 'hospitality'. */}
+      {hasModule('hospitality_settings', useCase) && (
+        <>
+          <div className="pt-2 pb-1">
+            <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Hospitality</h3>
+          </div>
+          <ModuleCard
+            icon={Building2}
+            name="Room Pricing"
+            description="Enable hotel room-type SERVICE items with nightly rate plans and occupancy-based pricing."
+            checked={hosp.enable_room_pricing}
+            onChange={hospToggle('enable_room_pricing')}
+            disabled={!canEdit}
+            saving={saving === 'enable_room_pricing'}
+          />
+          <ModuleCard
+            icon={CalendarDays}
+            name="Facility Booking"
+            description="Enable facility/conference-hall SERVICE items with session-based rates."
+            checked={hosp.enable_facility_booking}
+            onChange={hospToggle('enable_facility_booking')}
+            disabled={!canEdit}
+            saving={saving === 'enable_facility_booking'}
+          />
+          <ModuleCard
+            icon={BookOpen}
+            name="Conference Packages"
+            description="Enable conference/event bundle packages (DDR/RDR) with meals included."
+            checked={hosp.enable_conference_packages}
+            onChange={hospToggle('enable_conference_packages')}
+            disabled={!canEdit}
+            saving={saving === 'enable_conference_packages'}
+          />
+        </>
+      )}
     </div>
   );
 }
