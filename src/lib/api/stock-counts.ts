@@ -23,6 +23,14 @@ export interface StockCount {
   approved_by?: string;
   approved_at?: string | null;
   created_at: string;
+  /** Line-status breakdown, computed server-side in one aggregate query (List only — never
+   *  present on Create/Approve/Get responses). Absent (not 0) on a tenant/query where the
+   *  summary couldn't be computed — treat as "unknown", not "no lines". */
+  pending_lines?: number;
+  positive_lines?: number;
+  negative_lines?: number;
+  matched_lines?: number;
+  total_lines?: number;
 }
 
 export interface StockCountLine {

@@ -193,7 +193,10 @@ export default function StockTakeDetailPage() {
 
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(1);
-    const [onlyUncounted, setOnlyUncounted] = useState(false);
+    // Variance status filter — client-requested ("filter above the list for variances: pending,
+    // positive, or negative"). 'pending' replaces the old onlyUncounted boolean outright (same
+    // counted_qty==null check) rather than keeping both as separate controls for one concept.
+    const [varianceFilter, setVarianceFilter] = useState<'all' | 'pending' | 'positive' | 'negative'>('all');
     // Section filters — each team narrows the sheet to the categories/types they own
     // (kitchen → Raw Ingredients, bar → Beers/Spirits), fills their part, and the next
     // team filters to theirs; submit once every section is in.
@@ -212,10 +215,26 @@ export default function StockTakeDetailPage() {
         [lines],
     );
 
+    // Variance status per line — pending (not yet counted), positive (surplus), negative
+    // (shortage). Matched (counted, exact zero variance) has no dedicated filter tab, but still
+    // counts toward "counted" everywhere else on the page.
+    const varianceStatus = (ln: StockCountLine): 'pending' | 'positive' | 'negative' | 'matched' => {
+        if (ln.counted_qty == null) return 'pending';
+        if (ln.variance != null && ln.variance > 0) return 'positive';
+        if (ln.variance != null && ln.variance < 0) return 'negative';
+        return 'matched';
+    };
+    const varianceCounts = useMemo(() => {
+        const c = { pending: 0, positive: 0, negative: 0, matched: 0 };
+        for (const ln of lines) c[varianceStatus(ln)]++;
+        return c;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lines]);
+
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
         return lines.filter((ln) => {
-            if (onlyUncounted && ln.counted_qty != null) return false;
+            if (varianceFilter !== 'all' && varianceStatus(ln) !== varianceFilter) return false;
             if (categoryFilter && (ln.category_name ?? '') !== categoryFilter) return false;
             if (typeFilter && (ln.item_type ?? '') !== typeFilter) return false;
             if (!q) return true;
@@ -225,11 +244,12 @@ export default function StockTakeDetailPage() {
                 (ln.barcode ?? '').toLowerCase().includes(q)
             );
         });
-    }, [lines, search, onlyUncounted, categoryFilter, typeFilter]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lines, search, varianceFilter, categoryFilter, typeFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / LINES_PER_PAGE));
     const pageLines = filtered.slice((page - 1) * LINES_PER_PAGE, page * LINES_PER_PAGE);
-    useEffect(() => { setPage(1); }, [search, onlyUncounted, categoryFilter, typeFilter]);
+    useEffect(() => { setPage(1); }, [search, varianceFilter, categoryFilter, typeFilter]);
 
     const countedCount = lines.filter((ln) => ln.counted_qty != null).length;
 
@@ -382,12 +402,61 @@ export default function StockTakeDetailPage() {
                             />
                         )}
 
+                        {/* Variance alert pills — click to filter, click again to clear. Same
+                            pattern as the Stock list page's low/out-of-stock banners: only shown
+                            when there's something to flag, colored by urgency (shortage first). */}
+                        {(varianceCounts.negative > 0 || varianceCounts.positive > 0 || varianceCounts.pending > 0) && (
+                            <div className="flex flex-wrap items-center gap-2">
+                                {varianceCounts.negative > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setVarianceFilter((p) => (p === 'negative' ? 'all' : 'negative'))}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-500/10 border text-red-600 dark:text-red-400 transition-colors hover:bg-red-500/20 ${varianceFilter === 'negative' ? 'border-red-500 ring-1 ring-red-500/40' : 'border-red-500/20'}`}
+                                    >
+                                        <span className="text-sm font-medium">{varianceCounts.negative} line{varianceCounts.negative > 1 ? 's' : ''} short (negative variance)</span>
+                                    </button>
+                                )}
+                                {varianceCounts.positive > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setVarianceFilter((p) => (p === 'positive' ? 'all' : 'positive'))}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border text-emerald-600 dark:text-emerald-400 transition-colors hover:bg-emerald-500/20 ${varianceFilter === 'positive' ? 'border-emerald-500 ring-1 ring-emerald-500/40' : 'border-emerald-500/20'}`}
+                                    >
+                                        <span className="text-sm font-medium">{varianceCounts.positive} line{varianceCounts.positive > 1 ? 's' : ''} over (positive variance)</span>
+                                    </button>
+                                )}
+                                {varianceCounts.pending > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setVarianceFilter((p) => (p === 'pending' ? 'all' : 'pending'))}
+                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-500/10 border text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 ${varianceFilter === 'pending' ? 'border-amber-500 ring-1 ring-amber-500/40' : 'border-amber-500/20'}`}
+                                    >
+                                        <span className="text-sm font-medium">{varianceCounts.pending} pending (not yet counted)</span>
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {/* Filter row — teams narrow to their section (category/type), count it,
                             then the next team filters to theirs; one submit covers all sections. */}
                         <div className="flex flex-wrap items-center gap-3">
                             <div className="relative flex-1 min-w-52">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input placeholder="Filter by name, SKU or barcode…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
+                            </div>
+                            <div className="w-40" title="Filter lines by variance status">
+                                <SearchableCombobox
+                                    options={[
+                                        { value: 'all', label: 'All variances' },
+                                        { value: 'pending', label: `Pending${varianceCounts.pending ? ` (${varianceCounts.pending})` : ''}` },
+                                        { value: 'positive', label: `Positive${varianceCounts.positive ? ` (${varianceCounts.positive})` : ''}` },
+                                        { value: 'negative', label: `Negative${varianceCounts.negative ? ` (${varianceCounts.negative})` : ''}` },
+                                    ]}
+                                    value={varianceFilter}
+                                    onChange={(v) => setVarianceFilter((v || 'all') as typeof varianceFilter)}
+                                    placeholder="All variances"
+                                    clearable={false}
+                                />
                             </div>
                             {categoryOptions.length > 0 && (
                                 <div className="w-44" title="Show only one category — count your section, others count theirs">
@@ -413,10 +482,6 @@ export default function StockTakeDetailPage() {
                                     />
                                 </div>
                             )}
-                            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-                                <input type="checkbox" checked={onlyUncounted} onChange={(e) => setOnlyUncounted(e.target.checked)} className="rounded" />
-                                Uncounted only
-                            </label>
                         </div>
 
                         {/* Count sheet */}

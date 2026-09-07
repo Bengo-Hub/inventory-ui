@@ -62,6 +62,43 @@ export function buildStockTakeColumns(cb: StockTakeColumnCallbacks): DataTableCo
       render: (c) => new Date(c.created_at).toLocaleDateString(),
     },
     {
+      // Line-status breakdown so a manager can tell which sessions still need attention without
+      // opening each one — pending (not yet counted) needs finishing, positive/negative variances
+      // need review/classification. Hidden entirely when the summary wasn't computed (undefined,
+      // e.g. an older cached response) or every count is zero, rather than showing empty badges.
+      key: 'variance',
+      header: 'Variance',
+      hideBelow: 'md',
+      accessor: (c) => (c.negative_lines ?? 0) + (c.positive_lines ?? 0) + (c.pending_lines ?? 0),
+      render: (c) => {
+        const pending = c.pending_lines ?? 0;
+        const positive = c.positive_lines ?? 0;
+        const negative = c.negative_lines ?? 0;
+        if (pending === 0 && positive === 0 && negative === 0) {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
+        return (
+          <div className="flex flex-wrap items-center gap-1">
+            {negative > 0 && (
+              <span title={`${negative} line(s) short (counted below system quantity)`}>
+                <Badge variant="error" className="text-[10px]">−{negative}</Badge>
+              </span>
+            )}
+            {positive > 0 && (
+              <span title={`${positive} line(s) over (counted above system quantity)`}>
+                <Badge variant="success" className="text-[10px]">+{positive}</Badge>
+              </span>
+            )}
+            {pending > 0 && (
+              <span title={`${pending} line(s) not yet counted`}>
+                <Badge variant="warning" className="text-[10px]">{pending} pending</Badge>
+              </span>
+            )}
+          </div>
+        );
+      },
+    },
+    {
       key: 'actions',
       header: '',
       align: 'right',
