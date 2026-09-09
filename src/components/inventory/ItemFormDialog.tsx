@@ -496,21 +496,31 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     const t = setTimeout(() => setSkuCheckValue(sku.trim()), 300);
     return () => clearTimeout(t);
   }, [sku]);
-  const { data: skuConflict, isFetching: skuCheckLoading } = useQuery<Item | null>({
+  // GET /inventory/items/{sku} is the stock-AVAILABILITY endpoint (see inventory-api's
+  // GetStockAvailability/StockAvailability), not a full item lookup — it responds with
+  // `item_id`, never `id`. This was previously mistyped as `Item` and compared via
+  // `skuConflict.id`, which is always `undefined` — so on every EDIT of an existing item,
+  // `undefined !== item.id` was always true, permanently marking the item's own unchanged
+  // SKU as "taken by someone else" and disabling Save. Only the SKU field itself (which the
+  // user could set to something not-yet-taken) could ever clear it — a real, live-blocking
+  // bug on catalog item editing. Also skip the check entirely when the SKU hasn't actually
+  // changed from the item being edited — nothing to conflict with, and it saves a request on
+  // every dialog open.
+  const { data: skuConflict, isFetching: skuCheckLoading } = useQuery<{ item_id: string; sku: string } | null>({
     queryKey: ['item-sku-check', orgSlug, skuCheckValue],
     queryFn: async () => {
       try {
-        return await apiClient.get<Item>(`/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(skuCheckValue)}`);
+        return await apiClient.get<{ item_id: string; sku: string }>(`/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(skuCheckValue)}`);
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) return null;
         throw err;
       }
     },
-    enabled: !!orgSlug && skuCheckValue.length > 0,
+    enabled: !!orgSlug && skuCheckValue.length > 0 && skuCheckValue !== item?.sku,
     staleTime: 10_000,
   });
-  const skuTaken = !!skuConflict && skuConflict.id !== item?.id;
+  const skuTaken = !!skuConflict && skuConflict.item_id !== item?.id;
 
   // In event mode show only event categories; fall back to all if the tenant has none seeded.
   // Otherwise filter to the selected item type's kind (goods/service) so the dropdown only offers
@@ -787,7 +797,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   />
                   {skuTaken && (
                     <p className="text-xs text-red-600 dark:text-red-400">
-                      SKU already used by &quot;{skuConflict!.name}&quot; — choose a different one.
+                      This SKU is already used by another item — choose a different one.
                     </p>
                   )}
                 </div>
