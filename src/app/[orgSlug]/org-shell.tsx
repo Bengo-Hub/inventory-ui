@@ -14,8 +14,9 @@ import { useParams, usePathname } from 'next/navigation';
 import { Footer } from '@/components/footer';
 import { SubscriptionBanner } from '@/components/subscription/subscription-banner';
 import { VerifyEmailPrompt } from '@/components/auth/VerifyEmailPrompt';
-import { PWAUpdateBanner } from '@/components/pwa-update-banner';
+import { PwaUpdater } from '@bengo-hub/shared-ui-lib/offline';
 import { PWARegistration } from '@/components/pwa-registration';
+import { StaleChunkRecovery } from '@/components/stale-chunk-recovery';
 import { MobileBottomNav } from '@/components/mobile-bottom-nav';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
@@ -141,6 +142,8 @@ export function OrgShell({ children }: { children: ReactNode }) {
             <QueryClientProvider client={queryClient}>
                 <AuthProvider>
                     <BrandingProvider>
+                        <StaleChunkRecovery />
+                        <PwaUpdater />
                         <ManifestInjector />
                         <OutletQuerySync />
                         <div className="min-h-screen bg-background">{children}</div>
@@ -155,13 +158,14 @@ export function OrgShell({ children }: { children: ReactNode }) {
             <AuthProvider>
                 <BrandingProvider>
                     <SubscriptionEntitlementsProvider>
+                    <StaleChunkRecovery />
+                    <PwaUpdater />
                     <ManifestInjector />
                     <OutletQuerySync />
                     <NotificationListener />
                     <PlatformScopeGuard />
                     <OutletGate />
                     <DashboardScreensaver />
-                    <PWAUpdateBanner />
                     <PWARegistration />
                     {/*
                       * Shell is fixed to the viewport so the document never scrolls.
