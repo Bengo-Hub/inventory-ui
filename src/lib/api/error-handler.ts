@@ -39,7 +39,8 @@ export type SubscriptionErrorCode =
   | 'subscription_expired'
   | 'feature_not_available'
   | 'device_limit_reached'
-  | 'plan_upgrade_required';
+  | 'plan_upgrade_required'
+  | 'service_not_subscribed';
 
 const SUBSCRIPTION_CODES = new Set<SubscriptionErrorCode>([
   'subscription_inactive',
@@ -47,6 +48,7 @@ const SUBSCRIPTION_CODES = new Set<SubscriptionErrorCode>([
   'feature_not_available',
   'device_limit_reached',
   'plan_upgrade_required',
+  'service_not_subscribed',
 ]);
 
 /** Mirrors pos-ui's isSubscriptionError — matches the canonical WriteFeatureLocked body (code +
@@ -63,6 +65,7 @@ const SUBSCRIPTION_MESSAGES: Record<SubscriptionErrorCode, string> = {
   feature_not_available: 'This feature is not available on your current plan.',
   device_limit_reached: 'Device limit reached. Upgrade your plan to add more devices.',
   plan_upgrade_required: 'An upgrade is required to access this feature.',
+  service_not_subscribed: 'This service is not included in your current plan.',
 };
 
 export function subscriptionErrorMessage(data: any): string {
