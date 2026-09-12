@@ -2,33 +2,26 @@
 
 import { VerifyEmailBanner, type EmailVerificationState } from '@bengo-hub/shared-ui-lib/auth';
 import { useAuthStore } from '@/store/auth';
+import { apiClient } from '@/lib/api/client';
 
-// auth-api (SSO) hosts the authenticated verify endpoints. The embedded OTP dialog calls
-// them directly with the user's Bearer token — auth-api CORS allows POST + Authorization
-// from these origins — so the user never leaves the app to verify.
-const AUTH_BASE =
-  process.env.NEXT_PUBLIC_SSO_URL ||
-  process.env.NEXT_PUBLIC_AUTH_URL ||
-  'https://sso.codevertexafrica.com';
-
+/**
+ * Routed through inventory-api (which proxies on to auth-api's S2S endpoint — see
+ * inventory-api's AuthHandler.proxyEmailCode) rather than calling auth-api directly with the
+ * user's own session token. Two reasons that matters: apiClient's existing 401-retry-with-
+ * refresh interceptor now covers this call too (an SSO token that expired while this dialog
+ * sat open used to just fail with no recovery — the OTP dialog can force a wait of a minute
+ * or more before it's even usable), and it works for a terminal/PIN session, whose token is
+ * signed with inventory-api's own HMAC secret — auth-api has no key to verify that token and
+ * would reject it outright with "missing or invalid auth" no matter how fresh it was.
+ */
 async function postVerify(path: string, body: unknown): Promise<void> {
-  const token = useAuthStore.getState().session?.accessToken;
-  const res = await fetch(`${AUTH_BASE}${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    let msg = 'Request failed. Please try again.';
-    try {
-      const data = await res.json();
-      msg = data.message || data.error || msg;
-    } catch {
-      /* non-JSON body */
-    }
+  const tenantSlug = useAuthStore.getState().user?.tenant_slug;
+  if (!tenantSlug) throw new Error('No active organisation — please sign in again.');
+  try {
+    await apiClient.post(`/api/v1/${tenantSlug}${path}`, body);
+  } catch (e) {
+    const err = e as { response?: { data?: { message?: string; error?: string } } };
+    const msg = err.response?.data?.message || err.response?.data?.error || 'Request failed. Please try again.';
     throw new Error(msg);
   }
 }
@@ -52,8 +45,8 @@ export function VerifyEmailPrompt() {
   return (
     <VerifyEmailBanner
       state={state}
-      onSendCode={(email) => postVerify('/api/v1/auth/me/email/send-code', { email })}
-      onVerifyCode={(email, code) => postVerify('/api/v1/auth/me/email/verify-code', { email, code })}
+      onSendCode={(email) => postVerify('/auth/verify-email/send-code', { email })}
+      onVerifyCode={(email, code) => postVerify('/auth/verify-email/verify-code', { email, code })}
       onVerified={refetch}
     />
   );
