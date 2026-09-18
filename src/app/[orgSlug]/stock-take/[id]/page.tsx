@@ -188,7 +188,11 @@ export default function StockTakeDetailPage() {
     const canApprove = canAny([P.STOCK_COUNT_APPROVE, P.STOCK_MANAGE]);
 
     const status = count?.status;
-    const editable = !!canChange && status === 'counting';
+    // Editable through review too — not just counting — so a wrong entry can be fixed while the
+    // count sits pending approval, without cancelling and restarting the whole stock take
+    // (client-requested: "editing button before approval"). Blocked once approved (variance is
+    // already posted as real stock adjustments by then) or cancelled.
+    const editable = !!canChange && (status === 'counting' || status === 'review');
     const canClassify = !!canChange && (status === 'counting' || status === 'review');
 
     const [search, setSearch] = useState('');

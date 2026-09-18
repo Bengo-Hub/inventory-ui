@@ -29,6 +29,21 @@ export interface PurchaseOrderColumnCallbacks {
   onPrint: (po: PurchaseOrder) => void;
 }
 
+// effectivePODate returns the calendar day a PO counts toward in reports/lists — the staff-set
+// order_date override (backdated via the New/Amend Purchase Order form) when present, else
+// created_at. Mirrors the backend's handlers.effectivePODate so this list never shows "today"
+// for an order deliberately entered under an earlier date.
+export function effectivePODate(po: { order_date?: string; created_at: string }): string {
+  return po.order_date || po.created_at;
+}
+
+// isOverriddenPODate reports whether a PO's displayed date was backdated away from the day it
+// was actually entered — used to show a small "(entered ...)" note so the real creation
+// timestamp is never fully hidden, just no longer the misleading headline.
+export function isOverriddenPODate(po: { order_date?: string; created_at: string }): boolean {
+  return !!po.order_date && po.order_date.slice(0, 10) !== po.created_at.slice(0, 10);
+}
+
 export function buildPurchaseOrderColumns(cb: PurchaseOrderColumnCallbacks): DataTableColumn<PurchaseOrder>[] {
   return [
     {
@@ -77,9 +92,18 @@ export function buildPurchaseOrderColumns(cb: PurchaseOrderColumnCallbacks): Dat
       header: 'Date',
       sortable: true,
       hideBelow: 'md',
-      accessor: (po) => po.created_at,
+      accessor: (po) => effectivePODate(po),
       cellClassName: 'text-muted-foreground',
-      render: (po) => new Date(po.created_at).toLocaleDateString(),
+      render: (po) => (
+        <div>
+          <div>{new Date(effectivePODate(po)).toLocaleDateString()}</div>
+          {isOverriddenPODate(po) && (
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(po.created_at).toLocaleString()}`}>
+              entered {new Date(po.created_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       // Who raised this PO — critical for auditing procurement alongside adjustments.

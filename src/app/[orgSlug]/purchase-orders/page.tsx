@@ -12,7 +12,7 @@ import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatM
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
-import { buildPurchaseOrderColumns, STATUS_VARIANT, STATUS_LABEL } from './purchase-orders-columns';
+import { buildPurchaseOrderColumns, STATUS_VARIANT, STATUS_LABEL, effectivePODate, isOverriddenPODate } from './purchase-orders-columns';
 import {
     usePurchaseOrders,
     usePurchaseOrder,
@@ -87,6 +87,11 @@ function resolveDefaultUnitPrice(item: ItemResult): string {
     if (item.purchase_price != null) return String(item.purchase_price);
     if (item.cost_price != null) return String(item.cost_price);
     return '';
+}
+
+/** Today's date as "YYYY-MM-DD", for the Order Date input's default/max bound. */
+function todayStr(): string {
+    return new Date().toISOString().slice(0, 10);
 }
 
 /** Look up a unit's abbreviation (falling back to its name) from its id. */
@@ -165,6 +170,9 @@ export default function PurchaseOrdersPage() {
     // than relying on finding supplierId inside the loaded options.
     const [supplierName, setSupplierName] = useState('');
     const [expectedDate, setExpectedDate] = useState('');
+    // Backdate-at-entry: defaults to today (a no-op), lower it to record a PO under the date it
+    // was actually raised with the supplier (phone/in-person) rather than when it's entered here.
+    const [orderDate, setOrderDate] = useState('');
     const [poNotes, setPoNotes] = useState('');
     const [payTermDays, setPayTermDays] = useState('');
     const [additionalShipping, setAdditionalShipping] = useState('');
@@ -268,6 +276,7 @@ export default function PurchaseOrdersPage() {
         setSupplierName('');
         activeWarehouse.reset();
         setExpectedDate('');
+        setOrderDate(todayStr());
         setPoNotes('');
         setPayTermDays('');
         setAdditionalShipping('');
@@ -295,6 +304,7 @@ export default function PurchaseOrdersPage() {
         setSupplierName(po.supplier_name ?? '');
         activeWarehouse.setWarehouseId(po.warehouse_id);
         setExpectedDate(po.expected_date ? po.expected_date.slice(0, 10) : '');
+        setOrderDate(effectivePODate(po).slice(0, 10));
         setPoNotes(po.notes ?? '');
         setPayTermDays(po.pay_term_days != null ? String(po.pay_term_days) : '');
         setAdditionalShipping((po.additional_shipping_charges ?? 0) > 0 ? String(po.additional_shipping_charges) : '');
@@ -336,6 +346,9 @@ export default function PurchaseOrdersPage() {
             supplier_id: supplierId,
             warehouse_id: activeWarehouse.warehouseId,
             expected_date: expectedDate || undefined,
+            // Omit when it's just today (the default) — matches the pre-feature request shape
+            // exactly unless the user actually backdated it.
+            order_date: orderDate && orderDate !== todayStr() ? orderDate : undefined,
             notes: poNotes.trim() || undefined,
             pay_term_days: parseInt(payTermDays) > 0 ? parseInt(payTermDays) : undefined,
             additional_shipping_charges: parseDecimal(additionalShipping) > 0 ? parseDecimal(additionalShipping) : undefined,
@@ -481,7 +494,17 @@ export default function PurchaseOrdersPage() {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Order Date</label>
+                                        <Input
+                                            type="date"
+                                            value={orderDate}
+                                            max={todayStr()}
+                                            onChange={(e) => setOrderDate(e.target.value)}
+                                        />
+                                        <p className="text-xs text-muted-foreground">Defaults to today — back-date if this order was actually placed earlier.</p>
+                                    </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Expected Delivery</label>
                                         <Input
@@ -744,7 +767,12 @@ export default function PurchaseOrdersPage() {
             fields={poDetail ? [
                 { label: 'Supplier', value: poDetail.supplier_name },
                 { label: 'Warehouse', value: poDetail.warehouse_name ?? '—' },
-                { label: 'Date', value: new Date(poDetail.created_at).toLocaleDateString() },
+                {
+                    label: 'Date',
+                    value: isOverriddenPODate(poDetail)
+                        ? `${new Date(effectivePODate(poDetail)).toLocaleDateString()} (entered ${new Date(poDetail.created_at).toLocaleDateString()})`
+                        : new Date(effectivePODate(poDetail)).toLocaleDateString(),
+                },
                 { label: 'Total', value: poDetail.total_amount.toLocaleString() },
                 { label: 'Notes', value: poDetail.notes, full: true, hideIfEmpty: true },
             ] : []}

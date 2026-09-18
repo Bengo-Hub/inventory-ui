@@ -30,7 +30,8 @@ export interface PurchaseOrder {
   warehouse_id: string;
   warehouse_name?: string;
   status: POStatus;
-  order_date: string;
+  /** Business date the order was raised, overriding created_at for display/reporting when set. */
+  order_date?: string;
   expected_date?: string;
   received_date?: string;
   notes?: string;
@@ -49,6 +50,8 @@ export interface CreatePOInput {
   supplier_id: string;
   warehouse_id: string;
   expected_date?: string;
+  /** Backdate the order under a business date other than today — "YYYY-MM-DD". */
+  order_date?: string;
   notes?: string;
   pay_term_days?: number;
   additional_shipping_charges?: number;
