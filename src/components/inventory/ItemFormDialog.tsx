@@ -32,7 +32,7 @@ import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { DECIMAL_STEP, parseDecimal, roundDecimal } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 interface Category {
@@ -275,6 +275,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       queryClient.invalidateQueries({ queryKey: ['recipes', orgSlug] });
       // Refresh the item-detail + BOM views when a recipe is edited from the detail page.
       queryClient.invalidateQueries({ queryKey: ['catalog'] });
+      // This dialog's OWN recipe-hydration query (see `recipeData` below) was never
+      // invalidated on save — reopening Edit on the same recipe within its 5-minute
+      // staleTime served the cached PRE-save ingredients, which looked identical to "my
+      // ingredient edits reverted to the original after saving". Every other consumer of
+      // this recipe (the BOM card, the recipe view page) reads it under the 'catalog'/
+      // 'recipes' prefixes invalidated above; only this dialog's own key needed adding.
+      queryClient.invalidateQueries({ queryKey: ['item-form-recipe', orgSlug] });
       if (data.warnings?.length) {
         toast.warning(data.warnings.join('; '));
       } else {
@@ -418,8 +425,29 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     retry: false,
   });
 
+  // Guards the hydration below to run ONCE per recipe. `units` starts as `placeholderData: []`
+  // until its own fetch lands — a moment (or more, if it's still loading when the user opens the
+  // dialog) after `recipeData` resolves — and was previously a second dependency-array trigger
+  // that re-ran the WHOLE hydration below, unconditionally overwriting `recipeIngredients` from
+  // the ORIGINAL server snapshot. Any qty/unit/etc. edit made in that gap was silently wiped —
+  // live-reported as "editing a recipe ingredient's unit/qty doesn't stick, the original comes
+  // back after saving" (the edit never survived to be submitted in the first place). Once a
+  // recipe has been hydrated, a later `units` resolution only backfills each row's still-missing
+  // `base_unit` (needed for unit-conversion/costing) — it never touches qty/unit/name again.
+  const hydratedRecipeSkuRef = useRef<string | null>(null);
   useEffect(() => {
     if (!recipeData) return;
+    if (hydratedRecipeSkuRef.current === recipeData.sku) {
+      if ((units ?? []).length === 0) return;
+      setRecipeIngredients((prev) => prev.map((row) => {
+        if (row.base_unit || !row.ingredient_sku) return row;
+        const ing = (recipeData.ingredients ?? []).find((i) => i.item_sku === row.ingredient_sku);
+        const baseAbbr = ing?.item_unit_id ? units?.find((u) => u.id === ing.item_unit_id)?.abbreviation : undefined;
+        return baseAbbr ? { ...row, base_unit: baseAbbr, cost_basis_unit: row.cost_basis_unit || baseAbbr } : row;
+      }));
+      return;
+    }
+    hydratedRecipeSkuRef.current = recipeData.sku;
     if (recipeData.selling_price != null) setSellingPrice(String(recipeData.selling_price));
     if (recipeData.output_qty) setServings(String(recipeData.output_qty));
     if (recipeData.target_margin_percent != null && targetMargin === '') {
