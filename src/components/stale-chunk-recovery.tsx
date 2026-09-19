@@ -2,13 +2,25 @@
 
 import { useEffect } from 'react';
 
-const RELOAD_FLAG_KEY = 'cv-stale-chunk-reload-at';
+export const RELOAD_FLAG_KEY = 'cv-stale-chunk-reload-at';
 // Guards against a reload loop if the server itself is actually down/broken — a real deploy
 // gap is a one-time miss, not a repeating condition, so a single reload per short window is
 // enough to self-heal without risking a refresh storm against a genuinely failing backend.
 const RELOAD_COOLDOWN_MS = 30_000;
 
-function isStaleChunkError(reason: unknown): boolean {
+/**
+ * Recognizes a failed-chunk-fetch error both by its RAW shape (thrown directly from the
+ * dynamic `import()`/script load — `ChunkLoadError`, the various browser "failed to fetch
+ * a module" phrasings) and by its DOWNSTREAM shape: with no React error boundary anywhere in
+ * the tree (see error.tsx / global-error.tsx), React 19's own render-retry machinery can
+ * swallow the original ChunkLoadError while repeatedly retrying the Suspense boundary that
+ * keeps re-throwing it, and what actually reaches `window.onerror` a few retries later is
+ * React's own "Maximum update depth exceeded" (minified error #185) — a different error
+ * object with no trace of "chunk" or "import" in its message. Confirmed in prod: this is the
+ * ONLY error this app has ever observed for the stale-bundle-after-a-deploy scenario, so it's
+ * treated as an equally reliable signal, not just the raw fetch failure.
+ */
+export function isStaleChunkError(reason: unknown): boolean {
   if (!reason) return false;
   const name = (reason as { name?: string })?.name ?? '';
   const message = String((reason as { message?: unknown })?.message ?? reason);
@@ -16,11 +28,12 @@ function isStaleChunkError(reason: unknown): boolean {
     name === 'ChunkLoadError' ||
     /Loading chunk [\w.-]+ failed/i.test(message) ||
     /Failed to fetch dynamically imported module/i.test(message) ||
-    /Importing a module script failed/i.test(message)
+    /Importing a module script failed/i.test(message) ||
+    /Minified React error #185/.test(message)
   );
 }
 
-function reloadOnce() {
+export function reloadOnce() {
   try {
     const last = Number(sessionStorage.getItem(RELOAD_FLAG_KEY) || 0);
     if (Date.now() - last < RELOAD_COOLDOWN_MS) return;
@@ -44,6 +57,16 @@ function reloadOnce() {
  * render tree (observed in prod as React error #185, "Maximum update depth exceeded") with no
  * way back short of the user manually reloading. One hard reload re-fetches the current build's
  * HTML + chunk manifest and fully clears the stale module graph.
+ *
+ * Follow-up (audited 2026-09-19, live-reported on the catalog item edit form): this listener
+ * alone was NOT firing on the actual crash — `isStaleChunkError` only matched the raw fetch
+ * failure, but with no error boundary anywhere in the tree the error that actually reached
+ * `window.onerror` was always the downstream #185, never the original ChunkLoadError (see that
+ * function's own comment). Fixed by matching #185 too, and by adding `[orgSlug]/error.tsx` +
+ * `global-error.tsx` as a second line of defense: those catch the render-phase throw directly
+ * (this listener alone cannot — a same-tick synchronous render error doesn't always reach
+ * `window.onerror` before React has already torn down the tree) and call this same
+ * `reloadOnce()` from `componentDidCatch`/render.
  */
 export function StaleChunkRecovery() {
   useEffect(() => {
