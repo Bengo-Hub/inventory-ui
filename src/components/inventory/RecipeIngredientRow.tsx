@@ -38,10 +38,13 @@ export interface IngredientRowValue {
 // Shared desktop grid template for the recipe table (header + rows must match).
 // Both variants are complete literal class strings so Tailwind's static scanner
 // picks them up — never build these with string interpolation.
+// Gated at md: (was lg:) — the dialog that hosts this table (ItemFormDialog) caps out around
+// ~730-740px (max-w-3xl) well before 1024px, so the compact row layout was waiting on a viewport
+// breakpoint the dialog's actual content width had already satisfied since ~800px.
 export const RECIPE_GRID_HEADER =
   'grid-cols-[minmax(0,1fr)_76px_72px_64px_172px_100px_36px]';
 export const RECIPE_GRID_ROW =
-  'lg:grid-cols-[minmax(0,1fr)_76px_72px_64px_172px_100px_36px]';
+  'md:grid-cols-[minmax(0,1fr)_76px_72px_64px_172px_100px_36px]';
 
 /** The unit costing is expressed against: the ingredient's stock unit, or the line unit
  *  for a brand-new (auto-created) ingredient which will be stored in the line unit. */

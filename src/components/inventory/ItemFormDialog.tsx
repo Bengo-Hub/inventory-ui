@@ -1493,7 +1493,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
 
                       {/* Ingredient rows */}
                       <div className="space-y-0">
-                        <div className={`hidden lg:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
+                        <div className={`hidden md:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
                           <span>Ingredient</span><span>Qty</span><span>Unit</span><span>Waste%</span><span>EP Cost</span><span>Line</span><span/>
                         </div>
                         {recipeIngredients.map((row, i) => (

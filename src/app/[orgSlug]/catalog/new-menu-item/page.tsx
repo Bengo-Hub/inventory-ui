@@ -225,7 +225,7 @@ function Step2({ orgSlug, ingredients, setIngredients, sellingPrice, servings }:
       </div>
 
       <div className="space-y-0">
-        <div className={`hidden lg:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
+        <div className={`hidden md:grid ${RECIPE_GRID_HEADER} gap-2 py-1 text-xs font-medium text-muted-foreground border-b border-border`}>
           <span>Ingredient</span>
           <span className="inline-flex items-center gap-1">Qty
             <InfoHint title="Quantity per portion">How much of this ingredient one serving uses, expressed in the Unit beside it. Must be greater than 0.</InfoHint>
