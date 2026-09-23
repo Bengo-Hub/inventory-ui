@@ -53,20 +53,28 @@ export function Header({ onMenuClick }: HeaderProps) {
 
   return (
     <header className="h-20 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between">
-      <div className="flex items-center gap-4 flex-1">
+      <div className="flex items-center gap-4 flex-1 min-w-0 overflow-hidden">
         <button
           type="button"
           onClick={onMenuClick}
-          className="lg:hidden p-2 rounded-xl hover:bg-accent transition-colors"
+          className="lg:hidden p-2 rounded-xl hover:bg-accent transition-colors shrink-0"
           aria-label="Open menu"
         >
           <Menu className="h-5 w-5 text-muted-foreground" />
         </button>
         <div className="flex items-center gap-2 sm:gap-6 min-w-0 flex-1">
-          <h1 className="hidden sm:block text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate sm:max-w-none">
+          {/* truncate needs an actual bound to do anything — `sm:max-w-none` used to remove it
+              outright from 640px up, letting the title contend with the search box (md:+) and the
+              always-visible OutletFilter for the same space on tablet instead of yielding to them.
+              Bounded through the tablet tier; only genuinely unbounded once desktop width (lg+)
+              has room to spare. */}
+          <h1 className="hidden sm:block text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate max-w-28 md:max-w-36 lg:max-w-none">
             {getServiceTitle('Inventory')}
           </h1>
-          <div className="hidden md:flex relative w-80 max-w-full group ml-4">
+          {/* Deferred to lg: (was md:), matching pos-ui's header — at tablet width this fixed
+              320px search box left too little room for the title + the always-visible
+              OutletFilter, so it now waits for genuine desktop width. */}
+          <div className="hidden lg:flex relative w-80 max-w-full group ml-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
             <input
               placeholder="Search items, SKUs..."
