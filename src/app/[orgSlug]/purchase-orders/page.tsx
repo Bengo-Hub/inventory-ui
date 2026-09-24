@@ -41,6 +41,8 @@ import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { supplierOption } from '@/lib/supplier-balance';
+import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
 
 interface POLine {
     itemId: string;
@@ -479,13 +481,14 @@ export default function PurchaseOrdersPage() {
                                             value={supplierId}
                                             valueLabel={supplierName}
                                             onChange={(id) => { setSupplierId(id); setSupplierName(''); }}
-                                            options={(suppliers ?? []).map((s) => ({ id: s.id, name: s.name }))}
+                                            options={(suppliers ?? []).map(supplierOption)}
                                             placeholder="Select supplier..."
                                             required
                                             onAddClick={() => setAddSupplierOpen(true)}
                                             addLabel="Add supplier"
                                             onRemoteSearch={searchSuppliers}
                                         />
+                                        <SupplierBalanceNote orgSlug={orgSlug} supplierId={supplierId} />
                                     </div>
                                     <ActiveWarehousePicker
                                         active={activeWarehouse}

@@ -13,6 +13,7 @@ import { Download, Printer, Usb, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import { supplierBalanceLabel } from '@/lib/supplier-balance';
 
 type SelectionMode = 'category' | 'supplier' | 'purchase_order' | 'item_ids';
 
@@ -316,9 +317,10 @@ export function PrintLabelsDialog({
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
                 >
                   <option value="">Select a supplier…</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
+                  {suppliers.map((s) => {
+                    const bal = supplierBalanceLabel(s);
+                    return <option key={s.id} value={s.id}>{bal ? `${s.name} — ${bal}` : s.name}</option>;
+                  })}
                 </select>
               )}
               <label className="flex items-center gap-2 text-sm">

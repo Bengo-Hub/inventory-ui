@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Supplier } from '@/lib/api/suppliers';
+import { supplierBalance, supplierBalanceLabel } from '@/lib/supplier-balance';
 
 export const PAYMENT_LABEL: Record<string, string> = {
   mpesa: 'M-Pesa',
@@ -40,6 +41,19 @@ export function buildSupplierColumns(cb: SupplierColumnCallbacks): DataTableColu
           )}
         </div>
       ),
+    },
+    {
+      key: 'balance_owed',
+      header: 'Amount owed',
+      sortable: true,
+      align: 'right',
+      accessor: (s) => supplierBalance(s) ?? 0,
+      render: (s) => {
+        const n = supplierBalance(s);
+        if (n == null) return <span className="text-muted-foreground/40">—</span>;
+        const tone = n > 0.0001 ? 'text-amber-600' : n < -0.0001 ? 'text-emerald-600' : 'text-muted-foreground';
+        return <span className={`font-semibold tabular-nums ${tone}`}>{supplierBalanceLabel(s)}</span>;
+      },
     },
     {
       key: 'contact_person',

@@ -31,6 +31,12 @@ export interface Supplier {
   credit_limit?: number;
   created_at: string;
   updated_at: string;
+  /** What the business currently owes this supplier, from treasury (which owns AP). Signed:
+   *  positive = owed to the supplier, negative = the supplier holds a credit. Absent when
+   *  treasury has no AP record for the supplier yet. */
+  balance_owed?: string;
+  outstanding_payable?: string;
+  balance_currency?: string;
 }
 
 export interface CreateSupplierInput {

@@ -17,6 +17,8 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { supplierOption } from '@/lib/supplier-balance';
+import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
@@ -169,13 +171,14 @@ export default function ContractsPage() {
                                         <CreatableSelect
                                             value={supplierId}
                                             onChange={setSupplierId}
-                                            options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                            options={suppliers.map(supplierOption)}
                                             placeholder="— Select supplier —"
                                             required
                                             onAddClick={() => setAddSupplierOpen(true)}
                                             addLabel="Add supplier"
                                             onRemoteSearch={searchSuppliers}
                                         />
+                                        <SupplierBalanceNote orgSlug={org} supplierId={supplierId} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Title *</label>

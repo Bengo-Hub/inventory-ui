@@ -15,6 +15,7 @@ import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { supplierOption } from '@/lib/supplier-balance';
 
 interface Props {
     isPending: boolean;
@@ -283,7 +284,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                             <CreatableSelect
                                                 value={l.supplierId}
                                                 onChange={(id) => setExt(i, { supplierId: id })}
-                                                options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                                options={suppliers.map(supplierOption)}
                                                 placeholder="Preferred supplier (optional)"
                                                 onAddClick={() => setAddSupplierForLine(i)}
                                                 addLabel="Add supplier"
@@ -327,7 +328,7 @@ export function RequisitionFormDialog({ isPending, onSubmit, onClose }: Props) {
                                             <CreatableSelect
                                                 value={serviceSupplierId}
                                                 onChange={setServiceSupplierId}
-                                                options={suppliers.map((s) => ({ id: s.id, name: s.name }))}
+                                                options={suppliers.map(supplierOption)}
                                                 placeholder="Who will provide this? (optional)"
                                                 onAddClick={() => setAddServiceSupplier(true)}
                                                 addLabel="Add provider"

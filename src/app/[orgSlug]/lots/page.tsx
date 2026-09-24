@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { supplierBalanceLabel } from '@/lib/supplier-balance';
 
 const EXPIRY_WARNING_DAYS = 30;
 // isExpiringSoon / isExpired live in ./lot-columns (shared with column render logic).
@@ -90,6 +91,7 @@ function SupplierRefCombobox({
                         >
                             <span className="font-medium">{s.name}</span>
                             {s.phone && <span className="ml-2 text-xs text-muted-foreground">{s.phone}</span>}
+                            {supplierBalanceLabel(s) && <span className="ml-2 text-xs font-semibold text-amber-600">{supplierBalanceLabel(s)}</span>}
                         </button>
                     ))}
                 </div>

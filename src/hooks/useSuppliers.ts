@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { suppliersApi, type CreateSupplierInput, type UpdateSupplierInput, type SupplierListParams, type PaginatedSuppliers } from '@/lib/api/suppliers';
 import type { SelectOption } from '@/components/inventory/CreatableSelect';
+import { supplierOption } from '@/lib/supplier-balance';
 
 const SUPPLIERS_KEY = 'suppliers';
 
@@ -30,7 +31,7 @@ export function useSupplierSearch(orgSlug: string): (query: string) => Promise<S
   return useCallback(
     async (query: string) => {
       const res = await suppliersApi.list(orgSlug, { search: query, limit: 20 });
-      return res.data.map((s) => ({ id: s.id, name: s.name, hint: s.contact_person || s.phone || undefined }));
+      return res.data.map(supplierOption);
     },
     [orgSlug],
   );

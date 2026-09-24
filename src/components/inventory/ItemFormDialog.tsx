@@ -34,6 +34,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { supplierOption } from '@/lib/supplier-balance';
 
 interface Category {
   id: string;
@@ -940,7 +941,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       setPreferredSupplierId(id);
                       if (!id) setPreferredSupplierName('');
                     }}
-                    options={(preferredSuppliersPage?.data ?? []).map((s) => ({ id: s.id, name: s.name, hint: s.contact_person || s.phone || undefined }))}
+                    options={(preferredSuppliersPage?.data ?? []).map(supplierOption)}
                     placeholder="Select a preferred supplier..."
                     onRemoteSearch={searchPreferredSuppliers}
                     onAddClick={() => setAddVendorOpen(true)}

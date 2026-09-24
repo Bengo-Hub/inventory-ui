@@ -20,6 +20,8 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { supplierBalanceLabel } from '@/lib/supplier-balance';
+import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
 
 const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
@@ -168,8 +170,12 @@ export default function PurchaseReturnsPage() {
                                         <label className="text-sm font-medium">Supplier</label>
                                         <select className={selectClass} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
                                             <option value="">— Select supplier —</option>
-                                            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                            {suppliers.map((s) => {
+                                                const bal = supplierBalanceLabel(s);
+                                                return <option key={s.id} value={s.id}>{bal ? `${s.name} — ${bal}` : s.name}</option>;
+                                            })}
                                         </select>
+                                        <SupplierBalanceNote orgSlug={org} supplierId={supplierId} />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Reason</label>
