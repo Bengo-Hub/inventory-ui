@@ -54,6 +54,10 @@ export function Header({ onMenuClick }: HeaderProps) {
   return (
     <header className="h-20 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30 px-4 sm:px-8 flex items-center justify-between">
       <div className="flex items-center gap-4 flex-1 min-w-0 overflow-hidden">
+        {/* overflow-hidden keeps the title + filters from colliding on tablet widths, and clips
+          anything positioned inside it. Every dropdown opened from this group (outlet / tenant
+          filters) MUST render through AnchoredPortal (components/ui/anchored-portal.tsx) — an
+          `absolute top-full` panel here gets cut off at the header's bottom edge. */}
         <button
           type="button"
           onClick={onMenuClick}
