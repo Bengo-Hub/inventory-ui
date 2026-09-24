@@ -50,7 +50,11 @@ export function readIdleMinutes(): number {
   return Math.min(120, Math.max(1, Math.round(sec / 60)));
 }
 
-const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'wheel', 'scroll'] as const;
+// Listened for in the CAPTURE phase: `scroll` doesn't bubble, so scrolling inside a scrollable
+// container (e.g. a long dialog form) was invisible to a bubbling window listener and counted as
+// idle. `input` covers paste/autofill/scanner entry that may not emit a keydown.
+const ACTIVITY_EVENTS = ['mousedown', 'mousemove', 'keydown', 'touchstart', 'wheel', 'scroll', 'input', 'pointerdown'] as const;
+const LISTENER_OPTS: AddEventListenerOptions = { passive: true, capture: true };
 
 /**
  * useIdle — reports whether the user has been idle for `timeoutMs`.
@@ -86,10 +90,10 @@ export function useIdle(timeoutMs: number, enabled = true): { idle: boolean; wak
     };
 
     arm();
-    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, onActivity, { passive: true }));
+    ACTIVITY_EVENTS.forEach((e) => window.addEventListener(e, onActivity, LISTENER_OPTS));
     return () => {
       if (timer.current) clearTimeout(timer.current);
-      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, onActivity));
+      ACTIVITY_EVENTS.forEach((e) => window.removeEventListener(e, onActivity, LISTENER_OPTS));
     };
   }, [timeoutMs, enabled]);
 

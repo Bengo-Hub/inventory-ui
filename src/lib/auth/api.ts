@@ -151,7 +151,13 @@ export async function refreshTokens(refreshToken: string): Promise<{
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refresh_token: refreshToken, client_id: SSO_CLIENT_ID }),
     });
-    if (!response.ok) throw new Error('Token refresh failed');
+    if (!response.ok) {
+        // Carry the status so callers can tell "refresh token rejected — session over" (4xx) from
+        // "auth-api briefly unreachable/erroring" (5xx) and only log out on the former.
+        const err = new Error('Token refresh failed') as Error & { status?: number };
+        err.status = response.status;
+        throw err;
+    }
     return response.json();
 }
 

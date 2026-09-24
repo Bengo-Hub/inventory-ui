@@ -75,7 +75,14 @@ class ApiClient {
             const url: string = error.config?.url ?? '';
             if (!url.includes('/auth/me') && !error.config?._retried) {
                 const { refreshAccessToken } = await import('@/lib/auth/token-refresh');
-                const newToken = await refreshAccessToken();
+                let newToken: string | null;
+                try {
+                    newToken = await refreshAccessToken();
+                } catch {
+                    // auth-api briefly unreachable — fail this request but keep the session;
+                    // logging out here bounced users to PIN login on a mere network blip.
+                    return Promise.reject(error);
+                }
 
                 if (newToken) {
                     this.accessToken = newToken;

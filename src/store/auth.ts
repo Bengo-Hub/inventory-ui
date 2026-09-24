@@ -48,6 +48,9 @@ interface AuthState {
     handleSSOCallback: (orgSlug: string, code: string, callbackUrl: string) => Promise<void>;
     hydrateFromWebAuthn: (tokens: { accessToken: string; refreshToken: string; expiresIn: number }, tenantSlug?: string) => Promise<void>;
     logout: () => Promise<void>;
+    /** Ends this tab's session locally (no SSO logout, no navigation) — used to lock a shared
+     *  PIN terminal on idle so the next staff member must enter their own PIN. */
+    endLocalSession: () => void;
     fetchUser: () => Promise<void>;
 }
 
@@ -80,6 +83,26 @@ export const useAuthStore = create<AuthState>()(
                     if (Date.now() < expiresAt - 60_000) {
                         set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
                         return;
+                    }
+                    // Expired (e.g. a reload of a tab left open overnight): refresh first. The
+                    // profile call below goes to /auth/me, which the API client deliberately never
+                    // refreshes for, so without this an expired-but-refreshable session was
+                    // dropped straight to the login/PIN page on every such reload.
+                    if (session.refreshToken) {
+                        try {
+                            const { refreshAccessToken } = await import('@/lib/auth/token-refresh');
+                            const fresh = await refreshAccessToken();
+                            if (fresh) {
+                                apiClient.setAccessToken(fresh);
+                                set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                                return;
+                            }
+                        } catch {
+                            // auth-api unreachable right now — keep the stored session; the API
+                            // client refreshes again on the next 401 once it's reachable.
+                            set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                            return;
+                        }
                     }
                 }
 
@@ -261,6 +284,11 @@ export const useAuthStore = create<AuthState>()(
                         ? buildLogoutUrl(`${window.location.origin}/${slug}`)
                         : buildLogoutUrl(`https://accounts.codevertexafrica.com/login?return_to=${encodeURIComponent(window.location.origin)}`);
                 }
+            },
+
+            endLocalSession: () => {
+                set({ status: 'idle', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
+                apiClient.setAccessToken(null);
             },
 
             fetchUser: async () => {
