@@ -36,3 +36,28 @@ export function parseDecimal(value: string | number | null | undefined, fallback
     const n = typeof value === 'number' ? value : parseFloat(value);
     return Number.isFinite(n) ? roundDecimal(n) : fallback;
 }
+
+/**
+ * Local calendar day as YYYY-MM-DD for an `<input type="date">` value, offset by `days`.
+ * `new Date().toISOString().slice(0, 10)` is the UTC day, which in Kenya (UTC+3) is still
+ * YESTERDAY until 03:00, so forms defaulted to it quietly recorded the wrong date.
+ */
+export function localDateInput(days = 0): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
+/**
+ * Formats a date-only value ("YYYY-MM-DD", or an ISO timestamp whose date part is the calendar
+ * day) as that exact day in the viewer's locale, without timezone conversion moving it to the
+ * previous or next day.
+ */
+export function formatCalendarDay(day?: string | null): string {
+  if (!day) return '—';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  if (!m) return new Date(day).toLocaleDateString();
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).toLocaleDateString();
+}

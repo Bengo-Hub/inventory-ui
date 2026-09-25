@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   purchaseReturnsApi, type CreatePurchaseReturnInput, type PaginatedReturns, type ReturnListParams,
 } from '@/lib/api/purchase-returns';
+import { invalidateBulkStockQueries } from '@/hooks/useStock';
 
 const KEY = 'purchase-returns';
 const EMPTY: PaginatedReturns = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
@@ -30,6 +31,11 @@ export function useApprovePurchaseReturn(org: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => purchaseReturnsApi.approve(org, id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [KEY, org] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY, org] });
+      // Approval takes the goods out of stock: refresh balances, adjustments and item history.
+      invalidateBulkStockQueries(qc, org);
+      qc.invalidateQueries({ queryKey: ['stock-history', org] });
+    },
   });
 }

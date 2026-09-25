@@ -8,6 +8,7 @@ import { RowActions } from '@/components/inventory/RowActions';
 import { Package } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { TransferSummary } from '@/lib/api/transfers';
+import { localDateInput } from '@/lib/utils';
 
 export const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline',
@@ -52,9 +53,8 @@ export function isOverriddenTransferDate(t: { transfer_date?: string; created_at
 // transfers/service.go); the input's min/max just gives immediate feedback, the server is the
 // real enforcement point.
 export function isoDateOffset(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  // Local calendar day, not the UTC one (which lags a day until 03:00 in Kenya).
+  return localDateInput(days);
 }
 export const TODAY_STR = isoDateOffset(0);
 export const TRANSFER_DATE_MIN = isoDateOffset(-366);
