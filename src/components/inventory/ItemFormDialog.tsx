@@ -331,7 +331,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       // Selling Price is shared state with the RECIPE flow (mutually exclusive types, see
       // declaration above) — only hydrate it here for the non-RECIPE sellable types; RECIPE
       // hydrates it separately from the fetched recipe record once that query resolves.
-      if (['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE'].includes(item.type)) {
+      if (['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE', 'VOUCHER'].includes(item.type)) {
         setSellingPrice(
           item.max_selling_price != null
             ? String(item.max_selling_price)
@@ -987,6 +987,30 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </span>
               </label>
 
+              {/* Internal cost for SERVICE / VOUCHER items: what it costs the business to deliver
+                  the service (labour, transport, materials) or to back the voucher. Not
+                  pack-based and not stocked; it is the invoice line's cost snapshot for margin
+                  and COGS, while the Selling Price below is what the customer is charged. */}
+              {(type === 'SERVICE' || type === 'VOUCHER') && !isEventMode && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium inline-flex items-center gap-1">Internal cost (KES) <span className="text-muted-foreground font-normal">(optional)</span>
+                    <InfoHint title="What this costs you to deliver">
+                      The business&apos;s own cost of providing one unit of this {type === 'VOUCHER' ? 'voucher' : 'service'}.
+                      Never shown to customers; used for margins and cost of sales. The customer is charged the Selling Price below.
+                    </InfoHint>
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step={DECIMAL_STEP}
+                    placeholder="e.g. 1500"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    className="sm:max-w-xs"
+                  />
+                </div>
+              )}
+
               {/* Cost — pack-aware: price paid per pack/amount, e.g. 52.50 per 500 ml */}
               {['GOODS', 'INGREDIENT', 'EQUIPMENT'].includes(type) && (
                 <div className="space-y-2">
@@ -1075,7 +1099,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   own dedicated Selling Price field in the BOM section below (tied to food-cost /
                   batch economics) rather than duplicating it here. Retail/Wholesale default to
                   Selling Price on submit when left blank — see handleSubmit. */}
-              {['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE'].includes(type) && (
+              {['GOODS', 'EQUIPMENT', 'INGREDIENT', 'SERVICE', 'VOUCHER'].includes(type) && (
                 <div className="space-y-3 border border-border rounded-lg p-3">
                   <p className="text-sm font-semibold">Pricing</p>
                   <div className="space-y-2">
@@ -1101,9 +1125,9 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       <label className="text-sm font-medium">Retail / Max Price (KES) <span className="text-muted-foreground font-normal">(optional)</span></label>
                       <Input type="number" min="0" step={DECIMAL_STEP} placeholder="Retail" value={maxSellingPrice} onChange={(e) => setMaxSellingPrice(e.target.value)} />
                     </div>
-                    {/* Margin is cost-derived — only meaningful where a Cost input exists
-                        (GOODS/INGREDIENT/EQUIPMENT); SERVICE has no purchase cost in this model. */}
-                    {isStockable && (
+                    {/* Margin is cost-derived — only meaningful where a Cost input exists:
+                        stockables' pack cost, or SERVICE/VOUCHER internal cost. */}
+                    {(isStockable || ((type === 'SERVICE' || type === 'VOUCHER') && !isEventMode)) && (
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Target Margin (%) <span className="text-muted-foreground font-normal">(optional)</span></label>
                         <Input type="number" min="0" max="99.9" step={DECIMAL_STEP} placeholder="e.g. 30" value={targetMargin} onChange={(e) => setTargetMargin(e.target.value)} />
