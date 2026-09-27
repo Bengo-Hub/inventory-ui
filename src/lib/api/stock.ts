@@ -78,6 +78,8 @@ export interface StockListParams {
   search?: string;
   low_stock?: boolean;
   out_of_stock?: boolean;
+  /** Only balances below zero: goods sold before they were received (settle on receipt). */
+  negative?: boolean;
   category_id?: string;
   type?: string;
   /** Scope to a single item's balances across every warehouse — the item drawer's Locations

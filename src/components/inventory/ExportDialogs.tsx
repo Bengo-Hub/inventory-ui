@@ -176,7 +176,7 @@ export function StockExportDialog({
   orgSlug, initial, onClose,
 }: {
   orgSlug: string;
-  initial?: Pick<StockExportParams, 'search' | 'category_id' | 'type' | 'low_stock' | 'out_of_stock'>;
+  initial?: Pick<StockExportParams, 'search' | 'category_id' | 'type' | 'low_stock' | 'out_of_stock' | 'negative'>;
   onClose: () => void;
 }) {
   const [categoryId, setCategoryId] = useState(initial?.category_id ?? '');
@@ -210,6 +210,7 @@ export function StockExportDialog({
       ...(!warehouseId && outletId ? { outlet_id: outletId } : {}),
       ...(initial?.low_stock ? { low_stock: true } : {}),
       ...(initial?.out_of_stock ? { out_of_stock: true } : {}),
+      ...(initial?.negative ? { negative: true } : {}),
       ...(groupByCategory ? { group_by: 'category' } : {}),
     };
   }

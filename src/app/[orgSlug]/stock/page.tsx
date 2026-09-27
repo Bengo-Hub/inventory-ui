@@ -32,7 +32,7 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 // stockableTypes filter); services/vouchers/recipes never hold balances.
 const STOCKABLE_TYPES = ['GOODS', 'INGREDIENT', 'EQUIPMENT'] as const;
 
-type StatusFilter = 'all' | 'low' | 'out';
+type StatusFilter = 'all' | 'low' | 'out' | 'negative';
 
 const REASON_OPTIONS = [
     { value: 'correction', label: 'Count Correction' },
@@ -519,6 +519,8 @@ export default function StockPage() {
 
     const lowStockCount = stock?.filter((s) => s.reorder_point != null && s.available <= s.reorder_point && s.available > 0).length ?? 0;
     const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
+    // Below zero: sold or issued before the goods were received; settles when the purchase lands.
+    const negativeCount = stock?.filter((s) => s.on_hand < 0).length ?? 0;
 
     const filteredStock = useMemo(() => {
         const list = stock ?? [];
@@ -527,6 +529,9 @@ export default function StockPage() {
         }
         if (statusFilter === 'out') {
             return list.filter((s) => s.available <= 0);
+        }
+        if (statusFilter === 'negative') {
+            return list.filter((s) => s.on_hand < 0);
         }
         return list;
     }, [stock, statusFilter]);
@@ -606,8 +611,19 @@ export default function StockPage() {
             </div>
 
             {tab === 'levels' && (<>
-            {(lowStockCount > 0 || outOfStockCount > 0) && (
+            {(lowStockCount > 0 || outOfStockCount > 0 || negativeCount > 0) && (
                 <div className="flex flex-wrap gap-3">
+                    {negativeCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter((p) => (p === 'negative' ? 'all' : 'negative'))}
+                            title="Sold or issued before the goods were received. Receive the purchase (or correct the count) to clear."
+                            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-500/10 border text-rose-700 dark:text-rose-400 transition-colors hover:bg-rose-500/20 ${statusFilter === 'negative' ? 'border-rose-500 ring-1 ring-rose-500/40' : 'border-rose-500/20'}`}
+                        >
+                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                            <span className="text-sm font-medium">{negativeCount} item{negativeCount > 1 ? 's' : ''} below zero</span>
+                        </button>
+                    )}
                     {outOfStockCount > 0 && (
                         <button
                             type="button"
@@ -650,6 +666,7 @@ export default function StockPage() {
                                         { value: 'all', label: 'All status' },
                                         { value: 'low', label: 'Low stock' },
                                         { value: 'out', label: 'Out of stock' },
+                                        { value: 'negative', label: 'Below zero' },
                                     ]}
                                     value={statusFilter}
                                     onChange={(v) => setStatusFilter((v || 'all') as StatusFilter)}
@@ -790,6 +807,7 @@ export default function StockPage() {
                         ...(typeFilter ? { type: typeFilter } : {}),
                         ...(statusFilter === 'low' ? { low_stock: true } : {}),
                         ...(statusFilter === 'out' ? { out_of_stock: true } : {}),
+                        ...(statusFilter === 'negative' ? { negative: true } : {}),
                     }}
                     onClose={() => setExportOpen(false)}
                 />
