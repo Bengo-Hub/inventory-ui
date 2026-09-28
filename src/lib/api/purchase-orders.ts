@@ -78,6 +78,30 @@ export interface POListParams {
 
 export interface PaginatedPOs { data: PurchaseOrder[]; total: number; page: number; limit: number; hasMore: boolean; }
 
+/** One treasury budget line a purchase draws on, with what is left after this PO. */
+export interface POBudgetLine {
+  budget_id: string;
+  budget_name: string;
+  line_name: string;
+  planned: number;
+  actual: number;
+  committed: number;
+  available: number;
+  requested: number;
+  action: 'ok' | 'warn' | 'stop';
+}
+
+/** Treasury's verdict on a PO: warn still sends, stop blocks unless an approver overrides. */
+export interface POBudgetCheck {
+  action: 'ok' | 'warn' | 'stop';
+  lines: POBudgetLine[];
+}
+
+export interface SendPOResult {
+  status: string;
+  budget?: POBudgetCheck;
+}
+
 export const purchaseOrdersApi = {
   list: (orgSlug: string, params?: POListParams): Promise<PaginatedPOs> =>
     apiClient.get<PaginatedPOs>(`/api/v1/${orgSlug}/inventory/purchase-orders`, params),
@@ -94,8 +118,15 @@ export const purchaseOrdersApi = {
   amend: (orgSlug: string, id: string, data: CreatePOInput) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/amend`, data),
 
-  send: (orgSlug: string, id: string) =>
-    apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/send`, {}),
+  /**
+   * Sends the PO to the supplier. Treasury checks it against the tenant's budgets first: a stop
+   * answers 409 OVER_BUDGET, and approvals or procurement managers may resend with overrideBudget.
+   */
+  send: (orgSlug: string, id: string, overrideBudget = false) =>
+    apiClient.put<SendPOResult>(
+      `/api/v1/${orgSlug}/inventory/purchase-orders/${id}/send${overrideBudget ? '?override_budget=true' : ''}`,
+      {},
+    ),
 
   cancel: (orgSlug: string, id: string) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/cancel`, {}),

@@ -61,8 +61,9 @@ export function useReceivePurchaseOrder(orgSlug: string) {
 export function useSendPurchaseOrder(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => purchaseOrdersApi.send(orgSlug, id),
-    onSuccess: (_, id) => {
+    mutationFn: ({ id, overrideBudget }: { id: string; overrideBudget?: boolean }) =>
+      purchaseOrdersApi.send(orgSlug, id, overrideBudget),
+    onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug, id] });
     },

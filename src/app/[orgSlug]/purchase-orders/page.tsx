@@ -22,7 +22,7 @@ import {
     useReceivePurchaseOrder,
     useCancelPurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
-import type { PurchaseOrder, POStatus } from '@/lib/api/purchase-orders';
+import type { PurchaseOrder, POStatus, POBudgetCheck } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useSuppliers';
 import { useUnits } from '@/hooks/useUnits';
 import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
@@ -213,6 +213,42 @@ export default function PurchaseOrdersPage() {
     const { canAny } = usePermissions();
     const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
     const canChangePO = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
+    // Mirrors inventory-api canOverrideBudget: approvals or procurement managers may send over budget.
+    const canOverrideBudget = canAny([P.APPROVALS_MANAGE, 'inventory.procurement.manage']);
+
+    const budgetSummary = (budget?: POBudgetCheck) => {
+        const line = budget?.lines?.find((l) => l.action === budget.action) ?? budget?.lines?.[0];
+        if (!line) return undefined;
+        const kes = (v: number) => `KES ${Math.round(v).toLocaleString()}`;
+        return `${line.budget_name}${line.line_name ? ` / ${line.line_name}` : ''}: ${kes(line.available)} available, this order needs ${kes(line.requested)}`;
+    };
+
+    // Sends the PO. Treasury's budget check can warn (sent, toast) or stop (409 OVER_BUDGET), in
+    // which case approvers get a one-click resend with the override.
+    const sendToSupplier = (id: string, overrideBudget = false) =>
+        sendPO.mutate({ id, overrideBudget }, {
+            onSuccess: (res) => {
+                if (res?.budget?.action === 'warn' || (overrideBudget && res?.budget?.action === 'stop')) {
+                    toast.warning('PO sent, but it exceeds the budget', { description: budgetSummary(res.budget) });
+                } else {
+                    toast.success('PO sent to supplier');
+                }
+            },
+            onError: async (e: unknown) => {
+                const data = (e as { response?: { status?: number; data?: { error?: string; budget?: POBudgetCheck } } })?.response;
+                if (data?.status === 409 && data.data?.error === 'OVER_BUDGET') {
+                    toast.error('This purchase order exceeds the available budget', {
+                        description: budgetSummary(data.data.budget) ?? 'Ask an approver or procurement manager to send it.',
+                        duration: 12_000,
+                        action: canOverrideBudget && !overrideBudget
+                            ? { label: 'Send over budget', onClick: () => sendToSupplier(id, true) }
+                            : undefined,
+                    });
+                    return;
+                }
+                toast.error(await apiErrorMessage(e, 'Failed to send PO'));
+            },
+        });
     const canCancelPO = canAny([P.PURCHASES_DELETE, P.PURCHASES_MANAGE]);
 
     // Document preview (Print/Export) — reuses the shared-ui-lib PDF previewer (same as treasury-ui),
@@ -796,13 +832,7 @@ export default function PurchaseOrdersPage() {
                     )}
                     {canSend && (
                         <Button size="sm" disabled={isPOBusy}
-                            onClick={() => sendPO.mutate(poDetail.id, {
-                                onSuccess: () => toast.success('PO sent to supplier'),
-                                onError: (e: unknown) => {
-                                    const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
-                                    toast.error(msg || 'Failed to send PO');
-                                },
-                            })}>
+                            onClick={() => sendToSupplier(poDetail.id)}>
                             Send to Supplier
                         </Button>
                     )}
