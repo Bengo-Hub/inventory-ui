@@ -144,7 +144,15 @@ export type ItemUseCase =
   | 'CONFERENCE'
   | 'SALON_SERVICE'
   | 'AMENITY'
-  | 'PROFESSIONAL_SERVICE';
+  | 'PROFESSIONAL_SERVICE'
+  // Services trades: a services outlet's service profile shows only its own trade's services.
+  | 'PRINTING_SERVICE'
+  | 'AUTO_SERVICE'
+  | 'LAUNDRY_SERVICE'
+  | 'TAILORING_SERVICE'
+  | 'REPAIR_SERVICE'
+  | 'SPA_SERVICE'
+  | 'NAIL_SERVICE';
 
 export type MealPlan = 'RO' | 'BB' | 'HB' | 'FB' | 'AI';
 
@@ -155,7 +163,14 @@ export const ITEM_USE_CASES: { value: ItemUseCase; label: string }[] = [
   { value: 'HOSPITALITY_FACILITY', label: 'Facility' },
   { value: 'CONFERENCE', label: 'Conference Hall' },
   { value: 'PROFESSIONAL_SERVICE', label: 'Professional Service' },
-  { value: 'SALON_SERVICE', label: 'Salon / Spa Service' },
+  { value: 'PRINTING_SERVICE', label: 'Printing & Branding' },
+  { value: 'SALON_SERVICE', label: 'Salon & Barber' },
+  { value: 'NAIL_SERVICE', label: 'Nail Parlour' },
+  { value: 'SPA_SERVICE', label: 'Spa & Wellness' },
+  { value: 'AUTO_SERVICE', label: 'Garage & Car Wash' },
+  { value: 'LAUNDRY_SERVICE', label: 'Laundry & Dry Cleaning' },
+  { value: 'TAILORING_SERVICE', label: 'Tailoring & Fashion' },
+  { value: 'REPAIR_SERVICE', label: 'Phone & Electronics Repair' },
   { value: 'AMENITY', label: 'Amenity' },
 ];
 

@@ -1567,11 +1567,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 <div className="space-y-4 border-t border-border pt-4">
                   <p className="text-sm font-semibold">Service Details</p>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Use Case</label>
+                    <label className="text-sm font-medium">Service type</label>
                     <select value={useCase} onChange={(e) => setUseCase(e.target.value as ItemUseCase)} className={selectCls}>
                       {(hospitalityUseCases.length > 0 ? hospitalityUseCases : ITEM_USE_CASES).map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
-                    <p className="text-xs text-muted-foreground">Drives how this service is sold &amp; priced in POS. Rates are set under Pricing tiers.</p>
+                    <p className="text-xs text-muted-foreground">
+                      Drives how this service is sold &amp; priced in POS. A services outlet only shows the services of its own type
+                      (plus Professional Service ones). Rates are set under Pricing tiers.
+                    </p>
                   </div>
 
                   {useCase === 'HOSPITALITY_ROOM' && (

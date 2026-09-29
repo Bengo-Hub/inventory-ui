@@ -154,10 +154,13 @@ const SCOPES: Record<string, CatalogScope> = {
   },
   services: {
     itemTypes: ['SERVICE', 'GOODS', 'VOUCHER'],
-    // Generic professional service leads (legal, consulting, IT, etc.); salon/amenity remain
-    // for service tenants that actually offer them. Avoids forcing "Salon / Spa" on every
-    // services tenant.
-    itemUseCases: ['PROFESSIONAL_SERVICE', 'SALON_SERVICE', 'AMENITY'],
+    // The service type tags each service with its trade; a services outlet's service profile in
+    // POS (printing, salon, garage, ...) then shows only its own trade's services plus the
+    // generic Professional Service ones.
+    itemUseCases: [
+      'PROFESSIONAL_SERVICE', 'PRINTING_SERVICE', 'SALON_SERVICE', 'NAIL_SERVICE', 'SPA_SERVICE',
+      'AUTO_SERVICE', 'LAUNDRY_SERVICE', 'TAILORING_SERVICE', 'REPAIR_SERVICE', 'AMENITY',
+    ],
     defaultItemUseCase: 'PROFESSIONAL_SERVICE',
     showHospitality: true,
     showRecipe: false,
@@ -215,9 +218,16 @@ export const ITEM_USE_CASE_LABEL: Record<ItemUseCase, string> = {
   HOSPITALITY_ROOM: 'Hotel Rooms',
   HOSPITALITY_FACILITY: 'Facilities',
   CONFERENCE: 'Conference',
-  SALON_SERVICE: 'Salon / Spa',
+  SALON_SERVICE: 'Salon & Barber',
   AMENITY: 'Amenities',
   PROFESSIONAL_SERVICE: 'Professional Services',
+  PRINTING_SERVICE: 'Printing & Branding',
+  AUTO_SERVICE: 'Garage & Car Wash',
+  LAUNDRY_SERVICE: 'Laundry & Dry Cleaning',
+  TAILORING_SERVICE: 'Tailoring & Fashion',
+  REPAIR_SERVICE: 'Phone & Electronics Repair',
+  SPA_SERVICE: 'Spa & Wellness',
+  NAIL_SERVICE: 'Nail Parlour',
 };
 
 // ── Report nomenclature (Stock Reconciliation & consumption reports) ────────────
