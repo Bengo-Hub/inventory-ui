@@ -25,7 +25,7 @@ import { ItemEcommerceFields, ecommerceValuesFromItem, ecommercePayload, type Ec
 import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import { apiClient } from '@/lib/api/client';
 import { useOutletStore } from '@/store/outlet';
-import { gatedCatalogScope, nomenclatureFor } from '@/lib/use-case-nomenclature';
+import { gatedCatalogScope, nomenclatureFor, SERVICE_ITEM_USE_CASES } from '@/lib/use-case-nomenclature';
 import { useSubscription } from '@/hooks/use-subscription';
 import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfig, type MenuItemCompositeRequest, itemsApi, ITEM_USE_CASES, MEAL_PLANS } from '@/lib/api/items';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
@@ -137,7 +137,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // out-of-scope legacy item stays editable.
   const baseTypes: string[] = lockToEvent ? ['SERVICE'] : scope.itemTypes;
   const typeOptions = item?.type && !baseTypes.includes(item.type) ? [item.type, ...baseTypes] : baseTypes;
-  const hospitalityUseCases = ITEM_USE_CASES.filter((u) => scope.itemUseCases.includes(u.value));
+  // Service type options: every services trade plus the hospitality bookables this outlet runs,
+  // and always the item's own current value, so editing a service from any outlet never swaps
+  // its type for the first option (a print job silently becoming "Retail" would hide it from
+  // the print shop's till).
+  const serviceTypeOptions = ITEM_USE_CASES.filter((u) =>
+    SERVICE_ITEM_USE_CASES.includes(u.value) &&
+    (!['HOSPITALITY_ROOM', 'HOSPITALITY_FACILITY', 'CONFERENCE'].includes(u.value) ||
+      scope.itemUseCases.includes(u.value) || u.value === item?.use_case),
+  );
 
   const [name, setName] = useState(item?.name ?? initialName ?? '');
   const [sku, setSku] = useState(item?.sku ?? '');
@@ -748,7 +756,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       // items inherit the outlet's default (e.g. pharmacy goods → PHARMACY) so they surface
       // on the right per-use-case page. RETAIL is the backend default, so it's left implicit.
       use_case: isService
-        ? (useCase && useCase !== 'RETAIL' ? useCase : undefined)
+        ? (serviceTypeOptions.some((o) => o.value === useCase) ? useCase : 'PROFESSIONAL_SERVICE')
         : (!isEventMode && scope.defaultItemUseCase && scope.defaultItemUseCase !== 'RETAIL' ? scope.defaultItemUseCase : undefined),
       meal_plan: isService && useCase === 'HOSPITALITY_ROOM' && mealPlan ? (mealPlan as CreateItemInput['meal_plan']) : undefined,
       occupancy_basis: isService && useCase === 'HOSPITALITY_ROOM' && occupancyBasis ? (occupancyBasis as CreateItemInput['occupancy_basis']) : undefined,
@@ -1568,8 +1576,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                   <p className="text-sm font-semibold">Service Details</p>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Service type</label>
-                    <select value={useCase} onChange={(e) => setUseCase(e.target.value as ItemUseCase)} className={selectCls}>
-                      {(hospitalityUseCases.length > 0 ? hospitalityUseCases : ITEM_USE_CASES).map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
+                    <select
+                      value={serviceTypeOptions.some((o) => o.value === useCase) ? useCase : 'PROFESSIONAL_SERVICE'}
+                      onChange={(e) => setUseCase(e.target.value as ItemUseCase)}
+                      className={selectCls}
+                    >
+                      {serviceTypeOptions.map((u) => <option key={u.value} value={u.value}>{u.label}</option>)}
                     </select>
                     <p className="text-xs text-muted-foreground">
                       Drives how this service is sold &amp; priced in POS. A services outlet only shows the services of its own type

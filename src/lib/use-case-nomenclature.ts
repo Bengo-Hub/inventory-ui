@@ -210,6 +210,14 @@ export function isInventoryApplicableUseCase(useCase?: string | null): boolean {
   return !useCase || INVENTORY_APPLICABLE_USE_CASES.has(useCase);
 }
 
+// Item use cases a SERVICE item can carry regardless of the outlet it is edited from: the
+// services trades (a POS services outlet shows only its own trade) and the hospitality bookables.
+export const SERVICE_ITEM_USE_CASES: ItemUseCase[] = [
+  'PROFESSIONAL_SERVICE', 'PRINTING_SERVICE', 'SALON_SERVICE', 'NAIL_SERVICE', 'SPA_SERVICE',
+  'AUTO_SERVICE', 'LAUNDRY_SERVICE', 'TAILORING_SERVICE', 'REPAIR_SERVICE',
+  'HOSPITALITY_ROOM', 'HOSPITALITY_FACILITY', 'CONFERENCE', 'AMENITY',
+];
+
 // Master label map for item-level use_case (catalog filter dropdown).
 export const ITEM_USE_CASE_LABEL: Record<ItemUseCase, string> = {
   RETAIL: 'Retail',

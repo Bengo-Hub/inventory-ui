@@ -816,6 +816,10 @@ export default function CatalogPage() {
       cellClassName: 'font-mono text-xs tabular-nums',
       render: (i) => {
         if (i.on_hand == null) return <span className="text-muted-foreground">—</span>;
+        // Services and vouchers never hold stock.
+        if (i.type === 'SERVICE' || i.type === 'VOUCHER') {
+          return <span className="text-muted-foreground" title="Services hold no stock">n/a</span>;
+        }
         const out = i.on_hand <= 0;
         const low = !out && i.reorder_level != null && i.on_hand <= i.reorder_level;
         return (
