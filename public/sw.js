@@ -1,4 +1,6 @@
 /* eslint-disable no-restricted-globals */
+// Media cache (images from our API /media and /_next/image): see sw-media.js.
+importScripts('/sw-media.js');
 // Uniform Codevertex offline-shell service worker (committed, runtime-caching, bundler-agnostic).
 // next-pwa is disabled (disable:true) so no build overwrites this file. Registered by the shared
 // OfflineBar (registerServiceWorker). network-first navigations (cached page offline), cache-first
@@ -10,7 +12,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => !k.startsWith(VERSION) && k !== MEDIA_CACHE).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
