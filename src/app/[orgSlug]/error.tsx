@@ -1,7 +1,7 @@
 'use client';
 
 import { Button, Card, CardContent } from '@/components/ui/base';
-import { isStaleChunkError, reloadOnce } from '@/components/stale-chunk-recovery';
+import { recoverFromError } from '@bengo-hub/shared-ui-lib/offline';
 import { AlertTriangle } from 'lucide-react';
 import { useEffect } from 'react';
 
@@ -11,7 +11,7 @@ import { useEffect } from 'react';
  * anywhere in the app was an unrecoverable blank/broken screen (Next's built-in fallback),
  * which is what live-reported as "the inventory-ui item form breaks after some time in edit
  * mode". Most of those crashes are the stale-bundle-after-a-deploy scenario documented in
- * stale-chunk-recovery.tsx (a long-open tab's runtime requests a chunk the now-redeployed
+ * shared-ui-lib's offline/stale-chunk-recovery (a long-open tab's runtime requests a chunk the now-redeployed
  * server no longer has, surfacing several retries later as React's own "Maximum update depth
  * exceeded" rather than the original fetch failure) — auto-reload once for that signature so
  * the user never sees this screen for it. Anything else still lands here with a real recovery
@@ -20,7 +20,7 @@ import { useEffect } from 'react';
 export default function OrgSegmentError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
-    if (isStaleChunkError(error)) reloadOnce();
+    recoverFromError(error);
   }, [error]);
 
   return (
