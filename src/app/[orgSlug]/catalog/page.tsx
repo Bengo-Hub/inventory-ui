@@ -34,6 +34,7 @@ import { useNomenclature, useCatalogScope, catalogScopeFor, ITEM_USE_CASE_LABEL 
 import { useSubscription } from '@/hooks/use-subscription';
 import { UpgradeBadge } from '@bengo-hub/shared-ui-lib/subscription';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { RecipeHealthBanner } from '@/components/inventory/RecipeHealthBanner';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -932,6 +933,7 @@ export default function CatalogPage() {
   return (
     <>
       <div className="p-6 space-y-6">
+        <RecipeHealthBanner orgSlug={orgSlug} />
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           {/* Title */}
           <div className="min-w-0">

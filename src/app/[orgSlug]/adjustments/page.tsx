@@ -33,6 +33,7 @@ import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import type { DocFormat } from '@/components/inventory/DocFormatMenu';
+import { convertQuantity } from '@/lib/units/convert';
 
 interface ItemSearchOption extends SearchAddOption {
     item: Item;
@@ -75,12 +76,27 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
     const [reason, setReason] = useState('');
     const [notes, setNotes] = useState('');
     const [unitId, setUnitId] = useState('');
+    // The selected item's own stock unit: a quantity entered in another unit is converted into it
+    // by inventory-api (5 kg into an item stocked in g = 5000 g), never added raw.
+    const [itemUnitId, setItemUnitId] = useState('');
 
     // Branch resolution: default to the active outlet's warehouse; require an explicit pick
     // when "All Outlets" is selected (block submit while unresolved).
     const activeWarehouse = useActiveWarehouse(orgSlug);
     const { data: units } = useUnits(orgSlug);
     const mutation = useCreateAdjustment(orgSlug);
+
+    const entryHint = useMemo(() => {
+        if (!unitId || !itemUnitId || unitId === itemUnitId) return null;
+        const from = (units ?? []).find((u) => u.id === unitId)?.abbreviation;
+        const to = (units ?? []).find((u) => u.id === itemUnitId)?.abbreviation;
+        if (!from || !to) return null;
+        const qty = quantity !== '' ? parseDecimal(quantity) : 1;
+        const converted = convertQuantity(qty, from, to);
+        return converted == null
+            ? { ok: false, text: `This item is stocked in ${to}; ${from} can't be converted to it (unless the item has a content per unit set). Enter the quantity in ${to}.` }
+            : { ok: true, text: `${qty} ${from} = ${Number(converted.toPrecision(6))} ${to}, saved in the item's stock unit.` };
+    }, [unitId, itemUnitId, units, quantity]);
 
     const [addWarehouseOpen, setAddWarehouseOpen] = useState(false);
     const [addUnitOpen, setAddUnitOpen] = useState(false);
@@ -165,6 +181,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                     setItemName(item.name);
                                     // Preselect the chosen item's unit of measure.
                                     setUnitId(item.unit_id ?? '');
+                                    setItemUnitId(item.unit_id ?? '');
                                 }}
                             />
 
@@ -193,6 +210,11 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                     />
                                 </div>
                             </div>
+                            {entryHint && (
+                                <p className={`text-xs ${entryHint.ok ? 'text-muted-foreground' : 'text-amber-600 dark:text-amber-400'}`}>
+                                    {entryHint.text}
+                                </p>
+                            )}
 
                             <ActiveWarehousePicker
                                 active={activeWarehouse}

@@ -237,6 +237,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         // uses, applied here via the item-level `feature` override so hospitality/quick_service/
         // warehouse keep their existing unconditional (no feature check) access untouched.
         ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes', ...(useCase === 'retail' ? { feature: 'manufacturing' } : {}) }]),
+        // Data problems that break stock/costs (no BOM, unconvertible units, wrong cost per unit).
+        { label: 'Recipe Health', icon: ShieldCheck, href: '/recipes/health', moduleKey: 'recipes' },
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
         { label: 'Bundles & Packages', icon: PackagePlus, href: '/bundles', moduleKey: 'bundles' },
       ],

@@ -266,6 +266,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
     autoAdjustOnTransfer: true,
     recipeItemsNonDepletingDefault: false,
     recordTheoreticalUsage: true,
+    autoHideOnStockOut: false,
     perOutletPricingEnabled: false,
     batchPeriodPricingEnabled: false,
     stockAgingThresholdDays: 90,
@@ -288,6 +289,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
         autoAdjustOnTransfer: settings.auto_adjust_on_transfer,
         recipeItemsNonDepletingDefault: settings.recipe_items_non_depleting_default ?? false,
         recordTheoreticalUsage: settings.record_theoretical_usage ?? true,
+        autoHideOnStockOut: settings.auto_hide_on_stock_out ?? false,
         perOutletPricingEnabled: settings.per_outlet_pricing_enabled ?? false,
         batchPeriodPricingEnabled: settings.batch_period_pricing_enabled ?? false,
         stockAgingThresholdDays: settings.stock_aging_threshold_days ?? 90,
@@ -310,6 +312,7 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
       auto_adjust_on_transfer: form.autoAdjustOnTransfer,
       recipe_items_non_depleting_default: form.recipeItemsNonDepletingDefault,
       record_theoretical_usage: form.recordTheoreticalUsage,
+      auto_hide_on_stock_out: form.autoHideOnStockOut,
       per_outlet_pricing_enabled: form.perOutletPricingEnabled,
       batch_period_pricing_enabled: form.batchPeriodPricingEnabled,
       stock_aging_threshold_days: form.stockAgingThresholdDays,
@@ -482,10 +485,13 @@ function StockTab({ orgSlug }: { orgSlug: string }) {
             { key: 'enableExpiryTracking' as const, label: 'Expiry Date Tracking', desc: 'Track expiry dates and enforce FEFO (First Expired, First Out).', feature: 'batch_expiry_tracking' },
             { key: 'purchaseOrderApprovalRequired' as const, label: 'Purchase Order Approval Required', desc: 'Require manager approval before a PO can be issued.' },
             { key: 'autoAdjustOnTransfer' as const, label: 'Auto-Adjust Stock on Transfer', desc: 'Automatically deduct source and credit destination on transfer completion.' },
+            // Availability policy (all use cases). Off = items are only made unavailable by staff;
+            // stock-outs alert but never block a sale, and stock goes negative until restocked.
+            { key: 'autoHideOnStockOut' as const, label: 'Automatically Hide Items When Stock Runs Out', desc: 'Off (recommended): items stay on POS and the ordering app when the system shows zero stock, sales continue and stock goes negative until the next delivery or stock take; low/out-of-stock alerts still fire. Mark an item unavailable yourself when it really is finished. On: items, and recipes whose ingredient ran out, are hidden automatically.' },
             // Recipe-only: hidden for use cases that don't have a recipes/BOM module at all
             // (pharmacy, services, warehouse, logistics — see USE_CASE_MODULES), matching the
             // sidebar's own "Recipes / BOM" nav gating.
-            { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock (never auto-marked sold-out). Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.', moduleKey: 'recipes' },
+            { key: 'recipeItemsNonDepletingDefault' as const, label: 'Recipe Items Don’t Deplete Stock (Manual Counting)', desc: 'Menu/recipe items sell without deducting ingredient stock. Goods, bottles and tots keep depleting. Individual items can override via their Stock Tracking mode.', moduleKey: 'recipes' },
             { key: 'recordTheoreticalUsage' as const, label: 'Record Theoretical Usage for Non-Depleting Sales', desc: 'Still log what a sale WOULD have consumed so food-cost and actual-vs-theoretical variance reports stay meaningful (recommended).', moduleKey: 'recipes' },
             // Add-on (platform-admin grant required, see subscriptions-api's TenantFeatureGrant):
             { key: 'perOutletPricingEnabled' as const, label: 'Per-Branch / Outlet Pricing', desc: 'Set a different base price for the same item at different outlets. Once on, the Item Pricing tab shows an outlet picker.', feature: 'multi_branch_pricing', isAddon: true },

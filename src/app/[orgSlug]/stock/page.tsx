@@ -10,6 +10,7 @@ import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useCategories } from '@/hooks/useCategories';
 import { useUnits } from '@/hooks/useUnits';
+import { RecipeHealthBanner } from '@/components/inventory/RecipeHealthBanner';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type { StockLevel, StockListParams } from '@/lib/api/stock';
@@ -574,6 +575,7 @@ export default function StockPage() {
 
     return (
         <div className="p-6 space-y-6">
+            <RecipeHealthBanner orgSlug={orgSlug} />
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">Stock Levels</h1>

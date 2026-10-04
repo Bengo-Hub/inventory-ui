@@ -32,7 +32,7 @@ import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { DECIMAL_STEP, parseDecimal, roundDecimal } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { supplierOption } from '@/lib/supplier-balance';
 
@@ -120,6 +120,11 @@ interface Props {
 const inputCls =
   'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 const selectCls = `${inputCls} appearance-none`;
+
+/** Unit conversion factor for display: 0.001, 1000, 0.5 (no float noise, no trailing zeros). */
+function formatFactor(v: number): string {
+  return String(Number(v.toPrecision(6)));
+}
 
 function toLocalDatetimeValue(iso?: string | null): string {
   if (!iso) return '';
@@ -416,6 +421,16 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // Abbreviation of the selected base unit (e.g. "L", "kg"), shown as a suffix on
   // quantity fields so opening stock / reorder values read in the right unit.
   const selectedUnit = (units ?? []).find((u) => u.id === unitId);
+  // Editing an existing item's stock unit: the server rescales stock, costs and prices. Same-
+  // dimension changes (g to kg) convert by a known factor; others need the user's factor.
+  const [rescaleOldPerNew, setRescaleOldPerNew] = useState('');
+  const unitChange = useMemo(() => {
+    if (!item?.unit_id || !unitId || unitId === item.unit_id) return null;
+    const from = (units ?? []).find((u) => u.id === item.unit_id)?.abbreviation;
+    const to = selectedUnit?.abbreviation;
+    if (!from || !to) return null;
+    return { from, to, factor: convertQuantity(1, from, to) };
+  }, [item?.unit_id, unitId, units, selectedUnit]);
   const unitAbbr = selectedUnit?.abbreviation ?? '';
   // "count"-type units (PIECE, BOX, TABLET, ...) are discrete — a phone/box/tablet can never be
   // a fraction, unlike weight/volume/length units where decimals are normal. Matches the
@@ -690,6 +705,10 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
           ? '00000000-0000-0000-0000-000000000000'
           : undefined,
       unit_id: unitId || undefined,
+      // Cross-dimension stock-unit change (g to pc): how many old units make one new unit, so the
+      // server can carry stock, costs and prices across. Same-dimension changes convert themselves.
+      rescale_old_per_new:
+        unitChange && unitChange.factor == null && rescaleOldPerNew !== '' ? parseDecimal(rescaleOldPerNew) : undefined,
       barcode: barcode.trim() || undefined,
       // Opening stock is a create-time seed only — on edit, stock is changed via Adjustments /
       // Stock Take so the ledger stays the single source of truth (avoids double-counting).
@@ -902,6 +921,38 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     onAddClick={lockToEvent ? undefined : () => setAddUnitOpen(true)}
                     addLabel="Add unit"
                   />
+                  {unitChange && (
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900 dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-100 space-y-2">
+                      {unitChange.factor != null ? (
+                        <p>
+                          Changing the stock unit from <b>{unitChange.from}</b> to <b>{unitChange.to}</b>: stock on hand,
+                          reorder levels, cost per unit and prices convert automatically
+                          (1 {unitChange.from} = {formatFactor(unitChange.factor)} {unitChange.to}; a cost of 450 per 1000 {unitChange.from} stays
+                          450 per {formatFactor(1000 * unitChange.factor)} {unitChange.to}).
+                        </p>
+                      ) : (
+                        <>
+                          <p>
+                            <b>{unitChange.from}</b> and <b>{unitChange.to}</b> don’t convert automatically. Say how many {unitChange.from} make
+                            one {unitChange.to} so stock, costs and prices carry over (needed when the item has stock).
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span>1 {unitChange.to} =</span>
+                            <Input
+                              type="number"
+                              step={DECIMAL_STEP}
+                              min="0"
+                              value={rescaleOldPerNew}
+                              onChange={(e) => setRescaleOldPerNew(e.target.value)}
+                              className="h-8 w-28"
+                              aria-label={`How many ${unitChange.from} make one ${unitChange.to}`}
+                            />
+                            <span>{unitChange.from}</span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

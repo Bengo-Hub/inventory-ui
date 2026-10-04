@@ -29,6 +29,10 @@ export interface InventorySettings {
   recipe_items_non_depleting_default: boolean;
   // When non-depleting, still record theoretical usage rows for AvT/food-cost reports.
   record_theoretical_usage: boolean;
+  // Availability policy. false (the default) = availability is manual-only: running out of stock
+  // only raises alerts and items keep selling into negative stock. true = items (and recipes whose
+  // ingredient ran out) are automatically marked unavailable on POS and the ordering app.
+  auto_hide_on_stock_out: boolean;
   lots_module_enabled: boolean;
   recipes_module_enabled: boolean;
   purchase_orders_enabled: boolean;
@@ -69,6 +73,7 @@ export interface UpdateInventorySettingsInput {
   auto_adjust_on_transfer?: boolean;
   recipe_items_non_depleting_default?: boolean;
   record_theoretical_usage?: boolean;
+  auto_hide_on_stock_out?: boolean;
   default_target_margin_percent?: number;
   enable_room_pricing?: boolean;
   enable_facility_booking?: boolean;

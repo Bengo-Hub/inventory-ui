@@ -2,6 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { RecipeHealthBanner } from '@/components/inventory/RecipeHealthBanner';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { useRecipes, useCreateRecipe, useUpdateRecipe, useDeleteRecipe } from '@/hooks/use-recipes';
@@ -181,6 +182,7 @@ export default function RecipesPage() {
 
     return (
         <div className="p-6 space-y-6">
+            <RecipeHealthBanner orgSlug={orgSlug} />
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold tracking-tight">{isMfg ? 'Bills of Materials' : 'Recipes / BOM'}</h1>

@@ -195,6 +195,10 @@ export interface CreateItemInput {
   // Preferred supplier (uuid). Empty-string/null sentinel clears it on update.
   preferred_supplier_id?: string | null;
   unit_id?: string;
+  // Update only: how many OLD stock units make one NEW unit when the stock unit changes across
+  // dimensions (g to pc). The server rescales stock, costs and prices; same-dimension changes
+  // (g to kg) need no factor.
+  rescale_old_per_new?: number;
   barcode?: string;
   reorder_level?: number;
   reorder_quantity?: number;
@@ -388,7 +392,13 @@ export interface BulkActionResult {
   skipped: BulkSkipped[];
 }
 
-export type BulkStatusAction = 'activate' | 'deactivate' | 'not_for_sale_on' | 'not_for_sale_off';
+export type BulkStatusAction =
+  | 'activate'
+  | 'deactivate'
+  | 'not_for_sale_on'
+  | 'not_for_sale_off'
+  | 'non_depleting_on'
+  | 'non_depleting_off';
 
 export const itemsApi = {
   list: async (orgSlug: string, params?: ListItemsParams): Promise<PaginatedItems> => {

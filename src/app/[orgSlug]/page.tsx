@@ -1,6 +1,7 @@
 'use client';
 
 import { Badge, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { RecipeHealthBanner } from '@/components/inventory/RecipeHealthBanner';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
 import { useAnalyticsSummary, useStockTrends, useInventoryDistribution, useReorderAlerts, useTopItems } from '@/hooks/useAnalytics';
@@ -121,6 +122,7 @@ export default function DashboardPage() {
 
   return (
     <div className="p-6 space-y-6 animate-fade-up">
+      <RecipeHealthBanner orgSlug={orgSlug} />
       {/* Header + Quick Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
