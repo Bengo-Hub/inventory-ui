@@ -9,7 +9,6 @@ export interface Supplier {
   phone?: string;
   address?: string;
   contact_person?: string;
-  tax_number?: string;
   notes?: string;
   is_active: boolean;
   // Payment config
@@ -23,6 +22,7 @@ export interface Supplier {
   bank_account_number?: string;
   bank_name?: string;
   bank_branch?: string;
+  /** KRA PIN (the only tax-id field inventory-api stores). */
   tax_pin?: string;
   requires_invoice_before_payment?: boolean;
   auto_pay_enabled?: boolean;
@@ -45,7 +45,6 @@ export interface CreateSupplierInput {
   phone?: string;
   address?: string;
   contact_person?: string;
-  tax_number?: string;
   notes?: string;
   // Payment config
   payment_method_type?: PaymentMethodType;
@@ -57,6 +56,7 @@ export interface CreateSupplierInput {
   bank_account_number?: string;
   bank_name?: string;
   bank_branch?: string;
+  /** KRA PIN (the only tax-id field inventory-api stores). */
   tax_pin?: string;
   requires_invoice_before_payment?: boolean;
   auto_pay_enabled?: boolean;
