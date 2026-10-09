@@ -73,7 +73,7 @@ export function Header({ onMenuClick }: HeaderProps) {
               Bounded through the tablet tier; only genuinely unbounded once desktop width (lg+)
               has room to spare. */}
           <h1 className="hidden sm:block text-lg sm:text-xl font-black tracking-tight text-foreground uppercase truncate max-w-28 md:max-w-36 lg:max-w-none">
-            {getServiceTitle('Inventory')}
+            {getServiceTitle('Inventory', 'inventory')}
           </h1>
           {/* Deferred to lg: (was md:), matching pos-ui's header — at tablet width this fixed
               320px search box left too little room for the title + the always-visible
