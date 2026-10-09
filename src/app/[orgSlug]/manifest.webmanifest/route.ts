@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { serviceAppName } from '@bengo-hub/shared-ui-lib/branding';
 
 const AUTH_API_BASE =
   process.env.NEXT_PUBLIC_SSO_URL ||
@@ -60,9 +61,9 @@ export async function GET(
 
   const manifest = {
     name: `${name} Inventory`,
-    // Home-screen label = tenant first word + service, e.g. "Urban Inventory",
-    // so a tenant's several installed Bengo apps stay distinguishable.
-    short_name: `${name.trim().split(/\s+/)[0] || 'Bengo'} Inventory`,
+    // Home-screen label = tenant brand word + service, e.g. "The Urban Inventory" (shared rule in
+    // shared-ui-lib branding), so a tenant's several installed Bengo apps stay distinguishable.
+    short_name: serviceAppName(name, 'Inventory', 'Codevertex'),
     description: 'Manage inventory, stock levels and purchase orders.',
     start_url: `/${orgSlug}/`,
     scope: `/${orgSlug}/`,
