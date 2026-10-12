@@ -22,7 +22,7 @@ import { buildEOLColumns } from './eol-columns';
 import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, Plus, RefreshCw, Search, Split } from 'lucide-react';
 import { StockExportDialog } from '@/components/inventory/ExportDialogs';
 import { useParams, useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
@@ -485,9 +485,23 @@ export default function StockPage() {
     // Top-level view: live stock levels vs the End-of-Life tab (items awaiting purge/restore).
     const [tab, setTab] = useState<'levels' | 'eol'>('levels');
 
-    // End-of-Life listing — reuses the items endpoint with status=eol (only EOL items).
-    const { data: eolItems, isLoading: eolLoading } = useItems(orgSlug, { status: 'eol', limit: 200 });
-    const eolCount = eolItems?.total ?? eolItems?.data.length ?? 0;
+    // End-of-Life listing: the items endpoint with status=eol. Search (name, SKU, barcode) and
+    // paging run server-side so the tab stays fast however many items are retired.
+    const [eolSearch, setEolSearch] = useState('');
+    const deferredEolSearch = useDeferredValue(eolSearch.trim());
+    const [eolPage, setEolPage] = useState(1);
+    const [eolPageSize, setEolPageSize] = useState(25);
+    useEffect(() => { setEolPage(1); }, [deferredEolSearch, eolPageSize]);
+    const { data: eolItems, isLoading: eolLoading, isFetching: eolFetching } = useItems(orgSlug, {
+        status: 'eol',
+        page: eolPage,
+        limit: eolPageSize,
+        ...(deferredEolSearch ? { search: deferredEolSearch } : {}),
+    });
+    const eolTotal = eolItems?.total ?? eolItems?.data.length ?? 0;
+    // The tab badge counts every EOL item, not just the current search's matches.
+    const { data: eolAll } = useItems(orgSlug, { status: 'eol', page: 1, limit: 1 });
+    const eolCount = eolAll?.total ?? 0;
 
     const markEOL = useMarkItemEOL(orgSlug);
     const restoreEOL = useRestoreItemEOL(orgSlug);
@@ -752,19 +766,44 @@ export default function StockPage() {
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
+                        <div className="px-4 pb-3">
+                            <div className="relative max-w-md">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search End-of-Life items by name, SKU or barcode..."
+                                    value={eolSearch}
+                                    onChange={(e) => setEolSearch(e.target.value)}
+                                    className="pl-9"
+                                    aria-label="Search End-of-Life items"
+                                />
+                            </div>
+                        </div>
                         <div className="px-2 pb-2">
                             <DataTable<Item>
                                 columns={eolColumns}
                                 rows={eolItems?.data ?? []}
                                 rowKey={(it) => it.id}
-                                loading={eolLoading}
+                                loading={eolLoading || (eolFetching && !eolItems?.data.length)}
                                 loadingRows={8}
+                                page={eolPage}
+                                totalPages={Math.max(1, Math.ceil(eolTotal / eolPageSize))}
+                                onPageChange={setEolPage}
+                                total={eolTotal}
+                                pageSize={eolPageSize}
+                                onPageSizeChange={setEolPageSize}
                                 emptyState={
-                                    <>
-                                        <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                        <p className="text-muted-foreground">No End-of-Life items</p>
-                                        <p className="text-xs text-muted-foreground/70 mt-1">Mark an out-of-stock item End-of-Life to move it here</p>
-                                    </>
+                                    deferredEolSearch ? (
+                                        <>
+                                            <Search className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No End-of-Life items match &quot;{deferredEolSearch}&quot;</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <BookOpen className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                                            <p className="text-muted-foreground">No End-of-Life items</p>
+                                            <p className="text-xs text-muted-foreground/70 mt-1">Mark an out-of-stock item End-of-Life to move it here</p>
+                                        </>
+                                    )
                                 }
                                 storageKey="stock-eol-col-prefs"
                             />

@@ -93,7 +93,8 @@ export interface UpdateTransferInput {
 }
 
 export interface TransferListParams {
-  status?: TransferStatus;
+  /** One status, or several separated by commas (e.g. "draft,in_transit"). */
+  status?: TransferStatus | string;
   search?: string;
   warehouse_id?: string;
   from?: string;

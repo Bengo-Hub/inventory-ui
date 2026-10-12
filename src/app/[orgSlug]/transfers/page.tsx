@@ -166,10 +166,24 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
     );
 }
 
+// Status filter for the list, using the labels the Status column shows (draft reads "Pending",
+// received reads "Completed"). "Open" is everything not yet received: pending plus in transit.
+// The backend takes a comma separated status list.
+const TRANSFER_STATUS_FILTERS = {
+    all: { label: 'All statuses', statuses: '' },
+    open: { label: 'Pending + In Transit', statuses: 'draft,in_transit' },
+    draft: { label: 'Pending', statuses: 'draft' },
+    in_transit: { label: 'In Transit', statuses: 'in_transit' },
+    received: { label: 'Completed', statuses: 'received' },
+    cancelled: { label: 'Cancelled', statuses: 'cancelled' },
+} as const;
+type TransferStatusFilter = keyof typeof TRANSFER_STATUS_FILTERS;
+
 export default function TransfersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const [search, setSearch] = useState('');
+    const [statusFilter, setStatusFilter] = useState<TransferStatusFilter>('all');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
@@ -204,6 +218,7 @@ export default function TransfersPage() {
     // permanently unfindable once the tenant had more transfers than that one page could hold.
     const { data: transfersPage, isLoading, isError, refetch, isFetching } = useTransfers(orgSlug, {
         ...(search ? { search } : {}),
+        ...(statusFilter !== 'all' ? { status: TRANSFER_STATUS_FILTERS[statusFilter].statuses } : {}),
         from: range.from || undefined,
         to: range.to || undefined,
         page,
@@ -215,7 +230,7 @@ export default function TransfersPage() {
     const paginatedItems = transfersPage?.items ?? [];
     const totalPages = Math.max(1, Math.ceil((transfersPage?.total ?? 0) / pageSize));
 
-    useMemo(() => { setPage(1); }, [search, range, pageSize]);
+    useMemo(() => { setPage(1); }, [search, statusFilter, range, pageSize]);
 
     const columns = useMemo(
         () => buildTransferColumns({ onView: (t) => setViewId(t.id), onEdit: (t) => setEditId(t.id) }),
@@ -318,6 +333,16 @@ export default function TransfersPage() {
                             className="pl-10"
                         />
                     </div>
+                    <select
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as TransferStatusFilter)}
+                        aria-label="Filter by status"
+                        className="h-10 rounded-md border border-input bg-background px-3 text-sm sm:w-56"
+                    >
+                        {(Object.keys(TRANSFER_STATUS_FILTERS) as TransferStatusFilter[]).map((key) => (
+                            <option key={key} value={key}>{TRANSFER_STATUS_FILTERS[key].label}</option>
+                        ))}
+                    </select>
                     <DateRangePicker value={range} onChange={setRange} className="w-56" />
                 </CardHeader>
                 <CardContent className="p-0">
