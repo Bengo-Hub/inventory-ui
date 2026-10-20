@@ -6,6 +6,7 @@
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockAdjustment } from '@/lib/api/stock';
+import { isBackdatedAdjustment } from '@/lib/adjustment-date';
 
 export interface AdjustmentColumnCallbacks {
   onPrint: (a: StockAdjustment, format: DocFormat) => void;
@@ -32,7 +33,16 @@ export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTable
       sortable: true,
       accessor: (a) => a.adjusted_at ?? a.created_at,
       cellClassName: 'text-muted-foreground whitespace-nowrap',
-      render: (a) => new Date(a.adjusted_at ?? a.created_at).toLocaleDateString(),
+      render: (a) => (
+        <div>
+          <div>{new Date(a.adjusted_at ?? a.created_at).toLocaleDateString()}</div>
+          {isBackdatedAdjustment(a) && (
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(a.created_at).toLocaleString()}`}>
+              entered {new Date(a.created_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       key: 'item_name',

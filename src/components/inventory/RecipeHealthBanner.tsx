@@ -9,14 +9,14 @@ import Link from 'next/link';
 import { AlertTriangle, X } from 'lucide-react';
 import { useRecipeHealthSummary } from '@/hooks/use-recipe-health';
 import { RECIPE_HEALTH_ISSUES, type RecipeHealthIssue } from '@/lib/api/recipe-health';
-import { hasModule } from '@/lib/use-case-modules';
-import { useOutletStore } from '@/store/outlet';
+import { useRecipeScope } from '@/hooks/use-recipe-scope';
 
 const DISMISS_KEY = 'recipe-health-banner-dismissed';
 
 export function RecipeHealthBanner({ orgSlug, className }: { orgSlug: string; className?: string }) {
-  const useCase = useOutletStore((s) => s.outlet?.use_case);
-  const enabled = hasModule('recipes', useCase);
+  // Without recipes (a pure retail tenant) only the stock problem applies, worded for a shop.
+  const scope = useRecipeScope(orgSlug);
+  const enabled = scope.stockHealth;
   const { data } = useRecipeHealthSummary(orgSlug, enabled);
   const [dismissed, setDismissed] = useState(true);
 
@@ -28,17 +28,20 @@ export function RecipeHealthBanner({ orgSlug, className }: { orgSlug: string; cl
     }
   }, []);
 
-  if (!enabled || dismissed || !data || data.total <= 0) return null;
+  if (!enabled || dismissed || !data) return null;
 
   const counts = data.counts;
-  const worst = RECIPE_HEALTH_ISSUES.reduce<RecipeHealthIssue>(
+  const issues = scope.usesRecipes ? RECIPE_HEALTH_ISSUES : RECIPE_HEALTH_ISSUES.filter((it) => it.key === 'frequent_stock_outs');
+  if (issues.reduce((sum, it) => sum + (counts[it.key] ?? 0), 0) <= 0) return null;
+  const worst = issues.reduce<RecipeHealthIssue>(
     (best, it) => ((counts[it.key] ?? 0) > (counts[best] ?? 0) ? it.key : best),
-    'missing_bom',
+    issues[0].key,
   );
-  const parts = RECIPE_HEALTH_ISSUES.filter((it) => (counts[it.key] ?? 0) > 0).map(
+  const parts = issues.filter((it) => (counts[it.key] ?? 0) > 0).map(
     (it) => `${counts[it.key]} ${it.label.toLowerCase()}`,
   );
-  const missing = counts.missing_bom ?? 0;
+  const missing = scope.usesRecipes ? counts.missing_bom ?? 0 : 0;
+  const stockOuts = counts.frequent_stock_outs ?? 0;
 
   return (
     <div
@@ -50,9 +53,13 @@ export function RecipeHealthBanner({ orgSlug, className }: { orgSlug: string; cl
         <p className="font-semibold">
           {missing > 0
             ? `${missing} recipe item${missing === 1 ? ' has' : 's have'} no ingredients configured, so their sales are not deducting stock.`
-            : 'Some items have data problems that make stock or recipe costs wrong.'}
+            : !scope.usesRecipes
+              ? `${stockOuts} item${stockOuts === 1 ? ' has' : 's have'} run out three or more times in the last 30 days.`
+              : 'Some items have data problems that make stock or recipe costs wrong.'}
         </p>
-        <p className="text-xs opacity-80 mt-0.5">{parts.join(' · ')}</p>
+        <p className="text-xs opacity-80 mt-0.5">
+          {scope.usesRecipes ? parts.join(' · ') : 'Check that deliveries are received in the system and that each item’s unit matches how it is counted.'}
+        </p>
       </div>
       <Link
         href={`/${orgSlug}/recipes/health?issue=${worst}`}

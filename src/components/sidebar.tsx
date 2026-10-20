@@ -47,6 +47,7 @@ import { useSubscription } from '@/hooks/use-subscription';
 import { usePermissions } from '@/hooks/usePermissions';
 import { nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { hasModule } from '@/lib/use-case-modules';
+import { useRecipeScope } from '@/hooks/use-recipe-scope';
 import { FeatureLock } from '@bengo-hub/shared-ui-lib/subscription';
 
 interface SidebarProps {
@@ -216,6 +217,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   // ── Nav groups ────────────────────────────────────────────────────────────
 
   const useCase = outlet?.use_case;
+  const recipeScope = useRecipeScope(orgSlug);
 
   const allNavGroups: NavGroup[] = [
     {
@@ -235,9 +237,16 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         // pricing + in-house production, e.g. cupcakes) — same gate Production Batches already
         // uses, applied here via the item-level `feature` override so hospitality/quick_service/
         // warehouse keep their existing unconditional (no feature check) access untouched.
-        ...(useCase === 'manufacturing' ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes', ...(useCase === 'retail' ? { feature: 'manufacturing' } : {}) }]),
+        // A pure retail tenant (no recipe use case, no recipes created) never sees Recipes / BOM.
+        ...(useCase === 'manufacturing' || !recipeScope.usesRecipes ? [] : [{ label: 'Recipes / BOM', icon: ChefHat, href: '/recipes', moduleKey: 'recipes', ...(useCase === 'retail' ? { feature: 'manufacturing' } : {}) }]),
         // Data problems that break stock/costs (no BOM, unconvertible units, wrong cost per unit).
-        { label: 'Recipe Health', icon: ShieldCheck, href: '/recipes/health', moduleKey: 'recipes' },
+        // Without recipes the same page is "Stock Health": only the stock problems that apply to
+        // any shop (items that keep running out).
+        ...(recipeScope.usesRecipes
+          ? [{ label: 'Recipe Health', icon: ShieldCheck, href: '/recipes/health', moduleKey: 'recipes' }]
+          : recipeScope.stockHealth
+            ? [{ label: 'Stock Health', icon: ShieldCheck, href: '/recipes/health', moduleKey: 'stock' }]
+            : []),
         { label: 'Modifiers', icon: SquareStack, href: '/modifiers', moduleKey: 'modifiers' },
         { label: 'Bundles & Packages', icon: PackagePlus, href: '/bundles', moduleKey: 'bundles' },
       ],
@@ -286,8 +295,11 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
         { label: 'Aging Stock', icon: Tag, href: '/aging-stock', moduleKey: 'stock', feature: 'batch_period_pricing' },
         // Renamed from "Ingredient Utilization" per the use-case PowerSuite specs (route unchanged).
         { label: 'Stock Reconciliation', icon: Gauge, href: '/reports/ingredient-utilization', moduleKey: 'stock', feature: 'report_stock_reconciliation' },
-        { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes', feature: 'report_food_cost_variance' },
-        { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes', feature: 'report_menu_engineering' },
+        // Recipe-cost reports: meaningless without recipes, so a pure retail tenant does not see them.
+        ...(recipeScope.usesRecipes ? [
+          { label: 'Food Cost Variance', icon: DollarSign, href: '/reports/food-cost', moduleKey: 'recipes', feature: 'report_food_cost_variance' },
+          { label: 'Menu Engineering', icon: ChefHat, href: '/reports/menu-engineering', moduleKey: 'recipes', feature: 'report_menu_engineering' },
+        ] : []),
       ],
     },
     {

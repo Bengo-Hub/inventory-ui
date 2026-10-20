@@ -28,7 +28,9 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
-import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { DECIMAL_STEP, localDateInput, parseDecimal } from '@/lib/utils';
+import { adjustmentDateParam } from '@/lib/adjustment-date';
+import { AdjustmentDateField } from '@/components/inventory/AdjustmentDateField';
 import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
@@ -76,6 +78,8 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
     const [reason, setReason] = useState('');
     const [notes, setNotes] = useState('');
     const [unitId, setUnitId] = useState('');
+    // Today = a normal adjustment; an earlier day back-dates it (see AdjustmentDateField).
+    const [adjustmentDate, setAdjustmentDate] = useState(() => localDateInput(0));
     // The selected item's own stock unit: a quantity entered in another unit is converted into it
     // by inventory-api (5 kg into an item stocked in g = 5000 g), never added raw.
     const [itemUnitId, setItemUnitId] = useState('');
@@ -123,6 +127,7 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
             notes: notes.trim() || undefined,
             warehouse_id: activeWarehouse.warehouseId || undefined,
             unit_id: unitId || undefined,
+            adjustment_date: adjustmentDateParam(adjustmentDate),
         }, {
             onSuccess: () => {
                 toast.success('Stock adjustment recorded');
@@ -243,6 +248,8 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
                                     ))}
                                 </select>
                             </div>
+
+                            <AdjustmentDateField value={adjustmentDate} onChange={setAdjustmentDate} />
 
                             {reason === 'other' && (
                                 <div className="space-y-2">

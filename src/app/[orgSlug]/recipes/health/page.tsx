@@ -19,6 +19,7 @@ import {
   useRecomputeAllRecipeCosts,
 } from '@/hooks/use-recipe-health';
 import { usePermissions, P } from '@/hooks/usePermissions';
+import { useRecipeScope } from '@/hooks/use-recipe-scope';
 import { RECIPE_HEALTH_ISSUES, type RecipeHealthIssue, type RecipeHealthRow } from '@/lib/api/recipe-health';
 import type { BulkStatusAction } from '@/lib/api/items';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -38,7 +39,13 @@ export default function RecipeHealthPage() {
   const canRecompute = canAny(['inventory.recipes.change', P.CATALOG_MANAGE]);
 
   const initial = search?.get('issue') ?? null;
-  const [issue, setIssue] = useState<RecipeHealthIssue>(isIssue(initial) ? initial : 'missing_bom');
+  // Without recipes (a pure retail tenant) this is "Stock Health": only the stock problem that
+  // applies to any shop is shown, and the recipe-only ones, their counts and the recipe cost
+  // recalculation stay out of the way.
+  const scope = useRecipeScope(orgSlug);
+  const visibleIssues = scope.usesRecipes ? RECIPE_HEALTH_ISSUES : RECIPE_HEALTH_ISSUES.filter((i) => i.key === 'frequent_stock_outs');
+  const [issueChoice, setIssue] = useState<RecipeHealthIssue>(isIssue(initial) ? initial : 'missing_bom');
+  const issue = visibleIssues.some((i) => i.key === issueChoice) ? issueChoice : visibleIssues[0].key;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -163,13 +170,15 @@ export default function RecipeHealthPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <ShieldCheck className="h-6 w-6 text-primary" />Recipe Health
+            <ShieldCheck className="h-6 w-6 text-primary" />{scope.usesRecipes ? 'Recipe Health' : 'Stock Health'}
           </h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-            Problems that make stock levels or recipe costs wrong. Fix each one here; the list updates as you go.
+            {scope.usesRecipes
+              ? 'Problems that make stock levels or recipe costs wrong. Fix each one here; the list updates as you go.'
+              : 'Items whose stock keeps running out, usually because deliveries are not received in the system or the unit does not match how the item is counted. Fix each one here; the list updates as you go.'}
           </p>
         </div>
-        {canRecompute && (
+        {scope.usesRecipes && canRecompute && (
           <Button variant="outline" onClick={() => setConfirmRecompute(true)} disabled={recompute.isPending}>
             <Calculator className="h-4 w-4 mr-2" />
             {recompute.isPending ? 'Recalculating…' : 'Recalculate all recipe costs'}
@@ -177,8 +186,8 @@ export default function RecipeHealthPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {RECIPE_HEALTH_ISSUES.map((it) => {
+      <div className={cn('grid gap-3', scope.usesRecipes ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-1 sm:max-w-xs')}>
+        {visibleIssues.map((it) => {
           const n = counts?.[it.key];
           const active = it.key === issue;
           return (

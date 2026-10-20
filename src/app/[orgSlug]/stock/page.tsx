@@ -27,7 +27,9 @@ import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
 import { usePermissions, P } from '@/hooks/usePermissions';
-import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { DECIMAL_STEP, localDateInput, parseDecimal } from '@/lib/utils';
+import { adjustmentDateParam } from '@/lib/adjustment-date';
+import { AdjustmentDateField } from '@/components/inventory/AdjustmentDateField';
 
 // Only stockable item types appear on stock levels (mirrors the backend
 // stockableTypes filter); services/vouchers/recipes never hold balances.
@@ -69,6 +71,8 @@ function StockDrawer({
     const [adjNotes, setAdjNotes] = useState('');
     const [adjWarehouseId, setAdjWarehouseId] = useState(item.warehouse_id ?? '');
     const [adjUnitId, setAdjUnitId] = useState(item.unit_id ?? '');
+    // Today = a normal adjustment; an earlier day back-dates it (see AdjustmentDateField).
+    const [adjDate, setAdjDate] = useState(() => localDateInput(0));
     const [showAdjForm, setShowAdjForm] = useState(initialAction === 'adjust');
 
     // Breakdown (bulk pack -> retail units): the clicked row is the parent SKU.
@@ -107,6 +111,7 @@ function StockDrawer({
             notes: adjNotes.trim() || undefined,
             warehouse_id: adjWarehouseId || undefined,
             unit_id: adjUnitId || undefined,
+            adjustment_date: adjustmentDateParam(adjDate),
         }, {
             onSuccess: () => {
                 toast.success('Adjustment recorded');
@@ -315,6 +320,8 @@ function StockDrawer({
                                     ))}
                                 </select>
                             </div>
+
+                            <AdjustmentDateField value={adjDate} onChange={setAdjDate} className="space-y-1.5" />
 
                             {adjReason === 'other' && (
                                 <textarea

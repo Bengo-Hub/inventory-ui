@@ -46,6 +46,8 @@ export interface CreateAdjustmentInput {
   notes?: string;
   warehouse_id?: string;
   unit_id?: string;
+  /** YYYY-MM-DD, never in the future. Back-dates the movement; omit for a normal adjustment. */
+  adjustment_date?: string;
 }
 
 export interface CreateBreakdownInput {
