@@ -1,6 +1,7 @@
 'use client';
 
 import { useAuthStore } from '@/store/auth';
+import { useSubscription } from '@/hooks/use-subscription';
 import { useState } from 'react';
 import { Bell, ChevronDown, Menu, Search, Settings, User } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
@@ -45,7 +46,16 @@ export function Header({ onMenuClick }: HeaderProps) {
   // The App Store shows every real service to every authenticated user in the tenant — each
   // destination service already enforces its own RBAC + subscription gating on arrival, so
   // pre-filtering the directory here just hid apps that were actually reachable.
-  const services = useVisibleServices({ orgSlug, urls: SERVICE_URLS, canManageLinks: true });
+  // A service outside the plan stays visible as "Not in your plan" with a link to the plans page
+  // (shared-ui-lib default), so tenants discover the rest of the suite without hitting a 403.
+  const { activeServiceTags } = useSubscription();
+  const services = useVisibleServices({
+    orgSlug,
+    urls: SERVICE_URLS,
+    canManageLinks: true,
+    activeServiceTags,
+    upgradeUrl: SERVICE_URLS.subscriptions ? `${SERVICE_URLS.subscriptions}/${orgSlug}` : null,
+  });
   const [profileOpen, setProfileOpen] = useState(false);
   const isAuthenticated = !!user && !!session;
   const name = displayName(user);
