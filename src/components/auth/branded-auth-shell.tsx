@@ -3,6 +3,7 @@
 import { Package } from 'lucide-react';
 import { ReactNode } from 'react';
 import { useBranding } from '@/providers/branding-provider';
+import { MediaImage } from '@bengo-hub/shared-ui-lib/media';
 
 /**
  * BrandedAuthShell — the shared, modern, tenant-branded panel used by the
@@ -31,9 +32,10 @@ export function BrandedAuthShell({
         {/* Logo */}
         <div className="flex justify-center mb-8">
           {tenant?.logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <MediaImage
               src={tenant.logoUrl}
+              displayWidth={220}
+              loading="eager"
               alt={tenant.name ?? 'Logo'}
               className="h-14 w-auto max-w-[220px] object-contain"
             />

@@ -49,6 +49,7 @@ import { nomenclatureFor } from '@/lib/use-case-nomenclature';
 import { hasModule } from '@/lib/use-case-modules';
 import { useRecipeScope } from '@/hooks/use-recipe-scope';
 import { FeatureLock } from '@bengo-hub/shared-ui-lib/subscription';
+import { MediaImage } from '@bengo-hub/shared-ui-lib/media';
 
 interface SidebarProps {
   open?: boolean;
@@ -375,8 +376,10 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       <div className="border-b border-sidebar-border shrink-0 overflow-hidden" style={{ height: '72px' }}>
         {tenant?.logoUrl ? (
           <div className="flex items-center h-full px-3 py-2">
-            <img
+            <MediaImage
               src={tenant.logoUrl}
+              displayWidth={220}
+              loading="eager"
               alt={tenant.name ?? orgSlug}
               className="h-full w-auto max-w-full object-contain"
             />

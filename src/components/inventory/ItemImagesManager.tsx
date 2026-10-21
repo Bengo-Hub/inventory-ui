@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Image as ImageIcon, Loader2, Plus, Star, Trash2, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { MediaImage } from '@bengo-hub/shared-ui-lib/media';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 
@@ -151,8 +152,7 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
         <div className="flex items-center gap-3">
           {primaryUrl ? (
             <div className="relative h-16 w-16 shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={primaryUrl} alt="Item" className="h-16 w-16 rounded-lg object-cover border border-input" />
+              <MediaImage src={primaryUrl} displayWidth={64} fit="cover" aspect={1} alt="Item" className="h-16 w-16 rounded-lg object-cover border border-input" />
               <button
                 type="button"
                 onClick={() => onPrimaryChange?.('')}
@@ -186,8 +186,7 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
         {isLoading && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />}
         {images.map((img, idx) => (
           <div key={img.id} className="relative h-24 w-24 group rounded-lg border border-input overflow-hidden">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={img.url} alt={img.file_name ?? 'Item image'} className="h-full w-full object-cover" />
+            <MediaImage src={img.url} displayWidth={96} fit="cover" aspect={1} alt={img.file_name ?? 'Item image'} className="h-full w-full object-cover" />
             {img.is_primary && (
               <span className="absolute top-1 left-1 inline-flex items-center gap-0.5 rounded bg-primary px-1 py-0.5 text-[10px] font-medium text-primary-foreground">
                 <Star className="h-2.5 w-2.5 fill-current" /> Primary

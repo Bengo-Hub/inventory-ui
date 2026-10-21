@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useBranding } from '@/providers/branding-provider';
 import { DEFAULT_IDLE_SECONDS, useIdle } from '@/hooks/use-idle';
 import { resolveIdleSeconds } from '@/hooks/use-screensaver-timeout';
+import { MediaImage } from '@bengo-hub/shared-ui-lib/media';
 
 interface IdleScreensaverProps {
   /** Enable detection. Pass false on screens where a screensaver is unwanted. */
@@ -79,9 +80,10 @@ export function IdleScreensaver({ enabled = true, timeoutSeconds, onWake }: Idle
       {/* Brand */}
       <div className="flex flex-col items-center gap-5">
         {tenant?.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <MediaImage
             src={tenant.logoUrl}
+            displayWidth={260}
+            loading="eager"
             alt={tenant.name ?? 'Logo'}
             className="h-20 w-auto max-w-[260px] object-contain"
           />
