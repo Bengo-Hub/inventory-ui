@@ -277,6 +277,8 @@ export interface StockMovementRow {
     | 'sale'
     | 'sell_return'
     | 'purchase_return'
+    | 'service_out'
+    | 'service_in'
     | 'transfer_in'
     | 'transfer_out'
     | 'adjustment';
@@ -308,6 +310,9 @@ export interface StockHistorySummary {
   transfers_in: number;
   total_sold: number;
   total_purchase_returns: number;
+  /** Units sent to a repair provider and units received back repaired (neither is an adjustment). */
+  sent_for_repair: number;
+  returned_from_repair: number;
   transfers_out: number;
   /** Net of miscellaneous adjustments (damage, shrinkage, corrections…). */
   total_adjusted: number;

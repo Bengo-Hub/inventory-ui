@@ -136,3 +136,12 @@ Inventory-api uses auth-api as source of truth for roles/permissions; see invent
 | auth-ui SSO flow | Required | Login/logout |
 | shared-auth-client JWKS | Required | Token validation |
 | Shadcn UI components | Available | Use existing Codevertex component patterns |
+
+## Returns page: supplier returns and repair orders (2026-10-21)
+
+The Returns page (`/[orgSlug]/returns`) handles two destinations through one form, one list and one set of hooks (`hooks/usePurchaseReturns.ts`, `lib/api/purchase-returns.ts`):
+
+- **Return to supplier:** unchanged. Approving takes the items out of stock and treasury credits the supplier.
+- **Send for repair:** items go to a technician, service centre or care centre and are expected back. The form (`components/returns/ReturnFormDialog.tsx`) asks for the provider (free text), contact, fault and expected day. Approving ("Send out") takes the items out of stock. **Receive back** (`components/returns/ReceiveBackDialog.tsx`) restocks repaired units and writes off the ones that cannot be repaired. Nothing is credited.
+
+The list filters by type, by repair state and by overdue, and shows summary tiles from `GET /inventory/purchase-returns/service-summary` when something is out for repair. Overdue is decided from the browser's local day (`localDateInput()`), sent as `today`. The stock history page labels the two movements "Sent for Repair" and "Returned from Repair".

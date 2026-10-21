@@ -24,6 +24,8 @@ const MOVEMENT_TYPE_OPTIONS: { value: StockMovementRow['type']; label: string }[
   { value: 'sale', label: 'Sold' },
   { value: 'sell_return', label: 'Sell Return' },
   { value: 'purchase_return', label: 'Purchase Return' },
+  { value: 'service_out', label: 'Sent for Repair' },
+  { value: 'service_in', label: 'Returned from Repair' },
   { value: 'transfer_in', label: 'Transfer In' },
   { value: 'transfer_out', label: 'Transfer Out' },
   { value: 'adjustment', label: 'Adjustment' },
@@ -36,6 +38,8 @@ const TYPE_BADGE: Record<StockMovementRow['type'], 'success' | 'error' | 'warnin
   transfer_in: 'success',
   sale: 'error',
   purchase_return: 'error',
+  service_out: 'warning',
+  service_in: 'success',
   transfer_out: 'error',
   adjustment: 'warning',
 };
@@ -236,6 +240,7 @@ export default function StockHistoryPage() {
             <SummaryRow label="Total Purchase" value={`${qty(summary?.total_purchased)}${unit}`} />
             <SummaryRow label="Total Sell Return" value={`${qty(summary?.total_sell_returns)}${unit}`} />
             <SummaryRow label="Stock Transfers (In)" value={`${qty(summary?.transfers_in)}${unit}`} />
+            <SummaryRow label="Returned from Repair" value={`${qty(summary?.returned_from_repair)}${unit}`} />
           </dl>
         </div>
         <div className="rounded-xl border border-border p-4">
@@ -245,6 +250,7 @@ export default function StockHistoryPage() {
           <dl className="space-y-1.5 text-sm">
             <SummaryRow label="Total Sold" value={`${qty(summary?.total_sold)}${unit}`} />
             <SummaryRow label="Total Purchase Return" value={`${qty(summary?.total_purchase_returns)}${unit}`} />
+            <SummaryRow label="Sent for Repair" value={`${qty(summary?.sent_for_repair)}${unit}`} />
             <SummaryRow label="Stock Transfers (Out)" value={`${qty(summary?.transfers_out)}${unit}`} />
             <SummaryRow label="Net Adjustments" value={`${qty(summary?.total_adjusted)}${unit}`} />
           </dl>
