@@ -291,6 +291,31 @@ export interface UpdateItemImageInput {
   is_primary?: boolean;
 }
 
+/** One item a bulk-uploaded file could belong to (POST /items/images/match). */
+export interface ImageMatchCandidate {
+  item_id: string;
+  sku: string;
+  name: string;
+  is_active: boolean;
+  has_image: boolean;
+  image_url?: string;
+  /** 0..1, the same trigram score Postgres ranked by; 1 for a SKU, barcode or exact name. */
+  score: number;
+}
+
+/** sku and barcode are certain, exact is near certain, similar needs a person to confirm. */
+export type ImageMatchKind = 'sku' | 'barcode' | 'exact' | 'similar' | 'none';
+
+export interface ImageMatchResult {
+  file_name: string;
+  kind: ImageMatchKind;
+  match?: ImageMatchCandidate;
+  alternatives: ImageMatchCandidate[];
+}
+
+/** The server matches at most this many file names per request. */
+export const IMAGE_MATCH_PAGE = 100;
+
 function itemsBase(orgSlug: string) {
   return `/api/v1/${orgSlug}/inventory/items`;
 }
@@ -543,6 +568,12 @@ export const itemsApi = {
 
   deleteImage: (orgSlug: string, itemId: string, imageId: string): Promise<void> =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${itemId}/images/${imageId}`),
+
+  /** Suggest the item for each file name of a bulk image upload (at most IMAGE_MATCH_PAGE names). */
+  matchImages: async (orgSlug: string, fileNames: string[]): Promise<ImageMatchResult[]> => {
+    const res = await apiClient.post<{ matches: ImageMatchResult[] }>(`${itemsBase(orgSlug)}/images/match`, { file_names: fileNames });
+    return res.matches ?? [];
+  },
 
   // Branded PDF/CSV export of the catalog — same filters as the list (minus pagination/sort),
   // plus an outlet override. Streamed from inventory-api's docs report engine; feed the blob to

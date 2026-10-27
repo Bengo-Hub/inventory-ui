@@ -5,6 +5,7 @@ import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { BarcodeDialog } from '@/components/inventory/BarcodeDialog';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { PrintLabelsDialog } from '@/components/inventory/PrintLabelsDialog';
+import { BulkImageUploadDialog } from '@/components/inventory/BulkImageUploadDialog';
 import { ProductsExportDialog } from '@/components/inventory/ExportDialogs';
 import { DetailDrawer, type DetailField } from '@/components/inventory/DetailDrawer';
 import { useItemPricing, usePricingTiers } from '@/hooks/usePricing';
@@ -26,7 +27,7 @@ import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
 import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardEdit, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardEdit, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, ImagePlus, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
 import { MoveStockDialog, type MoveStockItem } from '@/components/inventory/MoveStockDialog';
 import { BulkAdjustStockDialog, type BulkAdjustStockItem } from '@/components/inventory/BulkAdjustStockDialog';
 import { useOutletStore } from '@/store/outlet';
@@ -568,6 +569,7 @@ export default function CatalogPage() {
   const [barcodeItem, setBarcodeItem] = useState<Item | null>(null);
   const openHistory = (sku: string) => router.push(`/${orgSlug}/stock-history/${encodeURIComponent(sku)}`);
   const [printLabelsOpen, setPrintLabelsOpen] = useState(false);
+  const [imagesOpen, setImagesOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
 
   const createItem = useCreateItem(orgSlug);
@@ -998,6 +1000,14 @@ export default function CatalogPage() {
               </>
             )}
 
+            {/* Pictures for many items at once, matched by file name. Same permission as editing
+                an item; each photo still goes through the per-item upload and its plan limits. */}
+            {canPrintLabels && (
+              <Button variant="outline" size="sm" onClick={() => setImagesOpen(true)} title="Add pictures to many items, matched by file name">
+                <ImagePlus className="h-4 w-4 mr-1.5" />Pictures
+              </Button>
+            )}
+
             {/* Bulk label printing — by category / supplier / PO / selection */}
             {canPrintLabels && (
               <Button variant="outline" size="sm" onClick={() => setPrintLabelsOpen(true)} title="Print barcode labels in bulk">
@@ -1331,6 +1341,9 @@ export default function CatalogPage() {
       {printLabelsOpen && (
         <PrintLabelsDialog orgSlug={orgSlug} onClose={() => setPrintLabelsOpen(false)} />
       )}
+
+      {/* Bulk pictures */}
+      {imagesOpen && <BulkImageUploadDialog orgSlug={orgSlug} onClose={() => setImagesOpen(false)} />}
 
       {/* Branded PDF/CSV export */}
       {exportOpen && (
