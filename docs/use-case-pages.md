@@ -21,7 +21,8 @@ page sets, each scoped to the active outlet's use case. Gating is **(role permis
 
 ### 1. Products — Retail  (`use_case ∈ {GENERAL_RETAIL, WHOLESALE, RETAIL, BOUTIQUE, HARDWARE, ELECTRONICS, PHARMACY, ...}`)
 - **Columns:** Image · Product · SKU · Barcode · UOM · Cost · Retail Price · Wholesale (W.Price) · Stock · Reorder · Status.
-- **Buttons:** Add Product · Import CSV · Generate Barcodes · Print Labels · Edit Multiple · Export · Refresh.
+- **Buttons:** Add Product · Import CSV · Generate Barcodes · Pictures · Print Labels · Edit Multiple · Export · Refresh.
+- **Pictures (2026-10-27):** bulk item pictures on every catalog page (`BulkImageUploadDialog`, needs `inventory.items.change`). Photos named after the item, SKU or barcode are shrunk in the browser (`lib/inventory/compress-image.ts`, 1600 px JPEG), matched by inventory-api `POST /items/images/match`, reviewed (sure matches ticked, close ones marked Check, items that already have a picture skipped), then sent three at a time through the normal per-item upload, so plan limits and storage rules apply as usual. Change an existing picture from the item page.
 - **Filters:** Category (**retail product categories only**) · Brand · Supplier · Stock status (in/low/out) · Tax class (A/B/C/D) · Serialized · Batch/Expiry (only if perishable) · Price tier.
 - **Forms/modals:** Product form (identity, barcode, UOM, pricing tiers, tax class, stock min/max, compliance flags); Pricing tiers (Retail default + Wholesale); Batch & Expiry; Serial numbers.
 - **EXCLUDE:** Create Menu Item, Recipe/BOM editor, Modifiers/Modifier groups, Course/Station, meal-plan/room-rate fields, menu categories.
