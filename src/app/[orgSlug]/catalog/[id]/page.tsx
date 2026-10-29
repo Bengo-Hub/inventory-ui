@@ -3,20 +3,20 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { apiClient } from '@/lib/api/client';
-import { itemsApi, type Item } from '@/lib/api/items';
+import { VariantOfNotice } from '@/components/inventory/ItemVariantsSection';
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
-import { useDeleteItem, useUpdateItem } from '@/hooks/useItems';
+import { useDeleteItem, useItemById, useItemVariants, useUpdateItem } from '@/hooks/useItems';
 import { useDeleteItemPricing, useItemPricing, usePricingTiers, useUpsertItemPricing } from '@/hooks/usePricing';
 import type { PricingTier } from '@/lib/api/pricing';
 import { useInventorySettings } from '@/hooks/useInventorySettings';
 import { useAllOutlets } from '@/hooks/useAllOutlets';
-import { ITEM_USE_CASE_LABEL, usesFoodCostLanguage } from '@/lib/use-case-nomenclature';
+import { ITEM_USE_CASE_LABEL, useCatalogScope, usesFoodCostLanguage } from '@/lib/use-case-nomenclature';
 import { useOutletStore } from '@/store/outlet';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { useQuery } from '@tanstack/react-query';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
-import { buildItemPricingColumns, buildSerialColumns } from './catalog-detail-columns';
-import { AlertTriangle, ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, Pencil, Trash2, X } from 'lucide-react';
+import { buildItemPricingColumns, buildSerialColumns, buildVariantColumns } from './catalog-detail-columns';
+import { AlertTriangle, ArrowLeft, BoxIcon, ChefHat, DollarSign, GitBranch, Layers, Pencil, Trash2, X } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -64,11 +64,15 @@ export default function ItemDetailPage() {
 
   // Full, enriched item fetched by UUID (category name, effective/tax price, on-hand, images)
   // via the list ?id= filter — the same shape the catalog list & quick-view drawer render.
-  const { data: item, isLoading, isError, refetch } = useQuery<Item | null>({
-    queryKey: ['catalog', 'item', orgSlug, id],
-    queryFn: () => itemsApi.getById(orgSlug, id),
-    enabled: !!id,
-  });
+  const { data: item, isLoading, isError, refetch } = useItemById(orgSlug, id);
+
+  // Variants: a parent lists its children; a child links back to its parent instead.
+  const scope = useCatalogScope();
+  const isVariantChild = !!item?.variant_of;
+  const { data: variants } = useItemVariants(orgSlug, id, !!item && !isVariantChild);
+  const showVariants = !!item && !isVariantChild &&
+    ((variants?.length ?? 0) > 0 || (!!scope.showVariants && item.type === 'GOODS'));
+  const variantColumns = useMemo(() => buildVariantColumns(orgSlug), [orgSlug]);
 
   const isRecipe = item?.type === 'RECIPE';
   const isStockable = item ? STOCKABLE_TYPES.includes(item.type) : false;
@@ -261,6 +265,8 @@ export default function ItemDetailPage() {
           </div>
         </div>
 
+        {isVariantChild && <VariantOfNotice orgSlug={orgSlug} item={item} />}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Item details */}
           <Card className="lg:col-span-2">
@@ -445,6 +451,38 @@ export default function ItemDetailPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Variants: each row is its own child item with its own stock (summed over warehouses). */}
+        {showVariants && (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="h-5 w-5 text-primary" />
+                  <h2 className="text-lg font-semibold">Variants</h2>
+                  {(variants?.length ?? 0) > 0 && <Badge variant="outline">{variants!.length}</Badge>}
+                </div>
+                {canEdit && (
+                  <Button variant="outline" size="sm" onClick={() => setEditOpen(true)}>
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit sizes and colours
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {(variants?.length ?? 0) === 0 ? (
+                <p className="px-6 pb-6 text-sm text-muted-foreground">
+                  No variants yet. Use Edit to add sizes, colours or other options.
+                </p>
+              ) : (
+                <div className="px-2 pb-2">
+                  <DataTable columns={variantColumns} rows={variants ?? []} rowKey={(v) => v.id} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* E-commerce / Marketplace — only when at least one of these optional fields is set */}
         {hasEcommerceDetails && (

@@ -81,6 +81,12 @@ export interface CatalogScope {
   showBarcodeType?: boolean;
   /** Default shelf-life (days) for perishables — every goods use_case except services. */
   showShelfLife?: boolean;
+  /**
+   * Size / colour variants (each variant is its own child item with its own SKU, barcode,
+   * price and stock). Retail, wholesale, manufacturing and general outlets; hospitality and
+   * quick service sell options through modifiers instead.
+   */
+  showVariants?: boolean;
 }
 
 const DEFAULT_SCOPE: CatalogScope = {
@@ -94,6 +100,8 @@ const DEFAULT_SCOPE: CatalogScope = {
   showServiceDuration: true,
   showBarcodeType: true,
   showShelfLife: true,
+  // Covers HQ and the use cases without their own scope below (general, wholesale).
+  showVariants: true,
 };
 
 // Each outlet use_case exposes only the item types / use-cases / sections that belong to it.
@@ -131,6 +139,7 @@ const SCOPES: Record<string, CatalogScope> = {
     showWeightDimensions: true,
     showBarcodeType: true,
     showShelfLife: true,
+    showVariants: true,
   },
   manufacturing: {
     itemTypes: ['GOODS', 'INGREDIENT', 'RECIPE', 'EQUIPMENT'],
@@ -141,6 +150,7 @@ const SCOPES: Record<string, CatalogScope> = {
     showSerialTracking: true,
     showWeightDimensions: true,
     showShelfLife: true,
+    showVariants: true,
   },
   pharmacy: {
     itemTypes: ['GOODS'],

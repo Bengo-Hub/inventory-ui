@@ -5,13 +5,19 @@ import {
   itemsApi,
   type BulkStatusAction,
   type CreateItemInput,
+  type Item,
+  type ItemVariant,
   type ListItemsParams,
+  type SaveVariantsInput,
   type UpdateItemInput,
   type PaginatedItems,
 } from '@/lib/api/items';
 import { useAuthStore } from '@/store/auth';
 
 const ITEMS_KEY = 'items';
+// The item detail page and variant parent lookups read one item by id under this key.
+const ITEM_BY_ID_KEY = ['catalog', 'item'] as const;
+const VARIANTS_KEY = 'item-variants';
 
 const EMPTY_PAGE: PaginatedItems = { data: [], total: 0, page: 1, limit: 20, hasMore: false };
 
@@ -30,6 +36,37 @@ export function useItem(orgSlug: string, sku: string) {
     queryKey: [ITEMS_KEY, orgSlug, sku],
     queryFn: () => itemsApi.get(orgSlug, sku),
     enabled: !!orgSlug && !!sku,
+  });
+}
+
+/** One fully enriched item by id (same shape as a catalog row). */
+export function useItemById(orgSlug: string, id: string | undefined) {
+  return useQuery<Item | null>({
+    queryKey: [...ITEM_BY_ID_KEY, orgSlug, id],
+    queryFn: () => itemsApi.getById(orgSlug, id!),
+    enabled: !!orgSlug && !!id,
+  });
+}
+
+/** Active variants of a parent item, in axis order. */
+export function useItemVariants(orgSlug: string, itemId: string | undefined, enabled = true) {
+  return useQuery<ItemVariant[]>({
+    queryKey: [VARIANTS_KEY, orgSlug, itemId],
+    queryFn: () => itemsApi.listVariants(orgSlug, itemId!),
+    enabled: enabled && !!orgSlug && !!itemId,
+  });
+}
+
+/** Saves a parent's whole variant matrix, then refreshes the lists, the item and its variants. */
+export function useSaveItemVariants(orgSlug: string, itemId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: SaveVariantsInput) => itemsApi.saveVariants(orgSlug, itemId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [VARIANTS_KEY, orgSlug, itemId] });
+      queryClient.invalidateQueries({ queryKey: [...ITEM_BY_ID_KEY, orgSlug] });
+      invalidateItemViews(queryClient, orgSlug);
+    },
   });
 }
 

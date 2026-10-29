@@ -131,8 +131,49 @@ export interface Item {
   return_window_days?: number | null; // null = tenant default
   allow_backorder?: boolean;     // orderable when out of stock
   is_discontinued?: boolean;     // hidden from new listings, existing stock still sellable
+  // Variants: a parent lists its active children in variants[] when the list is read with
+  // include=variants. A child carries variant_of (parent item id) and its attributes. All
+  // three are read only; write them with itemsApi.saveVariants.
+  has_variants?: boolean;
+  variants?: ItemVariant[];
+  variant_of?: string;
+  variant_attributes?: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+/** One variant of a parent item. id is the child item's own id. */
+export interface ItemVariant {
+  id: string;
+  sku: string;
+  name: string;
+  price: number;
+  attributes?: Record<string, string>;
+  barcode?: string;
+  is_active: boolean;
+  image_url?: string;
+  /** Summed over every warehouse. */
+  on_hand?: number | null;
+  available?: number | null;
+}
+
+/** Axis name (lower case, e.g. "size") to its values in display order. */
+export type VariantAxes = Record<string, string[]>;
+
+export interface SaveVariantRow {
+  attributes: Record<string, string>;
+  /** Blank lets the server build PARENTSKU-RED-M. */
+  sku?: string;
+  barcode?: string;
+  /** Omitted keeps the existing price, or copies the parent price for a new variant. */
+  price?: number;
+  is_active?: boolean;
+}
+
+/** The full matrix. Existing children left out of rows are deactivated, never deleted. */
+export interface SaveVariantsInput {
+  axes: VariantAxes;
+  rows: SaveVariantRow[];
 }
 
 export type ItemUseCase =
@@ -404,6 +445,8 @@ export interface ListItemsParams {
    *  min/max_selling_price, is_active, created_at, updated_at). */
   sort?: string;
   dir?: 'asc' | 'desc';
+  /** 'variants' folds variant children into their parent's variants[] (hidden as rows). */
+  include?: 'variants';
 }
 
 /** Per-id outcome reported by the bulk endpoints (idempotent skips, not errors). */
@@ -549,6 +592,15 @@ export const itemsApi = {
 
   createMenuItemComposite: (orgSlug: string, payload: MenuItemCompositeRequest) =>
     apiClient.post<MenuItemCompositeResult>(`/api/v1/${orgSlug}/inventory/items/menu-item`, payload),
+
+  // ── Variants (size, colour, ...) ───────────────────────────────────────────
+  /** Active variants in axis order. */
+  listVariants: (orgSlug: string, itemId: string): Promise<ItemVariant[]> =>
+    apiClient.get<ItemVariant[]>(`${itemsBase(orgSlug)}/${itemId}/variants`).then((r) => r ?? []),
+
+  /** Saves the whole matrix in one call; returns every child, active and inactive. */
+  saveVariants: (orgSlug: string, itemId: string, input: SaveVariantsInput): Promise<ItemVariant[]> =>
+    apiClient.put<ItemVariant[]>(`${itemsBase(orgSlug)}/${itemId}/variants`, input).then((r) => r ?? []),
 
   // ── Item images (multi-image gallery) ──────────────────────────────────────
   listImages: async (orgSlug: string, itemId: string): Promise<ItemImage[]> => {

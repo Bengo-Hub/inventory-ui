@@ -19,6 +19,7 @@ import { useCreateSupplier, useSuppliers, useSupplierSearch } from '@/hooks/useS
 import { type CreateSupplierInput } from '@/lib/api/suppliers';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { ItemImagesManager } from '@/components/inventory/ItemImagesManager';
+import { ItemVariantsSection, VariantOfNotice } from '@/components/inventory/ItemVariantsSection';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { DuplicateNameWarning } from '@/components/inventory/DuplicateNameWarning';
 import { ItemEcommerceFields, ecommerceValuesFromItem, ecommercePayload, type EcommerceFieldValues } from '@/components/inventory/ItemEcommerceFields';
@@ -1779,6 +1780,15 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </Button>
               </div>
             </form>
+
+            {/* Sizes and colours: outside the form above because it saves on its own (one PUT for
+                the whole matrix). Goods only, and only where CatalogScope.showVariants allows it;
+                a variant child always shows which product it belongs to. */}
+            {item?.variant_of ? (
+              <div className="mt-4"><VariantOfNotice orgSlug={orgSlug} item={item} /></div>
+            ) : scope.showVariants && type === 'GOODS' && !isEventMode ? (
+              <div className="mt-4"><ItemVariantsSection orgSlug={orgSlug} item={item} /></div>
+            ) : null}
           </CardContent>
         </Card>
       </div>

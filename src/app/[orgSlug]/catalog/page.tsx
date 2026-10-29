@@ -669,6 +669,9 @@ export default function CatalogPage() {
     status: statusFilter,
     page,
     limit: pageSize,
+    // Variant children fold into their parent's variants[] instead of cluttering the list
+    // (a search still finds a child by its own SKU or barcode).
+    include: 'variants',
   });
 
   const items = itemsPage?.data ?? [];
@@ -805,6 +808,10 @@ export default function CatalogPage() {
         <button className="font-medium hover:text-primary transition-colors text-left" onClick={() => setViewItem(i)}>
           {i.name}
           {i.not_for_sale && <Badge variant="outline" className="ml-1.5 text-[10px]">Not for sale</Badge>}
+          {(i.variants?.length ?? 0) > 0 && (
+            <Badge variant="outline" className="ml-1.5 text-[10px]">{i.variants!.length} variant{i.variants!.length === 1 ? '' : 's'}</Badge>
+          )}
+          {i.variant_of && <Badge variant="outline" className="ml-1.5 text-[10px]">Variant</Badge>}
         </button>
       ),
     },

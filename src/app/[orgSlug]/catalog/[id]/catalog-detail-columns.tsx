@@ -1,14 +1,17 @@
 'use client';
 
-// DataTable column definitions for the Catalog item detail page's two sub-lists (price
-// profiles, serial units) — split out of page.tsx to mirror the platform's
+// DataTable column definitions for the Catalog item detail page's sub-lists (price
+// profiles, serial units, variants) — split out of page.tsx to mirror the platform's
 // <page>-columns.tsx convention.
 
 import { Badge } from '@/components/ui/base';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { ItemPricing } from '@/lib/api/pricing';
+import type { ItemVariant } from '@/lib/api/items';
+import { comboLabel } from '@/lib/inventory/variant-matrix';
 import type { SerialRow } from './page';
 import { Trash2 } from 'lucide-react';
+import Link from 'next/link';
 
 export function buildItemPricingColumns(
   outletName?: (id: string) => string | undefined,
@@ -106,6 +109,64 @@ export function buildSerialColumns(): DataTableColumn<SerialRow>[] {
       accessor: (s) => s.sold_at ?? '',
       cellClassName: 'text-muted-foreground',
       render: (s) => (s.sold_at ? new Date(s.sold_at).toLocaleDateString() : '—'),
+    },
+  ];
+}
+
+/** Variants of a parent item. orgSlug builds the link to each variant's own page. */
+export function buildVariantColumns(orgSlug: string): DataTableColumn<ItemVariant>[] {
+  return [
+    {
+      key: 'attributes',
+      header: 'Variant',
+      primary: true,
+      accessor: (v) => (v.attributes ? comboLabel(v.attributes) : v.name),
+      cellClassName: 'font-medium',
+      render: (v) => (
+        <Link href={`/${orgSlug}/catalog/${v.id}`} className="hover:text-primary hover:underline">
+          {v.attributes && Object.keys(v.attributes).length > 0 ? comboLabel(v.attributes) : v.name}
+        </Link>
+      ),
+    },
+    {
+      key: 'sku',
+      header: 'SKU',
+      sortable: true,
+      accessor: (v) => v.sku,
+      cellClassName: 'font-mono text-xs',
+    },
+    {
+      key: 'barcode',
+      header: 'Barcode',
+      hideBelow: 'sm',
+      accessor: (v) => v.barcode ?? '',
+      cellClassName: 'font-mono text-xs text-muted-foreground',
+      render: (v) => v.barcode || '—',
+    },
+    {
+      key: 'price',
+      header: 'Price',
+      align: 'right',
+      sortable: true,
+      accessor: (v) => v.price,
+      cellClassName: 'tabular-nums',
+      render: (v) => `KES ${v.price.toLocaleString()}`,
+    },
+    {
+      key: 'on_hand',
+      header: 'On hand',
+      align: 'right',
+      sortable: true,
+      accessor: (v) => v.on_hand ?? 0,
+      cellClassName: 'tabular-nums',
+      render: (v) => (v.on_hand ?? 0).toLocaleString(),
+    },
+    {
+      key: 'is_active',
+      header: 'Active',
+      hideBelow: 'sm',
+      accessor: (v) => (v.is_active ? 'Active' : 'Inactive'),
+      render: (v) => <Badge variant={v.is_active ? 'success' : 'outline'}>{v.is_active ? 'Active' : 'Inactive'}</Badge>,
     },
   ];
 }

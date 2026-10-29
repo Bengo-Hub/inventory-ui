@@ -33,6 +33,9 @@ export const P = {
   CATALOG_DELETE:     'inventory.items.delete',
   CATALOG_MANAGE:     'inventory.items.manage',
 
+  // Variants (size / colour matrix): PUT /items/{id}/variants
+  VARIANTS_CHANGE:    'inventory.variants.change',
+
   // Warehouses
   WAREHOUSES_ADD:     'inventory.warehouses.add',
   WAREHOUSES_READ:    'inventory.warehouses.view',

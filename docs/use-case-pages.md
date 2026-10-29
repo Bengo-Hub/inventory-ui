@@ -67,6 +67,22 @@ page sets, each scoped to the active outlet's use case. Gating is **(role permis
 - Each action button is gated `hasPermission(...) && useCaseAllows(action)`.
 - Backend already scopes data by `use_case`; the UI must not surface cross-use-case fields/filters.
 
+## Variants: sizes and colours (2026-10-28)
+- Each variant is its own child item (own SKU, barcode, price, stock), saved by
+  `PUT /items/{id}/variants` with the whole matrix (inventory-api `06e7cdf`).
+- The item form shows "Sizes and colours" only when `CatalogScope.showVariants` is set (retail,
+  manufacturing, and the default scope that covers HQ, general and wholesale) and the item is GOODS.
+  Hospitality, quick service, pharmacy, services and warehouse scopes leave it unset, so they keep
+  modifiers. The gate and the permission (`inventory.variants.change`) live in one place each.
+- Axis editor (size, colour or a custom option), values as chips, then a grid of every combination
+  with SKU (blank builds `PARENT-RED-M`), barcode, price (blank uses the item price) and an active
+  tick. Unticked variants are deactivated, never deleted. Server errors name the combination.
+  Matrix logic is pure and lives in `lib/inventory/variant-matrix.ts`; the component is UI only.
+- A new item must be saved first; the block then appears when editing it.
+- The catalog list reads `include=variants`, so children fold into a "N variants" badge on the
+  parent; a search still finds a child by its own SKU or barcode. A child's page and form show
+  "Variant of <parent>" instead of the editor. The item page lists the variants with stock.
+
 ## Where this lands in the plan
 - **Phase 4 (inventory-ui):** build the page split + `useCaseConfig`; do NOT ship a single generic Items page.
 - **Phase 2 (pos-ui):** the retail register and product grid are the retail use-case surface; exclude
