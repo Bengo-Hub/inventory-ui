@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 export const BULK_JOB_LABELS: Record<string, string> = {
   item_relocation: 'Outlet update',
   bulk_stock_adjust: 'Bulk stock adjustment',
+  item_tax_codes: 'Tax code update',
 };
 
 export function labelForJobType(jobType: string): string {

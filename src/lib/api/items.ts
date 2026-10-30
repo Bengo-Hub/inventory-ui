@@ -36,6 +36,9 @@ export interface Item {
   is_active: boolean;
   // End-of-Life: non-null = the item is marked EOL (hidden everywhere) and awaiting auto-purge.
   end_of_life_at?: string | null;
+  // End of Life listing only: when the purge deletes the item, or why it keeps it (history).
+  eol_purge_at?: string | null;
+  eol_kept_reason?: string;
   image_url?: string;
   // Multi-image gallery (ItemAsset). image_url above stays the PRIMARY image for
   // backward compatibility; images[] is the full ordered set (primary first).
@@ -467,6 +470,10 @@ export type BulkStatusAction =
   | 'not_for_sale_off'
   | 'non_depleting_on'
   | 'non_depleting_off';
+
+/** Days an End-of-Life item waits before the purge deletes it (inventory-api EOL_RETENTION_DAYS).
+ *  Used for wording only; each End of Life row carries its own eol_purge_at from the API. */
+export const EOL_RETENTION_DAYS = 30;
 
 export const itemsApi = {
   list: async (orgSlug: string, params?: ListItemsParams): Promise<PaginatedItems> => {

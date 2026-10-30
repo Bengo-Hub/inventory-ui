@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
 import { useItems, useMarkItemEOL, useRestoreItemEOL } from '@/hooks/useItems';
-import type { Item } from '@/lib/api/items';
+import { EOL_RETENTION_DAYS, type Item } from '@/lib/api/items';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useCategories } from '@/hooks/useCategories';
@@ -767,8 +767,9 @@ export default function StockPage() {
                         <div>
                             <h2 className="text-sm font-semibold">End of Life</h2>
                             <p className="text-xs text-muted-foreground mt-1">
-                                Items marked End-of-Life are hidden from the POS, catalog, and ordering. They are
-                                permanently deleted after the retention window — restore one here to bring it back.
+                                Items marked End-of-Life at this outlet are hidden from the POS, catalog and ordering, and
+                                permanently deleted {EOL_RETENTION_DAYS} days later unless you restore them. An item with stock
+                                or purchase history is kept hidden instead of deleted, so its records stay intact.
                             </p>
                         </div>
                     </CardHeader>
@@ -825,7 +826,7 @@ export default function StockPage() {
                 title={eolConfirm?.action === 'mark' ? 'Mark End-of-Life?' : 'Restore item?'}
                 description={
                     eolConfirm?.action === 'mark'
-                        ? `"${eolConfirm?.name}" will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore it before then from the End of Life tab.`
+                        ? `"${eolConfirm?.name}" will be hidden from the POS, catalog and ordering, and permanently deleted after ${EOL_RETENTION_DAYS} days if it has no stock or purchase history (an item with history stays hidden instead). You can restore it before then from the End of Life tab.`
                         : `"${eolConfirm?.name}" will be re-activated and reappear in the catalog and POS.`
                 }
                 confirmLabel={eolConfirm?.action === 'mark' ? 'Mark End-of-Life' : 'Restore'}

@@ -1211,13 +1211,20 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                 </div>
               )}
 
-              {/* Tax & compliance — per-item override of the tenant Tax & Compliance defaults */}
-              {['GOODS', 'RECIPE', 'SERVICE', 'VOUCHER'].includes(type) && (
+              {/* Tax & compliance: per-item override of the tenant default. Shown for every item
+                  type: eTIMS registers and bands ingredients and equipment too (purchases and
+                  stock movements carry the tax band), not only what is sold. */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Tax Code <span className="text-muted-foreground font-normal">(optional)</span></label>
                     <TaxCodeCombobox orgSlug={orgSlug} value={taxCode} onChange={setTaxCode} />
-                    <p className="text-xs text-muted-foreground">KRA/eTIMS code from treasury. Leave blank to use the tenant default.</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item?.tax_code_id
+                        ? (item.metadata?.tax_code_source === 'manual'
+                          ? 'Set on this item by hand. It stays when VAT is switched on or off; only a new default in Settings replaces it.'
+                          : 'Set automatically. Choosing a code here keeps it on this item when VAT is switched on or off.')
+                        : 'Leave blank for the automatic code: the default in Settings, else D (Non-VAT), or B (VAT 16%) once the business charges VAT.'}
+                    </p>
                   </div>
                   <label className="flex items-start gap-2 text-sm cursor-pointer sm:pt-7">
                     <input type="checkbox" checked={taxInclusive} onChange={(e) => setTaxInclusive(e.target.checked)} className="rounded mt-0.5" />
@@ -1241,7 +1248,6 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                     </div>
                   </div>
                 </div>
-              )}
 
               {/* Non-billable — applies to anything the POS can ring up or deduct: stockable
                   goods/ingredients/equipment AND recipes (free accompaniments like ugali or

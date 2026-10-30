@@ -1,6 +1,8 @@
 'use client';
 
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { labelForJobType, registerPendingJob } from '@/lib/bulk-job-alert-queue';
 import { IdleScreensaverCard, PlatformScreensaverCard } from '@/components/settings/screensaver-cards';
 import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { AGENT_BASE, getAgentInfo, listLocalPrinters } from '@/lib/inventory/print-agent';
@@ -1250,12 +1252,32 @@ function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
     }
   }, [settings]);
 
-  const handleSave = () => {
-    update.mutate({
-      prices_inclusive_of_tax: form.pricesInclusiveOfTax,
-      default_tax_code: form.defaultTaxCode.trim(),
-    });
+  // A new default tax code replaces the code on every item (hand-set ones included), so the
+  // save is confirmed first.
+  const [confirmTaxDefault, setConfirmTaxDefault] = useState(false);
+  const automaticCode = settings?.automatic_tax_code ?? '';
+  const taxDefaultChanged = !!settings && form.defaultTaxCode.trim().toUpperCase() !== (settings.default_tax_code ?? '').toUpperCase();
+  const appliedCodeLabel = form.defaultTaxCode.trim() || (automaticCode ? `${automaticCode} (automatic)` : 'the automatic code');
+
+  const save = () => {
+    update.mutate(
+      {
+        prices_inclusive_of_tax: form.pricesInclusiveOfTax,
+        default_tax_code: form.defaultTaxCode.trim(),
+      },
+      {
+        onSuccess: (data) => {
+          setConfirmTaxDefault(false);
+          const job = data.tax_code_job;
+          if (job && job.items > 0) {
+            if (job.job_id) registerPendingJob(job.job_id, labelForJobType('item_tax_codes'));
+            toast.info(`Updating the tax code on ${job.items.toLocaleString()} item(s) to ${job.code} in the background.`);
+          }
+        },
+      },
+    );
   };
+  const handleSave = () => (taxDefaultChanged ? setConfirmTaxDefault(true) : save());
 
   if (isLoading) return (
     <div className="h-40 flex items-center justify-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin" /></div>
@@ -1294,10 +1316,18 @@ function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
               value={form.defaultTaxCode}
               onChange={(code) => setForm((f) => ({ ...f, defaultTaxCode: code }))}
               disabled={!canEdit}
+              placeholder={automaticCode ? `Automatic (${automaticCode})` : 'Automatic'}
             />
             <p className="text-xs text-muted-foreground">
-              KRA/eTIMS tax code applied to items that don&apos;t specify one. Options are synced from
-              treasury-api (the platform source of truth) — no rate is stored here.
+              Leave on Automatic and every item uses D (Non-VAT) until the business is VAT-registered and
+              charging VAT, then B (VAT 16%). When VAT is switched on or off, items whose code was set
+              automatically move to the new band in the background; codes set on single items stay.
+              {settings?.vat_active != null && (
+                <> This business is currently <span className="font-medium text-foreground">{settings.vat_active ? 'charging VAT' : 'not charging VAT'}</span>.</>
+              )}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Choosing a code here applies it to every item, replacing codes set on single items.
             </p>
           </div>
 
@@ -1314,6 +1344,15 @@ function TaxComplianceTab({ orgSlug }: { orgSlug: string }) {
           </div>
         </CardContent>
       </Card>
+      <ConfirmDialog
+        open={confirmTaxDefault}
+        variant="danger"
+        title="Apply this tax code to every item?"
+        description={`Every item in the catalog will be set to ${appliedCodeLabel}, including items whose code was set by hand. POS and online ordering pick up the change as it runs in the background.`}
+        confirmLabel={update.isPending ? 'Saving…' : 'Apply to all items'}
+        onConfirm={save}
+        onCancel={() => setConfirmTaxDefault(false)}
+      />
     </div>
   );
 }

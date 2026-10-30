@@ -52,7 +52,13 @@ export interface InventorySettings {
   costing_method: 'wavg' | 'fifo' | 'lifo' | 'fefo';
   default_target_margin_percent?: number | null;
   prices_inclusive_of_tax: boolean;
+  /** '' = automatic (see automatic_tax_code). */
   default_tax_code: string;
+  /** What automatic resolves to now: band B (VAT 16%) while VAT-active, band D (Non-VAT) otherwise. */
+  automatic_tax_code?: string;
+  vat_active?: boolean;
+  /** Set on the save that changed default_tax_code: the background job applying it to every item. */
+  tax_code_job?: { job_id?: string; code: string; items: number };
   label_print_defaults?: LabelPrintDefaults;
   updated_at: string;
 }

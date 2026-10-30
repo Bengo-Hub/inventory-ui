@@ -25,7 +25,7 @@ import { useBrands } from '@/hooks/useBrands';
 import { useItemModels } from '@/components/inventory/ModelCombobox';
 import { useUnits } from '@/hooks/useUnits';
 import { useBulkImport } from '@/hooks/useBulkImport';
-import { type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
+import { EOL_RETENTION_DAYS, type CreateItemInput, type UpdateItemInput, type Item, type BulkImportResult } from '@/lib/api/items';
 import { useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRightLeft, BadgeCheck, Ban, Barcode, ClipboardEdit, ClipboardList, Edit2, ExternalLink, Eye, FileSpreadsheet, Filter, History, ImagePlus, Loader2, Package, PackageX, Pencil, Plus, Printer, RotateCcw, Search, ShoppingCart, Trash2, Upload, X } from 'lucide-react';
 import { MoveStockDialog, type MoveStockItem } from '@/components/inventory/MoveStockDialog';
@@ -1296,8 +1296,8 @@ export default function CatalogPage() {
         description={
           eolConfirm?.action === 'mark'
             ? (eolConfirm.availableQty && eolConfirm.availableQty > 0
-                ? `"${eolConfirm.name}" still has ${eolConfirm.availableQty.toLocaleString()} unit(s) in stock. An item should ideally only be marked End-of-Life once it's out of stock — proceeding will still hide it from the POS, catalog, and ordering immediately, and permanently delete it after the retention window. You can restore it before then from Stock → End of Life.`
-                : `"${eolConfirm?.name}" will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore it before then from Stock → End of Life.`)
+                ? `"${eolConfirm.name}" still has ${eolConfirm.availableQty.toLocaleString()} unit(s) in stock. An item should ideally only be marked End-of-Life once it's out of stock — proceeding will still hide it from the POS, catalog, and ordering immediately, and permanently delete it after ${EOL_RETENTION_DAYS} days unless it has stock or purchase history (then it stays hidden). You can restore it before then from Stock → End of Life.`
+                : `"${eolConfirm?.name}" will be hidden from the POS, catalog, and ordering, and permanently deleted after ${EOL_RETENTION_DAYS} days unless it has stock or purchase history (then it stays hidden). You can restore it before then from Stock → End of Life.`)
             : `"${eolConfirm?.name}" will be re-activated and reappear in the catalog and POS.`
         }
         confirmLabel={eolConfirm?.action === 'mark' ? 'Mark End-of-Life' : 'Restore'}
@@ -1378,7 +1378,7 @@ export default function CatalogPage() {
                   const withStock = items.filter(
                     (i) => bulkConfirm.ids.includes(i.id) && STOCKABLE_TYPES.includes(i.type as typeof STOCKABLE_TYPES[number]) && (i.available ?? 0) > 0,
                   ).length;
-                  const base = 'The selected items will be hidden from the POS, catalog, and ordering, and permanently deleted after the retention window. You can restore any of them before then from Stock → End of Life.';
+                  const base = `The selected items will be hidden from the POS, catalog, and ordering, and permanently deleted after ${EOL_RETENTION_DAYS} days unless they have stock or purchase history (then they stay hidden). You can restore any of them before then from Stock → End of Life.`;
                   return withStock > 0
                     ? `${withStock} of the ${bulkConfirm.ids.length} selected item(s) still have stock. An item should ideally only be marked End-of-Life once it's out of stock. ${base}`
                     : base;
