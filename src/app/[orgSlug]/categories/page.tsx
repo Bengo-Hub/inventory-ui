@@ -17,6 +17,7 @@ import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildCategoryColumns, type CategoryRow } from './category-columns';
 import { buildBrandColumns } from './brand-columns';
+import { EtimsCodeSelect } from '@/components/inventory/EtimsCodeSelect';
 
 export interface Category {
     id: string;
@@ -28,6 +29,8 @@ export interface Category {
     parent_name?: string | null;
     is_active: boolean;
     created_at?: string;
+    /** KRA eTIMS classification its items register with when they have none of their own. */
+    kra_item_cls_cd?: string;
 }
 
 type Tab = 'categories' | 'brands';
@@ -84,6 +87,8 @@ interface CategoryPayload {
     code: string;
     description: string;
     parent_id?: string | null;
+    /** '' clears it on update. */
+    kra_item_cls_cd: string;
 }
 
 function CategoriesTab() {
@@ -101,6 +106,7 @@ function CategoriesTab() {
     const [formCode, setFormCode] = useState('');
     const [formDescription, setFormDescription] = useState('');
     const [formParentId, setFormParentId] = useState('');
+    const [formKraCls, setFormKraCls] = useState('');
 
     const { data: categories, isLoading, isError, refetch } = useQuery<Category[]>({
         queryKey: ['categories', orgSlug, search],
@@ -207,6 +213,7 @@ function CategoriesTab() {
         setFormCode('');
         setFormDescription('');
         setFormParentId('');
+        setFormKraCls('');
         setDialogOpen(true);
     }
 
@@ -216,6 +223,7 @@ function CategoriesTab() {
         setFormCode(cat.code ?? '');
         setFormDescription(cat.description ?? '');
         setFormParentId(cat.parent_id ?? '');
+        setFormKraCls(cat.kra_item_cls_cd ?? '');
         setDialogOpen(true);
     }
 
@@ -239,6 +247,7 @@ function CategoriesTab() {
             code: formCode.trim(),
             description: formDescription.trim(),
             parent_id: formParentId || null,
+            kra_item_cls_cd: formKraCls.trim(),
         });
     }
 
@@ -341,6 +350,14 @@ function CategoriesTab() {
                                             searchPlaceholder="Search categories…"
                                         />
                                         <p className="text-xs text-muted-foreground">Optional. Assign a parent to create a subcategory.</p>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">KRA eTIMS classification</label>
+                                        <EtimsCodeSelect orgSlug={orgSlug} codeType="ITEM_CLS" value={formKraCls} onChange={setFormKraCls}
+                                            placeholder="Inherit from the parent, else general goods (1000000000)" />
+                                        <p className="text-xs text-muted-foreground">
+                                            Items in this category and its subcategories register with KRA under this class, unless an item sets its own.
+                                        </p>
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium">Description</label>

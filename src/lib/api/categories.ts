@@ -11,6 +11,8 @@ export interface Category {
   is_active: boolean;
   /** Outlet use_cases this category is relevant to; empty/absent = universal. */
   use_cases?: string[];
+  /** KRA eTIMS classification its items register with when they have none of their own; '' clears it on update. */
+  kra_item_cls_cd?: string;
 }
 
 export interface CategoryPayload {
@@ -21,6 +23,8 @@ export interface CategoryPayload {
   /** Stamped from the creating outlet's use_case so food categories never
    *  pollute a pharmacy outlet's pickers (and vice versa). */
   use_cases?: string[];
+  /** KRA eTIMS classification its items register with when they have none of their own; '' clears it on update. */
+  kra_item_cls_cd?: string;
 }
 
 export const categoriesApi = {
