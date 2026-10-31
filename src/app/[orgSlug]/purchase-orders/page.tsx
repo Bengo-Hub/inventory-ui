@@ -43,6 +43,7 @@ import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { supplierOption } from '@/lib/supplier-balance';
 import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
+import { POLineTaxFields } from '@/components/inventory/POLineTaxFields';
 
 interface POLine {
     itemId: string;
@@ -66,6 +67,9 @@ interface POLine {
     priceScope: 'all_stock' | 'new_stock_only';
     // The item's selling price as of when it was picked — context only ("currently X").
     currentSellingPrice?: number | null;
+    // Input VAT: treasury tax code ('' = none) and whether unitPrice already holds the VAT.
+    taxCode: string;
+    priceIncludesTax: boolean;
 }
 
 // Default the line's unit to the item's purchase_unit (how it's actually bought — e.g. "kg"),
@@ -296,6 +300,9 @@ export default function PurchaseOrdersPage() {
             currentSellingPrice: item.selling_price ?? null,
             newSellingPrice: '',
             priceScope: 'all_stock',
+            // The item's own tax code and price convention are the likely ones; the buyer can change them.
+            taxCode: item.tax_code_id ?? '',
+            priceIncludesTax: !!item.tax_inclusive,
         }]);
     }
 
@@ -356,6 +363,8 @@ export default function PurchaseOrdersPage() {
                 newSellingPrice: li.new_selling_price != null ? String(li.new_selling_price) : '',
                 priceScope: li.price_scope ?? 'all_stock',
                 currentSellingPrice: li.current_selling_price ?? null,
+                taxCode: li.tax_code ?? '',
+                priceIncludesTax: !!li.price_includes_tax,
             }))
         );
         setCreateOpen(true);
@@ -376,6 +385,8 @@ export default function PurchaseOrdersPage() {
                     unit_id: l.unitId || undefined,
                     new_selling_price: newPrice && newPrice > 0 ? newPrice : undefined,
                     price_scope: newPrice && newPrice > 0 ? l.priceScope : undefined,
+                    tax_code: l.taxCode.trim() || undefined,
+                    price_includes_tax: l.taxCode.trim() ? l.priceIncludesTax : undefined,
                 };
             });
         if (lines.length === 0) { toast.error('Add at least one item'); return; }
@@ -658,6 +669,19 @@ export default function PurchaseOrdersPage() {
                                                     )}
                                                 </div>
                                             </div>
+
+                                            {line.itemId && (
+                                                <POLineTaxFields
+                                                    orgSlug={orgSlug}
+                                                    taxCode={line.taxCode}
+                                                    priceIncludesTax={line.priceIncludesTax}
+                                                    onChange={(patch) => {
+                                                        const updated = [...poLines];
+                                                        updated[idx] = { ...updated[idx], ...patch };
+                                                        setPoLines(updated);
+                                                    }}
+                                                />
+                                            )}
 
                                             {/* Selling-price adjustment — decide it now, while placing the order; it's
                                                 carried through (still editable) to the goods receipt when this line is

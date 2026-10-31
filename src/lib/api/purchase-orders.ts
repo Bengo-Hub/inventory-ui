@@ -20,6 +20,10 @@ export interface POLineItem {
   /** The item's selling price as of now — context only, shown as "currently X" next to the
    * input; never itself written anywhere. */
   current_selling_price?: number;
+  /** Input VAT: treasury tax code, the rate when ordered, and whether unit_cost holds the VAT. */
+  tax_code?: string;
+  tax_rate?: number;
+  price_includes_tax?: boolean;
 }
 
 export interface PurchaseOrder {
