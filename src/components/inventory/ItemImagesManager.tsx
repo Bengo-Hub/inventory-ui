@@ -41,9 +41,19 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
     enabled: !!itemId,
   });
 
-  function invalidate() {
-    queryClient.invalidateQueries({ queryKey: ['item-images', orgSlug, itemId] });
+  // After a gallery change, refetch the gallery and hand the form the server's primary image (or
+  // none), so saving the item form never sends back a deleted image's link. Item lists, the
+  // drawer and the catalog refetch too, so no screen keeps showing a deleted picture.
+  async function invalidate() {
+    const fresh = await queryClient.fetchQuery({
+      queryKey: ['item-images', orgSlug, itemId],
+      queryFn: () => itemsApi.listImages(orgSlug, itemId as string),
+      staleTime: 0,
+    });
+    onPrimaryChange?.(fresh.find((i) => i.is_primary)?.url ?? fresh[0]?.url ?? '');
     queryClient.invalidateQueries({ queryKey: ['items', orgSlug] });
+    queryClient.invalidateQueries({ queryKey: ['catalog'] });
+    queryClient.invalidateQueries({ queryKey: ['item-search', orgSlug] });
   }
 
   // Map a backend error (axios) to a friendly message for the toast.
@@ -86,6 +96,7 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
         const form = new FormData();
         form.append('file', file);
         const res = await apiClient.post<{ url: string }>('/api/v1/media/upload', form);
+        if (primaryUrl) itemsApi.discardUnsavedImage(primaryUrl).catch(() => {});
         onPrimaryChange?.(res.url);
       }
     } catch (err) {
@@ -128,9 +139,16 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
     }
   }
 
+  // Create mode: the picture was uploaded but no item uses it yet, so it is deleted from storage
+  // too. Best effort: a failure only leaves an unused file behind.
+  function removeUnsaved() {
+    if (primaryUrl) itemsApi.discardUnsavedImage(primaryUrl).catch(() => {});
+    onPrimaryChange?.('');
+  }
+
   async function remove(img: ItemImage) {
     if (!itemId) {
-      onPrimaryChange?.('');
+      removeUnsaved();
       return;
     }
     setBusyId(img.id);
@@ -155,7 +173,7 @@ export function ItemImagesManager({ orgSlug, itemId, primaryUrl, onPrimaryChange
               <MediaImage src={primaryUrl} displayWidth={64} fit="cover" aspect={1} alt="Item" className="h-16 w-16 rounded-lg object-cover border border-input" />
               <button
                 type="button"
-                onClick={() => onPrimaryChange?.('')}
+                onClick={removeUnsaved}
                 className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center"
               >
                 <X className="h-3 w-3" />

@@ -628,6 +628,11 @@ export const itemsApi = {
   deleteImage: (orgSlug: string, itemId: string, imageId: string): Promise<void> =>
     apiClient.delete<void>(`${itemsBase(orgSlug)}/${itemId}/images/${imageId}`),
 
+  /** Delete a picture uploaded for a new item and removed before the item was saved. The server
+   *  only deletes the organisation's own unused item images. */
+  discardUnsavedImage: (url: string): Promise<void> =>
+    apiClient.post<void>('/api/v1/media/upload/discard', { url }),
+
   /** Suggest the item for each file name of a bulk image upload (at most IMAGE_MATCH_PAGE names). */
   matchImages: async (orgSlug: string, fileNames: string[]): Promise<ImageMatchResult[]> => {
     const res = await apiClient.post<{ matches: ImageMatchResult[] }>(`${itemsBase(orgSlug)}/images/match`, { file_names: fileNames });
