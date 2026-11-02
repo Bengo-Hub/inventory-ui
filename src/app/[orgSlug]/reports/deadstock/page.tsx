@@ -1,15 +1,18 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useDeadstock } from '@/hooks/useReports';
+import { useWarehouses } from '@/hooks/useWarehouses';
+import { useOutletFilterStore } from '@/store/outlet-filter';
 import { reportsApi } from '@/lib/api/reports';
 import type { DeadstockItem } from '@/lib/api/reports';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildDeadstockColumns } from './deadstock-columns';
-import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Printer, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Boxes, DollarSign, MapPin, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
@@ -18,21 +21,46 @@ function fmt(n: number) {
 }
 
 const DAYS_OPTIONS = [30, 60, 90, 180];
+const ALL_LOCATIONS_ID = '__all__';
 
-// DeadstockPage lists stock on hand that has NOT sold within the window — capital tied up in
+// DeadstockPage lists stock on hand that has NOT moved within the window: capital tied up in
 // non-moving inventory. Read-only admin report.
+//
+// Location-scoped like Stock Valuation: the top-nav outlet narrows it to that outlet's own
+// locations (stock and movement both), and the picker drills into one location. An item selling
+// at one location is still dead stock where it sits idle.
 export default function DeadstockPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [days, setDays] = useState(90);
-    const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days);
+    const selectedOutlet = useOutletFilterStore((s) => s.selectedOutlet);
+    const outletId = selectedOutlet?.id;
+    const { data: warehouses } = useWarehouses(org);
+    const [warehouseId, setWarehouseId] = useState('');
+    const scopedWarehouses = useMemo(
+        () => (warehouses ?? []).filter((w) => !outletId || w.outlet_id === outletId),
+        [warehouses, outletId],
+    );
+    // A location picked under another outlet no longer applies once the outlet changes.
+    useEffect(() => { setWarehouseId(''); }, [outletId]);
+    const allLabel = selectedOutlet ? `All ${selectedOutlet.name} locations` : 'All Locations';
+    const locationOptions = useMemo(
+        () => [{ id: ALL_LOCATIONS_ID, name: allLabel }, ...scopedWarehouses.map((w) => ({ id: w.id, name: w.name }))],
+        [scopedWarehouses, allLabel],
+    );
+    const scopedWarehouseId = warehouseId && warehouseId !== ALL_LOCATIONS_ID ? warehouseId : undefined;
+    const scope = { outletId, warehouseId: scopedWarehouseId };
+    const scopeName = scopedWarehouseId
+        ? locationOptions.find((o) => o.id === scopedWarehouseId)?.name
+        : selectedOutlet?.name;
+    const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days, scope);
     const cur = data?.currency ?? 'KES';
 
-    // Print / Export — streams the branded deadstock PDF for the active lookback window.
+    // Print / Export streams the branded deadstock PDF for the active window and location.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
     function printReport() {
         openPreview(
-            () => reportsApi.deadstockDoc(org, days, 'pdf'),
+            () => reportsApi.deadstockDoc(org, days, 'pdf', scope),
             { fileName: `deadstock-${days}d.pdf`, title: 'Deadstock' },
         );
     }
@@ -53,7 +81,12 @@ export default function DeadstockPage() {
                 </Link>
                 <div className="flex-1">
                     <h1 className="text-2xl font-bold tracking-tight">Deadstock</h1>
-                    <p className="text-muted-foreground text-sm">Stock on hand that hasn&apos;t sold within the window</p>
+                    <p className="text-muted-foreground text-sm">
+                        Stock on hand that hasn&apos;t moved within the window
+                        {scopeName && (
+                            <> &middot; <span className="font-medium text-foreground">{scopeName}</span></>
+                        )}
+                    </p>
                 </div>
                 <div className="flex items-center gap-1.5">
                     {DAYS_OPTIONS.map((d) => (
@@ -74,6 +107,30 @@ export default function DeadstockPage() {
                     </Button>
                 </div>
             </div>
+
+            <Card>
+                <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                        <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <div className="w-full sm:w-64">
+                            <CreatableSelect
+                                value={warehouseId || ALL_LOCATIONS_ID}
+                                onChange={(v) => setWarehouseId(v === ALL_LOCATIONS_ID ? '' : v)}
+                                options={locationOptions}
+                                placeholder={allLabel}
+                                required
+                            />
+                        </div>
+                        <p className="text-xs text-muted-foreground hidden sm:block">
+                            {scopedWarehouseId
+                                ? 'Showing stock idle at this location only.'
+                                : selectedOutlet
+                                    ? `Showing every location of ${selectedOutlet.name}. Pick one to see its own stock.`
+                                    : 'Showing every location together. Pick one to see its own stock.'}
+                        </p>
+                    </div>
+                </CardContent>
+            </Card>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {kpis.map((k) => (

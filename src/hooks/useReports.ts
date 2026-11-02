@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   reportsApi,
   type DeadstockReport,
+  type ReportLocationScope,
   type FoodCostVarianceParams,
   type IngredientUtilizationParams,
   type IngredientUtilizationSummary,
@@ -45,10 +46,11 @@ export function useStockValuation(orgSlug: string, warehouseId?: string) {
   });
 }
 
-export function useDeadstock(orgSlug: string, days = 90) {
+// The scope is part of the key, so switching outlet or location never shows another one's report.
+export function useDeadstock(orgSlug: string, days = 90, scope?: ReportLocationScope) {
   return useQuery<DeadstockReport>({
-    queryKey: [REPORTS_KEY, 'deadstock', orgSlug, days],
-    queryFn: () => reportsApi.deadstock(orgSlug, days),
+    queryKey: [REPORTS_KEY, 'deadstock', orgSlug, days, scope?.outletId ?? 'all', scope?.warehouseId ?? 'all'],
+    queryFn: () => reportsApi.deadstock(orgSlug, days, scope),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
   });

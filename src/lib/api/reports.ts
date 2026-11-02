@@ -79,6 +79,19 @@ export interface DeadstockReport {
   items: DeadstockItem[];
 }
 
+/** Where a stock report looks: one warehouse, or an outlet's own warehouses. */
+export interface ReportLocationScope {
+  warehouseId?: string;
+  outletId?: string;
+}
+
+function locationParams(scope?: ReportLocationScope): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (scope?.warehouseId) out.warehouse_id = scope.warehouseId;
+  if (scope?.outletId) out.outlet_id = scope.outletId;
+  return out;
+}
+
 export type UtilizationGranularity = 'day' | 'week' | 'biweek' | 'month';
 
 export interface IngredientUtilizationParams {
@@ -158,8 +171,10 @@ export const reportsApi = {
   stockValuation: (orgSlug: string, warehouseId?: string): Promise<StockValuation> =>
     apiClient.get<StockValuation>(`/api/v1/${orgSlug}/inventory/reports/stock-valuation`, warehouseId ? { warehouse_id: warehouseId } : undefined),
 
-  deadstock: (orgSlug: string, days = 90): Promise<DeadstockReport> =>
-    apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days) }),
+  // Scope: warehouseId picks one location; else outletId covers that outlet's own locations;
+  // neither means every location.
+  deadstock: (orgSlug: string, days = 90, scope?: ReportLocationScope): Promise<DeadstockReport> =>
+    apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days), ...locationParams(scope) }),
 
   // Branded document exports (PDF/CSV) — streamed from inventory-api's *.pdf report endpoints and
   // fed to the shared PDF previewer. Each mirrors the JSON report's query params so the exported
@@ -167,8 +182,8 @@ export const reportsApi = {
   stockValuationDoc: (orgSlug: string, format: 'pdf' | 'csv' = 'pdf', warehouseId?: string): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/stock-valuation.pdf`, { format, ...(warehouseId ? { warehouse_id: warehouseId } : {}) }),
 
-  deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf'): Promise<Blob> =>
-    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format }),
+  deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format, ...locationParams(scope) }),
 
   foodCostVarianceDoc: (orgSlug: string, params?: FoodCostVarianceParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance.pdf`, params as Record<string, string | boolean | undefined>),
