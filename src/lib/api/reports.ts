@@ -79,6 +79,24 @@ export interface DeadstockReport {
   items: DeadstockItem[];
 }
 
+export interface FastMovingItem {
+  item_id: string;
+  sku: string;
+  name: string;
+  category_name?: string;
+  on_hand: number;
+  quantity_moved: number;
+  last_activity: string;
+}
+
+/** Items ranked by units moved (sold, used in production or meals) within the window. */
+export interface FastMovingReport {
+  days: number;
+  /** Every item that moved; items lists the busiest 100. */
+  item_count: number;
+  items: FastMovingItem[];
+}
+
 /** Where a stock report looks: one warehouse, or an outlet's own warehouses. */
 export interface ReportLocationScope {
   warehouseId?: string;
@@ -181,6 +199,12 @@ export const reportsApi = {
   // document matches what the page shows.
   stockValuationDoc: (orgSlug: string, format: 'pdf' | 'csv' = 'pdf', warehouseId?: string): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/stock-valuation.pdf`, { format, ...(warehouseId ? { warehouse_id: warehouseId } : {}) }),
+
+  fastMoving: (orgSlug: string, days = 90, scope?: ReportLocationScope): Promise<FastMovingReport> =>
+    apiClient.get<FastMovingReport>(`/api/v1/${orgSlug}/inventory/reports/fast-moving`, { days: String(days), ...locationParams(scope) }),
+
+  fastMovingDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/fast-moving.pdf`, { days: String(days), format, ...locationParams(scope) }),
 
   deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format, ...locationParams(scope) }),

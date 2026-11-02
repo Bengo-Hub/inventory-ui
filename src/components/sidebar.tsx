@@ -35,6 +35,7 @@ import {
   Users,
   Warehouse,
   X,
+  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
@@ -291,6 +292,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       items: [
         { label: 'Stock Valuation', icon: BarChart3, href: '/reports/stock-valuation', moduleKey: 'stock' },
         { label: 'Deadstock', icon: Boxes, href: '/reports/deadstock', moduleKey: 'stock' },
+        { label: 'Fast Moving', icon: TrendingUp, href: '/reports/fast-moving', moduleKey: 'stock' },
         // Add-on (platform-admin grant required): batch-age-driven clearance pricing, distinct
         // from Deadstock (sales-velocity based) — this is receiving-batch-age based.
         { label: 'Aging Stock', icon: Tag, href: '/aging-stock', moduleKey: 'stock', feature: 'batch_period_pricing' },

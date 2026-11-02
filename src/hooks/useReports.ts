@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   reportsApi,
   type DeadstockReport,
+  type FastMovingReport,
   type ReportLocationScope,
   type FoodCostVarianceParams,
   type IngredientUtilizationParams,
@@ -51,6 +52,16 @@ export function useDeadstock(orgSlug: string, days = 90, scope?: ReportLocationS
   return useQuery<DeadstockReport>({
     queryKey: [REPORTS_KEY, 'deadstock', orgSlug, days, scope?.outletId ?? 'all', scope?.warehouseId ?? 'all'],
     queryFn: () => reportsApi.deadstock(orgSlug, days, scope),
+    enabled: !!orgSlug,
+    staleTime: 5 * 60_000,
+  });
+}
+
+// Same scope keying as useDeadstock.
+export function useFastMoving(orgSlug: string, days = 90, scope?: ReportLocationScope) {
+  return useQuery<FastMovingReport>({
+    queryKey: [REPORTS_KEY, 'fast-moving', orgSlug, days, scope?.outletId ?? 'all', scope?.warehouseId ?? 'all'],
+    queryFn: () => reportsApi.fastMoving(orgSlug, days, scope),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
   });
