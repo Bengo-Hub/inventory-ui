@@ -15,12 +15,12 @@ test.describe('Inventory UI SSO login and landing', () => {
     await page.goto('/');
     const signInLink = page.getByRole('link', { name: /sign in|login/i }).first();
     await signInLink.click().catch(() => {});
-    const onAccounts = await page.waitForURL(/accounts\.codevertexitsolutions\.com\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
+    const onAccounts = await page.waitForURL(/accounts\.codevertexafrica\.com\/login/, { timeout: 15_000 }).then(() => true).catch(() => false);
     if (onAccounts) {
       await page.getByRole('textbox', { name: /email/i }).fill(EMAIL);
       await page.getByRole('textbox', { name: /password/i }).fill(PASSWORD);
       await page.getByRole('button', { name: /sign in/i }).click();
-      await page.waitForURL(/inventory\.codevertexitsolutions\.com|localhost/, { timeout: 25_000 }).catch(() => {});
+      await page.waitForURL((url) => /^(?:inventory\.codevertexafrica\.com|localhost)$/.test(url.hostname), { timeout: 25_000 }).catch(() => {});
     }
     const dashboardOrContent = page.getByRole('link', { name: /dashboard|profile/i }).or(page.getByText(/dashboard|inventory/i));
     await expect(dashboardOrContent.first()).toBeVisible({ timeout: 15_000 });
