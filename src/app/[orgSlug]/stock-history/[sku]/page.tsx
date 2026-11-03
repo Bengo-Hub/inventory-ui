@@ -22,6 +22,7 @@ const MOVEMENT_TYPE_OPTIONS: { value: StockMovementRow['type']; label: string }[
   { value: 'opening_stock', label: 'Opening Stock' },
   { value: 'purchase', label: 'Purchase' },
   { value: 'sale', label: 'Sold' },
+  { value: 'sale_reversal', label: 'Voided / Reversed Sale' },
   { value: 'sell_return', label: 'Sell Return' },
   { value: 'purchase_return', label: 'Purchase Return' },
   { value: 'service_out', label: 'Sent for Repair' },
@@ -37,12 +38,26 @@ const TYPE_BADGE: Record<StockMovementRow['type'], 'success' | 'error' | 'warnin
   sell_return: 'success',
   transfer_in: 'success',
   sale: 'error',
+  sale_reversal: 'warning',
   purchase_return: 'error',
   service_out: 'warning',
   service_in: 'success',
   transfer_out: 'error',
   adjustment: 'warning',
 };
+
+/** How a sale row reads once it was undone: "Voided", or "Partly returned 2" for a partial undo. */
+const SALE_STATUS_LABEL: Record<string, string> = {
+  voided: 'Voided', edited: 'Edited', reversed: 'Reversed', returned: 'Returned',
+};
+
+function saleStatusText(r: StockMovementRow, fmt: (n?: number) => string): string | null {
+  if (!r.status) return null;
+  const partial = r.status.startsWith('partially_');
+  const base = SALE_STATUS_LABEL[partial ? r.status.slice('partially_'.length) : r.status];
+  if (!base) return null;
+  return partial ? `Partly ${base.toLowerCase()} ${fmt(r.reversed_quantity)}` : base;
+}
 
 /**
  * Stock History — the Go-Digital-style per-item ledger, as a standalone page (not a modal):
@@ -107,10 +122,26 @@ export default function StockHistoryPage() {
       {
         key: 'label',
         header: 'Type',
-        accessor: (r) => r.label,
+        // A sale that was later voided, edited or returned says so on its own row, so the receipt
+        // number never reads as a standing sale; the undo itself is the Sale Voided (etc.) row.
+        accessor: (r) => {
+          const st = saleStatusText(r, qty);
+          return st ? `${r.label} (${st})` : r.label;
+        },
         sortable: true,
         filterable: true,
-        render: (r) => <Badge variant={TYPE_BADGE[r.type] ?? 'outline'}>{r.label}</Badge>,
+        render: (r) => {
+          const st = saleStatusText(r, qty);
+          return (
+            <div className="flex flex-col items-start gap-1">
+              <Badge variant={TYPE_BADGE[r.type] ?? 'outline'} className={r.status === 'voided' ? 'line-through' : undefined}>
+                {r.label}
+              </Badge>
+              {st && <Badge variant="warning" className="text-[10px] uppercase">{st}</Badge>}
+              {r.note && <span className="text-[11px] text-muted-foreground max-w-56 truncate" title={r.note}>{r.note}</span>}
+            </div>
+          );
+        },
       },
       {
         key: 'quantity_change',
@@ -249,6 +280,9 @@ export default function StockHistoryPage() {
           </p>
           <dl className="space-y-1.5 text-sm">
             <SummaryRow label="Total Sold" value={`${qty(summary?.total_sold)}${unit}`} />
+            {!!summary?.total_sale_reversals && (
+              <SummaryRow label="Voided / Reversed (not counted)" value={`${qty(summary.total_sale_reversals)}${unit}`} />
+            )}
             <SummaryRow label="Total Purchase Return" value={`${qty(summary?.total_purchase_returns)}${unit}`} />
             <SummaryRow label="Sent for Repair" value={`${qty(summary?.sent_for_repair)}${unit}`} />
             <SummaryRow label="Stock Transfers (Out)" value={`${qty(summary?.transfers_out)}${unit}`} />

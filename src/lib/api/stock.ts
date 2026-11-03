@@ -275,6 +275,7 @@ export interface StockMovementRow {
     | 'opening_stock'
     | 'purchase'
     | 'sale'
+    | 'sale_reversal'
     | 'sell_return'
     | 'purchase_return'
     | 'service_out'
@@ -301,6 +302,17 @@ export interface StockMovementRow {
    * note convention; never hides the real audit timestamp, just isn't the primary Date shown.
    */
   entered_at?: string;
+  /**
+   * On a sale row: what later happened to it (voided, edited, reversed, returned), prefixed
+   * "partially_" when only part of it was undone. Absent for a sale that still stands.
+   */
+  status?: string;
+  /** How much of a sale row was undone, alongside status. */
+  reversed_quantity?: number;
+  /** On a sale_reversal or customer-return row: void | edit | reversal | return. */
+  reversal_kind?: string;
+  /** Reason recorded with a reversal, e.g. "Delete Sale (shred): wrong customer". */
+  note?: string;
 }
 
 export interface StockHistorySummary {
@@ -308,7 +320,10 @@ export interface StockHistorySummary {
   total_purchased: number;
   total_sell_returns: number;
   transfers_in: number;
+  /** Net of voided, edited and reversed sales (total_sale_reversals). */
   total_sold: number;
+  /** Units put back by voids, Edit Sale reductions and reversals; customer returns are separate. */
+  total_sale_reversals: number;
   total_purchase_returns: number;
   /** Units sent to a repair provider and units received back repaired (neither is an adjustment). */
   sent_for_repair: number;
