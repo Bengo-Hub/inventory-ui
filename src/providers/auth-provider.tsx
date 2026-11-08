@@ -9,7 +9,7 @@ import { useMe } from '@/hooks/useMe';
 import { useAuthStore } from '@/store/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const { status, initialize } = useAuthStore();
@@ -25,8 +25,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isAuthCallback = pathname?.includes('/auth');
     const isUnauthorizedPage = pathname?.endsWith('/unauthorized');
 
+    // `ready` = initialize() has restored any saved session. Deciding before that sent a signed-in
+    // person on a full page load through the silent SSO probe, and then to PIN login.
+    const [ready, setReady] = useState(false);
     useEffect(() => {
-        initialize();
+        let active = true;
+        initialize().finally(() => { if (active) setReady(true); });
+        return () => { active = false; };
     }, [initialize]);
 
     // Register 401 handler: clear all caches and redirect to SSO.
@@ -70,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // probe while online — offline the accounts domain is unreachable and the redirect
     // would strand the user on a browser error page.
     useEffect(() => {
-        if (status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
+        if (ready && status === 'idle' && !pathname?.includes('/auth') && orgSlug) {
             const path = typeof window !== 'undefined'
                 ? window.location.pathname + window.location.search
                 : `/${orgSlug}`;
@@ -83,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
             router.replace(`/${orgSlug}/auth/pin-login?returnTo=${encodeURIComponent(path)}`);
         }
-    }, [status, pathname, orgSlug, router]);
+    }, [ready, status, pathname, orgSlug, router]);
 
     useEffect(() => {
         if (!session || isUnauthorizedPage || meLoading) return;
