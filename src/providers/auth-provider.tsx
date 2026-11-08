@@ -101,7 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [session, isError, error, isUnauthorizedPage, meLoading, orgSlug, router]);
 
-    const loading = status === 'loading' || (!!session && meLoading);
+    // !ready: child effects run before this provider's, so rendering pages before initialize() has set
+    // the token sent their first requests with no token (401, then a retry).
+    const loading = !ready || status === 'loading' || (!!session && meLoading);
     if (loading && !isAuthCallback) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-background">
