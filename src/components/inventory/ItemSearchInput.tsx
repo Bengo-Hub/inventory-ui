@@ -7,7 +7,8 @@ import { ItemFormDialog } from '@/components/inventory/ItemFormDialog';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { useCreateItem } from '@/hooks/useItems';
 import type { CreateItemInput, Item } from '@/lib/api/items';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -102,7 +103,11 @@ function itemToResult(i: Item): ItemResult {
 }
 
 export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Search items...', label, fixedDropdown, allowCreate = true, enableScan = true, type, forRecipe, warehouseId }: Props) {
-  const [query, setQuery] = useState('');
+  // `search.value` is the box (updates on every key); `search.term` is the debounced,
+  // trimmed term that drives the request. Terms under 2 characters become '' (no request).
+  const search = useDebouncedSearch({ minChars: 2 });
+  const query = search.value;
+  const term = search.term;
   const [open, setOpen] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({});
   const [createOpen, setCreateOpen] = useState(false);
@@ -110,23 +115,27 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
   const inputRef = useRef<HTMLDivElement>(null);
   const createItem = useCreateItem(orgSlug);
 
-  const { data: results } = useQuery<ItemResult[]>({
-    queryKey: ['item-search', orgSlug, query, type, forRecipe ?? false, warehouseId ?? ''],
-    queryFn: async () => {
-      const params: Record<string, string> = { search: query };
+  const { data: termResults } = useQuery<ItemResult[]>({
+    queryKey: ['item-search', orgSlug, term, type, forRecipe ?? false, warehouseId ?? ''],
+    queryFn: async ({ signal }) => {
+      const params: Record<string, string> = { search: term };
       if (forRecipe) params.for_recipe = '1';
       else if (type) params.type = type;
       if (warehouseId) params.warehouse_id = warehouseId;
       const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
         `/api/v1/${orgSlug}/inventory/items`,
-        params
+        params,
+        { signal },
       );
       return Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
     },
-    enabled: !!orgSlug && query.length >= 2,
-    placeholderData: [],
+    enabled: !!orgSlug && term !== '',
+    // Keep the last results visible while the next term loads instead of flashing empty.
+    placeholderData: keepPreviousData,
     staleTime: 30_000,
   });
+  // With no term (cleared box, or under 2 characters) nothing is listed, as before.
+  const results = term ? termResults : [];
 
   function handleCreateSubmit(data: CreateItemInput) {
     createItem.mutate(data, {
@@ -163,7 +172,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
 
   function handleSelect(item: ItemResult) {
     onSelect(item);
-    setQuery('');
+    search.clear();
     setOpen(false);
   }
 
@@ -192,9 +201,12 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
           placeholder={placeholder}
           value={query || value}
           onChange={(e) => {
-            setQuery(e.target.value);
+            search.setValue(e.target.value);
             setOpen(true);
           }}
+          onKeyDown={search.inputProps.onKeyDown}
+          onCompositionStart={search.inputProps.onCompositionStart}
+          onCompositionEnd={search.inputProps.onCompositionEnd}
           onFocus={() => query.length >= 2 && setOpen(true)}
           className={enableScan ? 'pl-10 pr-12' : 'pl-10'}
         />
@@ -204,7 +216,7 @@ export function ItemSearchInput({ orgSlug, value, onSelect, placeholder = 'Searc
               title="Scan item barcode"
               hint="Point the camera at the item barcode."
               className="h-8 w-8 rounded-lg"
-              onScan={(code) => { setQuery(code); setOpen(true); }}
+              onScan={(code) => { search.setValue(code, { immediate: true }); setOpen(true); }}
             />
           </div>
         )}

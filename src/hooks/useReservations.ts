@@ -8,7 +8,7 @@ const RESERVATIONS_KEY = 'reservations';
 export function useReservations(orgSlug: string, params?: ReservationListParams) {
   return useQuery<ReservationListResult>({
     queryKey: [RESERVATIONS_KEY, orgSlug, params],
-    queryFn: () => reservationsApi.list(orgSlug, params),
+    queryFn: ({ signal }) => reservationsApi.list(orgSlug, params, signal),
     enabled: !!orgSlug,
     placeholderData: (previous) => previous,
     staleTime: 15_000,

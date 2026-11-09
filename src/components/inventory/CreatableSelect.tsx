@@ -26,8 +26,10 @@ interface Props {
    * than `remoteThreshold` local matches, so a record that exists but lives past page 1
    * (e.g. searching "tesia" in a 24-supplier list) is still found. Omit for small,
    * fully-prefetched lists (categories, units, warehouses — fetched whole, never paginated).
+   * The second argument carries the combobox's AbortSignal; pass it to the request so a
+   * superseded search is cancelled.
    */
-  onRemoteSearch?: (query: string) => Promise<SelectOption[]>;
+  onRemoteSearch?: (query: string, ctx?: { signal?: AbortSignal }) => Promise<SelectOption[]>;
   remoteThreshold?: number;
   /** Fallback display name when `value` is pre-set (edit/amend) but its record isn't in
    * `options` (e.g. it lives past the prefetched page) — avoids showing `placeholder`
@@ -52,7 +54,7 @@ export function CreatableSelect({ value, onChange, options, placeholder = 'Selec
         disabled={disabled}
         clearable={!required}
         valueLabel={valueLabel}
-        onRemoteSearch={onRemoteSearch ? async (q) => (await onRemoteSearch(q)).map((o) => ({ value: o.id, label: o.name, hint: o.hint })) : undefined}
+        onRemoteSearch={onRemoteSearch ? async (q, ctx) => (await onRemoteSearch(q, ctx)).map((o) => ({ value: o.id, label: o.name, hint: o.hint })) : undefined}
         remoteThreshold={remoteThreshold}
         footer={
           onAddClick ? (

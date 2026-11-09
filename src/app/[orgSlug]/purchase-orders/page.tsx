@@ -33,6 +33,7 @@ import { BarChart3, DollarSign, Minus, Plus, Search, ShieldCheck, X } from 'luci
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -136,10 +137,11 @@ interface POItemOption extends SearchAddOption {
 
 /** Searches inventory items for the top-of-form SearchAddTable, restocking-relevant types only
  *  (GOODS/INGREDIENT — see the type filter comment where this used to live on ItemSearchInput). */
-async function searchPOItems(orgSlug: string, query: string): Promise<POItemOption[]> {
+async function searchPOItems(orgSlug: string, query: string, signal?: AbortSignal): Promise<POItemOption[]> {
     const res = await apiClient.get<{ data: ItemResult[]; total: number } | ItemResult[]>(
         `/api/v1/${orgSlug}/inventory/items`,
         { search: query, type: 'GOODS,INGREDIENT' },
+        { signal },
     );
     const items = Array.isArray(res) ? res : (res as { data: ItemResult[] }).data ?? [];
     return items.map((item) => ({ id: item.id, label: item.name, hint: item.sku, item }));
@@ -161,7 +163,9 @@ function recalcUnitPriceForNewUnit(line: POLine, newUnitId: string, units: Unit[
 export default function PurchaseOrdersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [statusFilter, setStatusFilter] = useState('');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
@@ -457,8 +461,7 @@ export default function PurchaseOrdersPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by PO number or supplier..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                {...searchBox.inputProps}
                                 className="pl-10"
                             />
                         </div>
@@ -594,7 +597,7 @@ export default function PurchaseOrdersPage() {
                                         that can't actually be purchased as stock. Picking a result both creates AND
                                         populates the row below in one step (see addLineFromItem). */}
                                     <SearchAddTable<POItemOption>
-                                        onSearch={(q) => searchPOItems(orgSlug, q)}
+                                        onSearch={(q, ctx) => searchPOItems(orgSlug, q, ctx?.signal)}
                                         onAdd={(option) => addLineFromItem(option.item)}
                                         excludeIds={poLines.filter((l) => l.itemId).map((l) => l.itemId)}
                                         placeholder="Search item to add..."

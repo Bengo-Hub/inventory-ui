@@ -340,7 +340,7 @@ function BundleModal({ orgSlug, editing, onClose, onCreate, onUpdate, isPending,
                         <div className="flex gap-2 items-end">
                             <div className="flex-1">
                                 <SearchAddTable<ItemSearchOption>
-                                    onSearch={async (q) => (await searchItems(orgSlug, q))
+                                    onSearch={async (q, ctx) => (await searchItems(orgSlug, q, {}, ctx?.signal))
                                         .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
                                     onAdd={(opt) => addComponent(opt.item)}
                                     excludeIds={components.map((c) => c.component_item_id)}

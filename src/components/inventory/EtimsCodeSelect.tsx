@@ -4,6 +4,7 @@ import { etimsApi, type EtimsCode } from '@/lib/api/etims';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Check, ChevronsUpDown, Loader2, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useDebouncedValue } from '@bengo-hub/shared-ui-lib/search';
 
 interface Props {
   orgSlug: string;
@@ -34,16 +35,11 @@ const inputCls =
 export function EtimsCodeSelect({ orgSlug, codeType, value, onChange, placeholder, search, className }: Props) {
   const [open, setOpen] = useState(false);
   const [rawSearch, setRawSearch] = useState('');
-  const [query, setQuery] = useState('');
+  // Debounced term (shared 300 ms default) so each keystroke doesn't hit the API.
+  const query = useDebouncedValue(rawSearch.trim());
   const [activeIndex, setActiveIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-
-  // Debounce the search term (300ms) so each keystroke doesn't hit the API.
-  useEffect(() => {
-    const t = setTimeout(() => setQuery(rawSearch.trim()), 300);
-    return () => clearTimeout(t);
-  }, [rawSearch]);
 
   // Close on outside click.
   useEffect(() => {
@@ -76,7 +72,7 @@ export function EtimsCodeSelect({ orgSlug, codeType, value, onChange, placeholde
   const effectiveQuery = query || (search ?? '').trim();
   const options = useQuery({
     queryKey: ['etims-codes', 'search', orgSlug, codeType, effectiveQuery],
-    queryFn: () => etimsApi.codeLists(orgSlug, codeType, effectiveQuery || undefined, 50),
+    queryFn: ({ signal }) => etimsApi.codeLists(orgSlug, codeType, effectiveQuery || undefined, 50, signal),
     enabled: !!orgSlug && open,
     placeholderData: keepPreviousData,
     staleTime: 120_000,
@@ -99,7 +95,6 @@ export function EtimsCodeSelect({ orgSlug, codeType, value, onChange, placeholde
     onChange(code);
     setOpen(false);
     setRawSearch('');
-    setQuery('');
   }
 
   function onKeyDown(e: React.KeyboardEvent) {

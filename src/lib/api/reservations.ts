@@ -43,9 +43,9 @@ export interface ReservationListResult {
 }
 
 export const reservationsApi = {
-  list: async (orgSlug: string, params?: ReservationListParams): Promise<ReservationListResult> => {
+  list: async (orgSlug: string, params?: ReservationListParams, signal?: AbortSignal): Promise<ReservationListResult> => {
     const res = await apiClient.get<{ data: Reservation[]; total: number } | Reservation[]>(
-      `/api/v1/${orgSlug}/inventory/reservations`, params,
+      `/api/v1/${orgSlug}/inventory/reservations`, params, { signal },
     );
     return Array.isArray(res) ? { data: res, total: res.length } : { data: res.data ?? [], total: res.total ?? 0 };
   },

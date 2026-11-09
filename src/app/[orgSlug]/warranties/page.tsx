@@ -10,6 +10,7 @@ import { useWarranties, useCreateWarranty, useUpdateWarranty, useClaimWarranty, 
 import { type Warranty, type WarrantyStatus, type WarrantyWriteInput } from '@/lib/api/warranties';
 import { BarcodeScanButton } from '@/components/inventory/BarcodeScanner';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildWarrantyColumns, STATUS_VARIANT } from './warranty-columns';
 import { AlertTriangle, CheckCircle2, Plus, ScanLine, Search, ShieldCheck, ShieldX, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -39,7 +40,9 @@ export default function WarrantiesPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [tab, setTab] = useState<Tab>('');
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
@@ -193,7 +196,7 @@ export default function WarrantiesPage() {
                             </div>
                             <div className="relative sm:ml-auto sm:w-72">
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input className="pl-10" placeholder="Search serial, item or SKU…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                                <Input className="pl-10" placeholder="Search serial, item or SKU…" {...searchBox.inputProps} />
                             </div>
                             <DateRangePicker value={range} onChange={setRange} className="w-56" />
                         </div>

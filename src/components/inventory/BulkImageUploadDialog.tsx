@@ -186,8 +186,9 @@ export function BulkImageUploadDialog({ orgSlug, onClose }: { orgSlug: string; o
   }
 
   const searchItems = useCallback(
-    async (query: string): Promise<ComboboxOption[]> => {
-      const res = await itemsApi.list(orgSlug, { search: query, limit: 20, status: 'all' });
+    // The combobox passes `{ signal }` so a superseded search is cancelled.
+    async (query: string, ctx?: { signal?: AbortSignal }): Promise<ComboboxOption[]> => {
+      const res = await itemsApi.list(orgSlug, { search: query, limit: 20, status: 'all' }, ctx?.signal);
       return res.data.map((it) => {
         imageKnown.current.set(it.id, !!it.image_url);
         return { value: it.id, label: it.name, hint: it.sku, description: it.image_url ? 'Already has a picture' : undefined };

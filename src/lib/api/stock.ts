@@ -182,8 +182,8 @@ export interface BulkJob {
 }
 
 export const stockApi = {
-  list: (orgSlug: string, params?: StockListParams) =>
-    apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params),
+  list: (orgSlug: string, params?: StockListParams, signal?: AbortSignal) =>
+    apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params, { signal }),
 
   // Branded PDF/CSV export of stock levels — same filters as list() plus warehouse/location
   // drill-down and an outlet override. Streamed from inventory-api's docs report engine.
@@ -195,9 +195,9 @@ export const stockApi = {
   // returns the true `total`. A caller that omits page/limit gets the backend's own default page
   // size (previously a hard-coded, un-pageable 200-row cap), NOT the full list — always pass
   // them for a list meant to page through everything (see adjustments/page.tsx).
-  listAdjustments: async (orgSlug: string, params?: AdjustmentListParams): Promise<AdjustmentListResult> => {
+  listAdjustments: async (orgSlug: string, params?: AdjustmentListParams, signal?: AbortSignal): Promise<AdjustmentListResult> => {
     const res = await apiClient.get<{ data: StockAdjustment[]; total: number } | StockAdjustment[]>(
-      `/api/v1/${orgSlug}/inventory/adjustments`, params
+      `/api/v1/${orgSlug}/inventory/adjustments`, params, { signal }
     );
     return Array.isArray(res) ? { data: res, total: res.length } : { data: res.data ?? [], total: res.total ?? 0 };
   },

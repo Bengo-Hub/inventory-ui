@@ -5,6 +5,7 @@ import { ModifierGroupDialog } from '@/components/inventory/ModifierGroupDialog'
 import { useModifierGroups, useCreateModifierGroup, useUpdateModifierGroup, useDeleteModifierGroup } from '@/hooks/use-modifiers';
 import type { ModifierGroup, ModifierGroupPayload } from '@/lib/api/modifiers';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildModifierColumns, ModifierOptionsPanel } from './modifier-columns';
 import { Plus, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -46,7 +47,9 @@ function ConfirmDeleteDialog({
 export default function ModifiersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -132,8 +135,7 @@ export default function ModifiersPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search modifier groups..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

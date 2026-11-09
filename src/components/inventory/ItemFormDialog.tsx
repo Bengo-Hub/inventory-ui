@@ -32,6 +32,7 @@ import { type CreateItemInput, type Item, type ItemUseCase, type RecurrenceConfi
 import { fetchRecipeBySku, type Recipe } from '@/lib/api/recipes';
 import { DECIMAL_STEP, parseDecimal, roundDecimal } from '@/lib/utils';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useDebouncedValue } from '@bengo-hub/shared-ui-lib/search';
 import { ChevronDown, ChevronUp, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -518,17 +519,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // thousands, so unlike suppliers/units/categories we can't hold the full list
   // client-side) scoped to the item's own type so a Goods item isn't flagged
   // against an unrelated Service of the same name.
-  const [dupSearch, setDupSearch] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setDupSearch(name.trim()), 300);
-    return () => clearTimeout(t);
-  }, [name]);
+  const dupSearch = useDebouncedValue(name.trim());
   const { data: dupCandidates } = useQuery<Item[]>({
     queryKey: ['item-dup-check', orgSlug, dupSearch, type],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(
         `/api/v1/${orgSlug}/inventory/items`,
         { search: dupSearch, type },
+        { signal },
       );
       return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
     },
@@ -544,11 +542,7 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // live on boi-enterprises' Add Product (raw "duplicate key value violates unique constraint
   // item_tenant_id_sku" reaching the UI) — this catches it before submit instead. Exact lookup
   // (not the fuzzy name search above) since SKU matching is exact-or-nothing.
-  const [skuCheckValue, setSkuCheckValue] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setSkuCheckValue(sku.trim()), 300);
-    return () => clearTimeout(t);
-  }, [sku]);
+  const skuCheckValue = useDebouncedValue(sku.trim());
   // GET /inventory/items/{sku} is the stock-AVAILABILITY endpoint (see inventory-api's
   // GetStockAvailability/StockAvailability), not a full item lookup — it responds with
   // `item_id`, never `id`. This was previously mistyped as `Item` and compared via
@@ -561,9 +555,13 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
   // every dialog open.
   const { data: skuConflict, isFetching: skuCheckLoading } = useQuery<{ item_id: string; sku: string } | null>({
     queryKey: ['item-sku-check', orgSlug, skuCheckValue],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       try {
-        return await apiClient.get<{ item_id: string; sku: string }>(`/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(skuCheckValue)}`);
+        return await apiClient.get<{ item_id: string; sku: string }>(
+          `/api/v1/${orgSlug}/inventory/items/${encodeURIComponent(skuCheckValue)}`,
+          undefined,
+          { signal },
+        );
       } catch (err: unknown) {
         const status = (err as { response?: { status?: number } })?.response?.status;
         if (status === 404) return null;

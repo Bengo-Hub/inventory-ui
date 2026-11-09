@@ -13,9 +13,10 @@ const EMPTY_SUPPLIERS: PaginatedSuppliers = { data: [], total: 0, page: 1, limit
 export function useSuppliers(orgSlug: string, params?: SupplierListParams) {
   return useQuery<PaginatedSuppliers>({
     queryKey: [SUPPLIERS_KEY, orgSlug, params],
-    queryFn: () => suppliersApi.list(orgSlug, params),
+    queryFn: ({ signal }) => suppliersApi.list(orgSlug, params, signal),
     enabled: !!orgSlug,
-    placeholderData: EMPTY_SUPPLIERS,
+    // Keep the previous page while a new search loads; empty only on the first load.
+    placeholderData: (previous) => previous ?? EMPTY_SUPPLIERS,
     staleTime: 60_000,
   });
 }
@@ -25,12 +26,15 @@ export function useSuppliers(orgSlug: string, params?: SupplierListParams) {
  * (purchase orders, contracts, requisitions, preferred-supplier on the item form)
  * — GET /inventory/suppliers?search=… backed by the SAME endpoint `useSuppliers`
  * prefetches page 1 of, so a supplier past that first page (e.g. alphabetically
- * beyond the default 20-row limit) is still found once typed.
+ * beyond the default 20-row limit) is still found once typed. The shared combobox passes
+ * `{ signal }` as the second argument, so a superseded search is cancelled.
  */
-export function useSupplierSearch(orgSlug: string): (query: string) => Promise<SelectOption[]> {
+export function useSupplierSearch(
+  orgSlug: string,
+): (query: string, ctx?: { signal?: AbortSignal }) => Promise<SelectOption[]> {
   return useCallback(
-    async (query: string) => {
-      const res = await suppliersApi.list(orgSlug, { search: query, limit: 20 });
+    async (query: string, ctx?: { signal?: AbortSignal }) => {
+      const res = await suppliersApi.list(orgSlug, { search: query, limit: 20 }, ctx?.signal);
       return res.data.map(supplierOption);
     },
     [orgSlug],

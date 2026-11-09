@@ -9,9 +9,10 @@ const EMPTY: PaginatedPOs = { data: [], total: 0, page: 1, limit: 20, hasMore: f
 export function usePurchaseOrders(orgSlug: string, params?: POListParams) {
   return useQuery<PaginatedPOs>({
     queryKey: [PO_KEY, orgSlug, params],
-    queryFn: () => purchaseOrdersApi.list(orgSlug, params),
+    queryFn: ({ signal }) => purchaseOrdersApi.list(orgSlug, params, signal),
     enabled: !!orgSlug,
-    placeholderData: EMPTY,
+    // Keep the previous page while a new search loads; empty only on the first load.
+    placeholderData: (previous) => previous ?? EMPTY,
     staleTime: 30_000,
   });
 }

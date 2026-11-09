@@ -20,9 +20,10 @@ const EMPTY_RECIPES: PaginatedRecipes = { data: [], total: 0, page: 1, limit: 20
 export function useRecipes(orgSlug: string, params?: RecipeListParams) {
     return useQuery<PaginatedRecipes>({
         queryKey: [RECIPES_KEY, orgSlug, params],
-        queryFn: () => fetchRecipes(orgSlug, params),
+        queryFn: ({ signal }) => fetchRecipes(orgSlug, params, signal),
         enabled: !!orgSlug,
-        placeholderData: EMPTY_RECIPES,
+        // Keep the previous page while a new search loads; empty only on the first load.
+        placeholderData: (previous) => previous ?? EMPTY_RECIPES,
     });
 }
 

@@ -24,9 +24,11 @@ const EMPTY_PAGE: PaginatedItems = { data: [], total: 0, page: 1, limit: 20, has
 export function useItems(orgSlug: string, params?: ListItemsParams) {
   return useQuery({
     queryKey: [ITEMS_KEY, orgSlug, params],
-    queryFn: () => itemsApi.list(orgSlug, params),
+    queryFn: ({ signal }) => itemsApi.list(orgSlug, params, signal),
     enabled: !!orgSlug,
-    placeholderData: EMPTY_PAGE,
+    // Keep the previous page on screen while a new search or page loads (no flash to
+    // empty); the empty page only covers the very first load, as before.
+    placeholderData: (previous) => previous ?? EMPTY_PAGE,
     staleTime: 60_000,
   });
 }

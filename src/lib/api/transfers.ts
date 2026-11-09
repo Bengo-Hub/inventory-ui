@@ -113,8 +113,8 @@ export const transfersApi = {
   // the transfer number) plus `page`/`limit`, and returns the true `total`. A caller that omits
   // page/limit gets the backend's own default page size, NOT the full list, so always pass them
   // for a list that's meant to page through everything (see transfers/page.tsx).
-  list: async (orgSlug: string, params?: TransferListParams): Promise<TransferListResult> => {
-    const res = await apiClient.get<{ items: TransferSummary[]; total: number }>(`/api/v1/${orgSlug}/inventory/transfers`, params);
+  list: async (orgSlug: string, params?: TransferListParams, signal?: AbortSignal): Promise<TransferListResult> => {
+    const res = await apiClient.get<{ items: TransferSummary[]; total: number }>(`/api/v1/${orgSlug}/inventory/transfers`, params, { signal });
     return { items: res.items ?? [], total: res.total ?? 0 };
   },
 

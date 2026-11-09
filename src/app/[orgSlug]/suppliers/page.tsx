@@ -5,6 +5,7 @@ import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { useSuppliers, useCreateSupplier, useUpdateSupplier, useDeleteSupplier } from '@/hooks/useSuppliers';
 import { type Supplier, type CreateSupplierInput } from '@/lib/api/suppliers';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildSupplierColumns } from './supplier-columns';
 import { Plus, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -16,7 +17,9 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 export default function SuppliersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -108,8 +111,7 @@ export default function SuppliersPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search suppliers..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

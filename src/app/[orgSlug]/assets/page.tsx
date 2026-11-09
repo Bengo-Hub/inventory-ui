@@ -9,6 +9,7 @@ import {
 } from '@/hooks/useAssets';
 import { type Asset, type AssetStatus, type CreateAssetInput } from '@/lib/api/assets';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildAssetColumns, STATUS_VARIANT, money } from './asset-columns';
 import { BarChart3, Boxes, FolderTree, Plus } from 'lucide-react';
 import Link from 'next/link';
@@ -25,7 +26,9 @@ export default function AssetsPage() {
     const router = useRouter();
     const orgSlug = params?.orgSlug as string;
     const [status, setStatus] = useState<AssetStatus | ''>('');
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -111,7 +114,7 @@ export default function AssetsPage() {
             <Card>
                 <CardHeader>
                     <div className="flex flex-col sm:flex-row gap-3">
-                        <Input className="sm:max-w-xs" placeholder="Search tag, name, serial…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <Input className="sm:max-w-xs" placeholder="Search tag, name, serial…" {...searchBox.inputProps} />
                         <select className="border border-border rounded-md px-3 py-2 text-sm bg-background"
                             value={status} onChange={(e) => setStatus(e.target.value as AssetStatus | '')}>
                             <option value="">All statuses</option>

@@ -375,13 +375,18 @@ export interface ItemSearchParams {
  *  internal queryFn/params exactly, kept here as a plain async function since SearchAddTable's
  *  onSearch (fired from a debounced effect, not render) can't use a hook. ItemSearchInput itself
  *  is untouched — its many "persistent select" callers keep working exactly as before. */
-export async function searchItems(orgSlug: string, query: string, params: ItemSearchParams = {}): Promise<Item[]> {
+export async function searchItems(
+  orgSlug: string,
+  query: string,
+  params: ItemSearchParams = {},
+  signal?: AbortSignal,
+): Promise<Item[]> {
   if (!orgSlug || query.trim().length < 2) return [];
   const qp: Record<string, string> = { search: query };
   if (params.forRecipe) qp.for_recipe = '1';
   else if (params.type) qp.type = params.type;
   if (params.warehouseId) qp.warehouse_id = params.warehouseId;
-  const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(itemsBase(orgSlug), qp);
+  const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(itemsBase(orgSlug), qp, { signal });
   return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
 }
 
@@ -476,8 +481,12 @@ export type BulkStatusAction =
 export const EOL_RETENTION_DAYS = 30;
 
 export const itemsApi = {
-  list: async (orgSlug: string, params?: ListItemsParams): Promise<PaginatedItems> => {
-    const res = await apiClient.get<PaginatedItems | Item[]>(itemsBase(orgSlug), params as Record<string, string | number | undefined>);
+  list: async (orgSlug: string, params?: ListItemsParams, signal?: AbortSignal): Promise<PaginatedItems> => {
+    const res = await apiClient.get<PaginatedItems | Item[]>(
+      itemsBase(orgSlug),
+      params as Record<string, string | number | undefined>,
+      { signal },
+    );
     if (Array.isArray(res)) {
       return { data: res, total: res.length, page: 1, limit: res.length, hasMore: false };
     }

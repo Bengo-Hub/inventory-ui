@@ -2,6 +2,11 @@ import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig } from 
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://inventoryapi.codevertexafrica.com';
 
+/** Per-request options. `signal` aborts the request when a newer search replaces it. */
+export interface RequestOptions {
+    signal?: AbortSignal;
+}
+
 class ApiClient {
     private instance: AxiosInstance;
     private accessToken: string | null = null;
@@ -137,8 +142,14 @@ class ApiClient {
         this.outletId = outletId;
     }
 
-    public get<T>(url: string, params?: any): Promise<T> {
-        return this.instance.get<T>(url, { params }).then((res: AxiosResponse<T>) => res.data);
+    /**
+     * GET a JSON payload. Pass `opts.signal` (react-query's queryFn signal, or a search
+     * callback's signal) so a superseded search is cancelled instead of running to the end.
+     */
+    public get<T>(url: string, params?: any, opts?: RequestOptions): Promise<T> {
+        return this.instance
+            .get<T>(url, { params, signal: opts?.signal })
+            .then((res: AxiosResponse<T>) => res.data);
     }
 
     public post<T>(url: string, data?: any): Promise<T> {

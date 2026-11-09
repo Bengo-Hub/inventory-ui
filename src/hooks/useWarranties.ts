@@ -10,9 +10,10 @@ const KEY = 'warranties';
 export function useWarranties(org: string, params?: WarrantyListParams) {
   return useQuery<Warranty[]>({
     queryKey: [KEY, org, params],
-    queryFn: () => warrantiesApi.list(org, params),
+    queryFn: ({ signal }) => warrantiesApi.list(org, params, signal),
     enabled: !!org,
-    placeholderData: [],
+    // Keep the previous rows while a new search loads; empty only on the first load.
+    placeholderData: (previous) => previous ?? [],
     staleTime: 60_000,
   });
 }

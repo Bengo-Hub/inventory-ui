@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Button } from '@/components/ui/base';
 import { useReservations } from '@/hooks/useReservations';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildReservationColumns, STATUS_LABEL } from './reservation-columns';
 import { Filter, Package, Search } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -14,7 +15,9 @@ const STATUS_FILTERS = ['All', 'pending', 'confirmed', 'consumed', 'released'];
 export default function ReservationsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [statusFilter, setStatusFilter] = useState('All');
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
@@ -52,8 +55,7 @@ export default function ReservationsPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by order ID..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                {...searchBox.inputProps}
                                 className="pl-10"
                             />
                         </div>

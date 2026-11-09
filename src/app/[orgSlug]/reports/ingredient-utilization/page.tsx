@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
@@ -55,14 +56,16 @@ const RANGE_PRESETS = [
 function useConsumableOptions(orgSlug: string, search: string, includeIngredients: boolean) {
   const goods = useQuery({
     queryKey: ['ingredient-picker', orgSlug, 'GOODS', search],
-    queryFn: () => itemsApi.list(orgSlug, { type: 'GOODS', search: search || undefined, limit: 50 }),
+    queryFn: ({ signal }) => itemsApi.list(orgSlug, { type: 'GOODS', search: search || undefined, limit: 50 }, signal),
     enabled: !!orgSlug,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
   const ingredients = useQuery({
     queryKey: ['ingredient-picker', orgSlug, 'INGREDIENT', search],
-    queryFn: () => itemsApi.list(orgSlug, { type: 'INGREDIENT', search: search || undefined, limit: 50 }),
+    queryFn: ({ signal }) => itemsApi.list(orgSlug, { type: 'INGREDIENT', search: search || undefined, limit: 50 }, signal),
     enabled: !!orgSlug && includeIngredients,
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
   });
   const options = useMemo(() => {
@@ -85,7 +88,9 @@ export default function IngredientUtilizationPage() {
   const rn = useReportNomenclature();
   const scope = useCatalogScope();
 
-  const [itemSearch, setItemSearch] = useState('');
+  // The box updates on every key; both item queries wait for the debounced term.
+  const itemSearchBox = useDebouncedSearch();
+  const itemSearch = itemSearchBox.term;
   const [itemId, setItemId] = useState('');
   const [rangeDays, setRangeDays] = useState(30);
   const [granularity, setGranularity] = useState<UtilizationGranularity>('day');
@@ -165,8 +170,7 @@ export default function IngredientUtilizationPage() {
               <label className="text-sm font-medium">{rn.subject}</label>
               <input
                 type="text"
-                value={itemSearch}
-                onChange={(e) => setItemSearch(e.target.value)}
+                {...itemSearchBox.inputProps}
                 placeholder={`Search ${rn.subjectLower} by name…`}
                 className="w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm mb-2 focus:ring-1 focus:ring-ring focus:outline-none"
               />

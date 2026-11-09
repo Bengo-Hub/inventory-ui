@@ -102,7 +102,8 @@ const catBase = (org: string) => `/api/v1/${org}/inventory/asset-categories`;
 const opBase = (org: string) => `/api/v1/${org}/inventory`;
 
 export const assetsApi = {
-  list: (org: string, params?: AssetListParams): Promise<PaginatedAssets> => apiClient.get<PaginatedAssets>(base(org), params),
+  list: (org: string, params?: AssetListParams, signal?: AbortSignal): Promise<PaginatedAssets> =>
+    apiClient.get<PaginatedAssets>(base(org), params, { signal }),
   get: (org: string, id: string) => apiClient.get<Asset>(`${base(org)}/${id}`),
   create: (org: string, data: CreateAssetInput) => apiClient.post<Asset>(base(org), data),
   update: (org: string, id: string, data: UpdateAssetInput) => apiClient.put<Asset>(`${base(org)}/${id}`, data),

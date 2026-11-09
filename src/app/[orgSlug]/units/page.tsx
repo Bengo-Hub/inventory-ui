@@ -6,8 +6,9 @@ import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { useItems } from '@/hooks/useItems';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { buildUnitColumns, TYPE_LABELS, type Unit } from './unit-columns';
 import { Plus, Ruler, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
@@ -80,7 +81,9 @@ export default function UnitsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const queryClient = useQueryClient();
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -93,12 +96,12 @@ export default function UnitsPage() {
 
     const { data: units, isLoading, isError, refetch } = useQuery<Unit[]>({
         queryKey: ['units', orgSlug, search],
-        queryFn: () => {
+        queryFn: ({ signal }) => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            return apiClient.get(`/api/v1/${orgSlug}/inventory/units`, p);
+            return apiClient.get(`/api/v1/${orgSlug}/inventory/units`, p, { signal });
         },
-        placeholderData: [],
+        placeholderData: keepPreviousData,
     });
 
     // Unfiltered list for the duplicate-name/abbreviation check below — decoupled
@@ -218,8 +221,7 @@ export default function UnitsPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search units..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

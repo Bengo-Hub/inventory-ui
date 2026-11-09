@@ -290,7 +290,7 @@ function TemplateDialog({ orgSlug, editing, onClose }: {
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Specific items</label>
                                 <SearchAddTable<ItemSearchOption>
-                                    onSearch={async (q) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }))
+                                    onSearch={async (q, ctx) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }, ctx?.signal))
                                         .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
                                     onAdd={(opt) => setItems((prev) => prev.some((p) => p.id === opt.item.id) ? prev : [...prev, { id: opt.item.id, name: opt.item.name, sku: opt.item.sku }])}
                                     excludeIds={items.map((it) => it.id)}

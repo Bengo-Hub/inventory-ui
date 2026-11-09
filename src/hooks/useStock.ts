@@ -11,9 +11,10 @@ const SUMMARY_KEY = 'inventory-summary';
 export function useStock(orgSlug: string, params?: StockListParams, enabled = true) {
   return useQuery({
     queryKey: [STOCK_KEY, orgSlug, params],
-    queryFn: () => stockApi.list(orgSlug, params),
+    queryFn: ({ signal }) => stockApi.list(orgSlug, params, signal),
     enabled: !!orgSlug && enabled,
-    placeholderData: [],
+    // Keep the previous rows while a new search loads; empty only on the first load.
+    placeholderData: (previous) => previous ?? [],
     staleTime: 30_000,
   });
 }
@@ -21,7 +22,7 @@ export function useStock(orgSlug: string, params?: StockListParams, enabled = tr
 export function useAdjustments(orgSlug: string, params?: AdjustmentListParams) {
   return useQuery({
     queryKey: [ADJ_KEY, orgSlug, params],
-    queryFn: () => stockApi.listAdjustments(orgSlug, params),
+    queryFn: ({ signal }) => stockApi.listAdjustments(orgSlug, params, signal),
     enabled: !!orgSlug,
     placeholderData: (previous) => previous,
     staleTime: 30_000,

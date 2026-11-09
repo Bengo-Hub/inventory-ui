@@ -21,6 +21,7 @@ import { buildAdjustmentColumns } from './adjustments-columns';
 import type { StockAdjustment } from '@/lib/api/stock';
 import { searchItems, type Item } from '@/lib/api/items';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { Minus, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -299,7 +300,9 @@ function AdjustmentModal({ orgSlug, onClose, prefillSku = '', prefillName = '' }
 export default function AdjustmentsPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(25);
@@ -408,8 +411,7 @@ export default function AdjustmentsPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search by item, reason, or warehouse..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>
@@ -466,7 +468,7 @@ export default function AdjustmentsPage() {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <SearchAddTable<ItemSearchOption>
-                                onSearch={async (q) => (await searchItems(orgSlug, q))
+                                onSearch={async (q, ctx) => (await searchItems(orgSlug, q, {}, ctx?.signal))
                                     .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
                                 onAdd={(opt) => {
                                     if (bulkItems.some((i) => i.sku === opt.item.sku)) return;

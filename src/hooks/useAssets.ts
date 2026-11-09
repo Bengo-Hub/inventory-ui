@@ -21,9 +21,10 @@ const EMPTY: PaginatedAssets = { data: [], total: 0, page: 1, limit: 20, hasMore
 export function useAssets(org: string, params?: AssetListParams) {
   return useQuery<PaginatedAssets>({
     queryKey: [KEY, org, params],
-    queryFn: () => assetsApi.list(org, params),
+    queryFn: ({ signal }) => assetsApi.list(org, params, signal),
     enabled: !!org,
-    placeholderData: EMPTY,
+    // Keep the previous page while a new search loads; empty only on the first load.
+    placeholderData: (previous) => previous ?? EMPTY,
     staleTime: 60_000,
   });
 }

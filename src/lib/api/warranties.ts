@@ -51,8 +51,8 @@ export interface WarrantyListParams {
 const base = (org: string) => `/api/v1/${org}/inventory/warranties`;
 
 export const warrantiesApi = {
-  list: (org: string, params?: WarrantyListParams): Promise<Warranty[]> =>
-    apiClient.get<Warranty[]>(base(org), params),
+  list: (org: string, params?: WarrantyListParams, signal?: AbortSignal): Promise<Warranty[]> =>
+    apiClient.get<Warranty[]>(base(org), params, { signal }),
   lookup: (org: string, serial: string): Promise<Warranty[]> =>
     apiClient.get<Warranty[]>(`${base(org)}/lookup`, { serial }),
   get: (org: string, id: string) => apiClient.get<Warranty>(`${base(org)}/${id}`),

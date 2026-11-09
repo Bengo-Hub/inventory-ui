@@ -19,6 +19,7 @@ import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { apiClient } from '@/lib/api/client';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
@@ -182,7 +183,9 @@ type TransferStatusFilter = keyof typeof TRANSFER_STATUS_FILTERS;
 export default function TransfersPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [statusFilter, setStatusFilter] = useState<TransferStatusFilter>('all');
     const [range, setRange] = useState<DateRange>({ from: '', to: '' });
     const [page, setPage] = useState(1);
@@ -328,8 +331,7 @@ export default function TransfersPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search transfers..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

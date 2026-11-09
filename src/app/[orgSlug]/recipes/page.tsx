@@ -10,11 +10,12 @@ import { useDuplicateNameWarning } from '@/hooks/useDuplicateNameWarning';
 import type { Recipe, RecipePayload } from '@/lib/api/recipes';
 import { useOutletStore } from '@/store/outlet';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
+import { useDebouncedSearch, useDebouncedValue } from '@bengo-hub/shared-ui-lib/search';
 import { buildRecipeColumns } from './recipe-columns';
 import { ChefHat, Factory, Plus, Search, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
@@ -32,7 +33,9 @@ export default function RecipesPage() {
     const isMfg = outlet?.use_case === 'manufacturing';
     const docLabel = isMfg ? 'Bill of Materials' : 'Recipe';
 
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,12 +61,8 @@ export default function RecipesPage() {
     // Duplicate-name warning — debounced server search, same pattern as the New Menu
     // Item wizard's item dup-check. Informational only; recipe names collide silently
     // today (there's no uniqueness constraint), so this is the only guard against it.
-    const [dupSearch, setDupSearch] = useState('');
-    useEffect(() => {
-        if (!dialogOpen) { setDupSearch(''); return; }
-        const t = setTimeout(() => setDupSearch(formName.trim()), 300);
-        return () => clearTimeout(t);
-    }, [formName, dialogOpen]);
+    const debouncedFormName = useDebouncedValue(formName.trim());
+    const dupSearch = dialogOpen ? debouncedFormName : '';
     const { data: dupData } = useRecipes(orgSlug, { search: dupSearch, page: 1, limit: 5 });
     const dupMatches = useDuplicateNameWarning(dupSearch.length >= 2 ? dupData?.data : undefined, formName, { excludeId: editing?.id });
 
@@ -202,8 +201,7 @@ export default function RecipesPage() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search recipes..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

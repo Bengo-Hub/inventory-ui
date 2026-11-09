@@ -22,7 +22,8 @@ import { buildEOLColumns } from './eol-columns';
 import { AlertTriangle, BookOpen, FileSpreadsheet, History, Minus, Plus, RefreshCw, Search, Split } from 'lucide-react';
 import { StockExportDialog } from '@/components/inventory/ExportDialogs';
 import { useParams, useRouter } from 'next/navigation';
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { approvalGateFromError } from '@/lib/api/approvals';
@@ -465,7 +466,9 @@ export default function StockPage() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const router = useRouter();
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the stock request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [categoryId, setCategoryId] = useState('');
     const [typeFilter, setTypeFilter] = useState('');
@@ -494,16 +497,17 @@ export default function StockPage() {
 
     // End-of-Life listing: the items endpoint with status=eol. Search (name, SKU, barcode) and
     // paging run server-side so the tab stays fast however many items are retired.
-    const [eolSearch, setEolSearch] = useState('');
-    const deferredEolSearch = useDeferredValue(eolSearch.trim());
+    // The request waits for a pause in typing (debounced term), not for every key.
+    const eolSearchBox = useDebouncedSearch();
+    const eolSearchTerm = eolSearchBox.term;
     const [eolPage, setEolPage] = useState(1);
     const [eolPageSize, setEolPageSize] = useState(25);
-    useEffect(() => { setEolPage(1); }, [deferredEolSearch, eolPageSize]);
+    useEffect(() => { setEolPage(1); }, [eolSearchTerm, eolPageSize]);
     const { data: eolItems, isLoading: eolLoading, isFetching: eolFetching } = useItems(orgSlug, {
         status: 'eol',
         page: eolPage,
         limit: eolPageSize,
-        ...(deferredEolSearch ? { search: deferredEolSearch } : {}),
+        ...(eolSearchTerm ? { search: eolSearchTerm } : {}),
     });
     const eolTotal = eolItems?.total ?? eolItems?.data.length ?? 0;
     // The tab badge counts every EOL item, not just the current search's matches.
@@ -677,8 +681,7 @@ export default function StockPage() {
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by item name, SKU, or warehouse..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
+                                {...searchBox.inputProps}
                                 className="pl-10"
                             />
                         </div>
@@ -779,8 +782,7 @@ export default function StockPage() {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search End-of-Life items by name, SKU or barcode..."
-                                    value={eolSearch}
-                                    onChange={(e) => setEolSearch(e.target.value)}
+                                    {...eolSearchBox.inputProps}
                                     className="pl-9"
                                     aria-label="Search End-of-Life items"
                                 />
@@ -800,10 +802,10 @@ export default function StockPage() {
                                 pageSize={eolPageSize}
                                 onPageSizeChange={setEolPageSize}
                                 emptyState={
-                                    deferredEolSearch ? (
+                                    eolSearchTerm ? (
                                         <>
                                             <Search className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                                            <p className="text-muted-foreground">No End-of-Life items match &quot;{deferredEolSearch}&quot;</p>
+                                            <p className="text-muted-foreground">No End-of-Life items match &quot;{eolSearchTerm}&quot;</p>
                                         </>
                                     ) : (
                                         <>

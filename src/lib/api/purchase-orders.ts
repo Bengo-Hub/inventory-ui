@@ -107,8 +107,8 @@ export interface SendPOResult {
 }
 
 export const purchaseOrdersApi = {
-  list: (orgSlug: string, params?: POListParams): Promise<PaginatedPOs> =>
-    apiClient.get<PaginatedPOs>(`/api/v1/${orgSlug}/inventory/purchase-orders`, params),
+  list: (orgSlug: string, params?: POListParams, signal?: AbortSignal): Promise<PaginatedPOs> =>
+    apiClient.get<PaginatedPOs>(`/api/v1/${orgSlug}/inventory/purchase-orders`, params, { signal }),
 
   get: (orgSlug: string, id: string) =>
     apiClient.get<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}`),

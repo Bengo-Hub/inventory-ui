@@ -70,8 +70,8 @@ export interface PaginatedModifierGroups {
 
 /* ── API Functions ─────────────────────────────────────────────────── */
 
-export function fetchModifierGroups(orgSlug: string, params?: ModifierGroupListParams): Promise<PaginatedModifierGroups> {
-    return apiClient.get<PaginatedModifierGroups>(`/api/v1/${orgSlug}/inventory/modifier-groups`, params);
+export function fetchModifierGroups(orgSlug: string, params?: ModifierGroupListParams, signal?: AbortSignal): Promise<PaginatedModifierGroups> {
+    return apiClient.get<PaginatedModifierGroups>(`/api/v1/${orgSlug}/inventory/modifier-groups`, params, { signal });
 }
 
 export function fetchModifierGroup(orgSlug: string, id: string) {

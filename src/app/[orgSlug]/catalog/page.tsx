@@ -18,6 +18,7 @@ import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { DataTable, type BulkAction, type DataTableColumn, type SortState } from '@bengo-hub/shared-ui-lib/data-table';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useCreateFromQuery } from '@/hooks/useCreateFromQuery';
 import { useCategories } from '@/hooks/useCategories';
@@ -529,7 +530,10 @@ export default function CatalogPage() {
   // Label printing is a privileged item operation (backend gates on inventory.items.manage).
   const canPrintLabels = canAny([P.CATALOG_MANAGE, P.CATALOG_CHANGE]);
 
-  const [search, setSearch] = useState('');
+  // The box updates on every key; `search` (the debounced term) drives the list request,
+  // and a new term sends the table back to page 1.
+  const searchBox = useDebouncedSearch({ onTermChange: () => setPage(1) });
+  const search = searchBox.term;
   const [categoryId, setCategoryId] = useState('');
   // Brand/Model — GOODS-only master + free-text pairing (see BrandCombobox/ModelCombobox);
   // clearing the brand also clears model since the model suggestion list is brand-scoped.
@@ -1094,8 +1098,7 @@ export default function CatalogPage() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Search by SKU, name, or barcode..."
-                value={search}
-                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                {...searchBox.inputProps}
                 className="pl-10 pr-12"
               />
               <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
@@ -1103,7 +1106,7 @@ export default function CatalogPage() {
                   title="Scan barcode to search"
                   hint="Point the camera at the product barcode."
                   className="h-8 w-8 rounded-lg"
-                  onScan={(code) => { setSearch(code); setPage(1); }}
+                  onScan={(code) => searchBox.setValue(code, { immediate: true })}
                 />
               </div>
             </div>

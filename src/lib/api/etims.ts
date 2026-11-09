@@ -14,12 +14,14 @@ export interface EtimsCode {
  * syncs the lists from KRA (Treasury → eTIMS Devices → Refresh Code Lists).
  */
 export const etimsApi = {
-  codeLists: async (orgSlug: string, type: string, q?: string, limit?: number): Promise<EtimsCode[]> => {
+  codeLists: async (orgSlug: string, type: string, q?: string, limit?: number, signal?: AbortSignal): Promise<EtimsCode[]> => {
     const qs = new URLSearchParams({ type });
     if (q) qs.set('q', q);
     if (limit) qs.set('limit', String(limit));
     const res = await apiClient.get<{ codes: EtimsCode[]; total: number }>(
       `/api/v1/${orgSlug}/inventory/etims/code-lists?${qs}`,
+      undefined,
+      { signal },
     );
     return res.codes ?? [];
   },

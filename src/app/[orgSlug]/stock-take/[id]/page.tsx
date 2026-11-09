@@ -394,7 +394,7 @@ export default function StockTakeDetailPage() {
                             items hold no stock of their own (their ingredients are counted). */}
                         {editable && (
                             <SearchAddTable<ItemSearchOption>
-                                onSearch={async (q) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }))
+                                onSearch={async (q, ctx) => (await searchItems(orgSlug, q, { type: 'GOODS,INGREDIENT,EQUIPMENT' }, ctx?.signal))
                                     .map((it) => ({ id: it.id, label: it.name, hint: it.sku, item: it }))}
                                 onAdd={(opt) =>
                                     addLine.mutate(

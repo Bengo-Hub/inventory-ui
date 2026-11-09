@@ -7,13 +7,14 @@ import { useCategories } from '@/hooks/useCategories';
 import { normalizeName } from '@/hooks/useDuplicateNameWarning';
 import { useBrands, useCreateBrand, useUpdateBrand, useDeleteBrand } from '@/hooks/useBrands';
 import { type Brand, type BrandPayload } from '@/lib/api/brands';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, X, Tag, Award } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import { useDebouncedSearch } from '@bengo-hub/shared-ui-lib/search';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildCategoryColumns, type CategoryRow } from './category-columns';
 import { buildBrandColumns } from './brand-columns';
@@ -95,7 +96,9 @@ function CategoriesTab() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
     const queryClient = useQueryClient();
-    const [search, setSearch] = useState('');
+    // The box updates on every key; `search` (the debounced term) drives the request.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -110,13 +113,13 @@ function CategoriesTab() {
 
     const { data: categories, isLoading, isError, refetch } = useQuery<Category[]>({
         queryKey: ['categories', orgSlug, search],
-        queryFn: async () => {
+        queryFn: async ({ signal }) => {
             const p: Record<string, string> = {};
             if (search) p.search = search;
-            const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`, p);
+            const res = await apiClient.get<{ data: Category[]; total: number } | Category[]>(`/api/v1/${orgSlug}/inventory/categories`, p, { signal });
             return Array.isArray(res) ? res : (res as { data: Category[] }).data ?? [];
         },
-        placeholderData: [],
+        placeholderData: keepPreviousData,
     });
 
     // Unfiltered list for the duplicate-name check below — decoupled from the search
@@ -274,8 +277,7 @@ function CategoriesTab() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search categories..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>
@@ -394,7 +396,9 @@ function CategoriesTab() {
 function BrandsTab() {
     const params = useParams();
     const orgSlug = params?.orgSlug as string;
-    const [search, setSearch] = useState('');
+    // Filters the loaded brands in memory; the pause saves re-ranking on every key.
+    const searchBox = useDebouncedSearch();
+    const search = searchBox.term;
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [dialogOpen, setDialogOpen] = useState(false);
@@ -523,8 +527,7 @@ function BrandsTab() {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search brands..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
+                            {...searchBox.inputProps}
                             className="pl-10"
                         />
                     </div>

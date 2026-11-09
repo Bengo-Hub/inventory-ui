@@ -82,8 +82,8 @@ export interface PaginatedSuppliers {
 }
 
 export const suppliersApi = {
-  list: (orgSlug: string, params?: SupplierListParams): Promise<PaginatedSuppliers> =>
-    apiClient.get<PaginatedSuppliers>(`/api/v1/${orgSlug}/inventory/suppliers`, params),
+  list: (orgSlug: string, params?: SupplierListParams, signal?: AbortSignal): Promise<PaginatedSuppliers> =>
+    apiClient.get<PaginatedSuppliers>(`/api/v1/${orgSlug}/inventory/suppliers`, params, { signal }),
 
   get: (orgSlug: string, id: string) =>
     apiClient.get<Supplier>(`/api/v1/${orgSlug}/inventory/suppliers/${id}`),

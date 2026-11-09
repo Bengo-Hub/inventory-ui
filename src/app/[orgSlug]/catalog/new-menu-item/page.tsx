@@ -14,7 +14,8 @@ import { useUnits } from '@/hooks/useUnits';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, ArrowRight, Check, Plus } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useDebouncedValue } from '@bengo-hub/shared-ui-lib/search';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 
@@ -65,17 +66,14 @@ function Step1({ orgSlug, data, onChange }: { orgSlug: string; data: Step1Data; 
   // Duplicate-name warning — debounced server search restricted to RECIPE (menu) items,
   // mirroring ItemFormDialog's item dup-check. Informational only; this wizard has no
   // natural "pick existing instead" target, unlike the inline create-from-search flow.
-  const [dupSearch, setDupSearch] = useState('');
-  useEffect(() => {
-    const t = setTimeout(() => setDupSearch(data.name.trim()), 300);
-    return () => clearTimeout(t);
-  }, [data.name]);
+  const dupSearch = useDebouncedValue(data.name.trim());
   const { data: dupCandidates } = useQuery<Item[]>({
     queryKey: ['item-dup-check', orgSlug, dupSearch, 'RECIPE'],
-    queryFn: async () => {
+    queryFn: async ({ signal }) => {
       const res = await apiClient.get<{ data: Item[]; total: number } | Item[]>(
         `/api/v1/${orgSlug}/inventory/items`,
         { search: dupSearch, type: 'RECIPE' },
+        { signal },
       );
       return Array.isArray(res) ? res : (res as { data: Item[] }).data ?? [];
     },

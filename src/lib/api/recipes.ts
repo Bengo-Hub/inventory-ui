@@ -78,8 +78,8 @@ export interface PaginatedRecipes {
 
 /* ── API Functions ─────────────────────────────────────────────────── */
 
-export function fetchRecipes(orgSlug: string, params?: RecipeListParams): Promise<PaginatedRecipes> {
-    return apiClient.get<PaginatedRecipes>(`/api/v1/${orgSlug}/inventory/recipes`, params);
+export function fetchRecipes(orgSlug: string, params?: RecipeListParams, signal?: AbortSignal): Promise<PaginatedRecipes> {
+    return apiClient.get<PaginatedRecipes>(`/api/v1/${orgSlug}/inventory/recipes`, params, { signal });
 }
 
 export function fetchRecipe(orgSlug: string, id: string) {

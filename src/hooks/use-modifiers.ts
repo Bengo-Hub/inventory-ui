@@ -20,9 +20,10 @@ const EMPTY_MODIFIER_GROUPS: PaginatedModifierGroups = { data: [], total: 0, pag
 export function useModifierGroups(orgSlug: string, params?: ModifierGroupListParams) {
     return useQuery<PaginatedModifierGroups>({
         queryKey: [MODIFIERS_KEY, orgSlug, params],
-        queryFn: () => fetchModifierGroups(orgSlug, params),
+        queryFn: ({ signal }) => fetchModifierGroups(orgSlug, params, signal),
         enabled: !!orgSlug,
-        placeholderData: EMPTY_MODIFIER_GROUPS,
+        // Keep the previous page while a new search loads; empty only on the first load.
+        placeholderData: (previous) => previous ?? EMPTY_MODIFIER_GROUPS,
     });
 }
 

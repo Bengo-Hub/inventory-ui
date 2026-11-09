@@ -8,7 +8,7 @@ const TRANSFERS_KEY = 'transfers';
 export function useTransfers(orgSlug: string, params?: TransferListParams) {
   return useQuery<TransferListResult>({
     queryKey: [TRANSFERS_KEY, orgSlug, params],
-    queryFn: () => transfersApi.list(orgSlug, params),
+    queryFn: ({ signal }) => transfersApi.list(orgSlug, params, signal),
     enabled: !!orgSlug,
     placeholderData: (previous) => previous,
     staleTime: 30_000,
