@@ -181,9 +181,23 @@ export interface BulkJob {
   completed_at?: string;
 }
 
+/** One page of stock levels plus the low / out / below-zero counts for the whole scope. */
+export interface PagedStock {
+  data: StockLevel[];
+  total: number;
+  page: number;
+  limit: number;
+  hasMore: boolean;
+  counts: { low: number; out: number; negative: number };
+}
+
 export const stockApi = {
   list: (orgSlug: string, params?: StockListParams, signal?: AbortSignal) =>
     apiClient.get<StockLevel[]>(`/api/v1/${orgSlug}/inventory/stock`, params, { signal }),
+
+  /** Server-paged stock list (sending `page` switches the API to the paged envelope). */
+  listPaged: (orgSlug: string, params: StockListParams & { page: number; limit: number }, signal?: AbortSignal) =>
+    apiClient.get<PagedStock>(`/api/v1/${orgSlug}/inventory/stock`, params, { signal }),
 
   // Branded PDF/CSV export of stock levels — same filters as list() plus warehouse/location
   // drill-down and an outlet override. Streamed from inventory-api's docs report engine.

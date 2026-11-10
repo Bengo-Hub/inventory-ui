@@ -3,7 +3,7 @@
 import { Badge, Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
-import { useStock, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
+import { useStockPage, useCreateAdjustment, useCreateBreakdown, useAdjustments } from '@/hooks/useStock';
 import { useItems, useMarkItemEOL, useRestoreItemEOL } from '@/hooks/useItems';
 import { EOL_RETENTION_DAYS, type Item } from '@/lib/api/items';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
@@ -534,43 +534,33 @@ export default function StockPage() {
 
     const { data: categories } = useCategories(orgSlug);
 
-    // Search, category and type are filtered server-side; the low/out status filter is
-    // applied client-side so the banner counts stay accurate within the current scope.
+    // Search, category, type, the status tab and paging all run on the server; one page comes
+    // back with the low / out / below-zero counts for the whole scope (for the banners).
     const listParams: StockListParams = {
         search: search || undefined,
         category_id: categoryId || undefined,
         type: typeFilter || undefined,
+        ...(statusFilter === 'low' ? { low_stock: true } : {}),
+        ...(statusFilter === 'out' ? { out_of_stock: true } : {}),
+        // Below zero: sold or issued before the goods were received; settles when the purchase lands.
+        ...(statusFilter === 'negative' ? { negative: true } : {}),
     };
-    const { data: stock, isLoading, isError, refetch, isFetching } = useStock(orgSlug, listParams);
+    const { data: stockPage, isLoading, isError, refetch, isFetching } = useStockPage(orgSlug, listParams, page, pageSize);
 
-    const lowStockCount = stock?.filter((s) => s.reorder_point != null && s.available <= s.reorder_point && s.available > 0).length ?? 0;
-    const outOfStockCount = stock?.filter((s) => s.available <= 0).length ?? 0;
-    // Below zero: sold or issued before the goods were received; settles when the purchase lands.
-    const negativeCount = stock?.filter((s) => s.on_hand < 0).length ?? 0;
+    const lowStockCount = stockPage?.counts.low ?? 0;
+    const outOfStockCount = stockPage?.counts.out ?? 0;
+    const negativeCount = stockPage?.counts.negative ?? 0;
 
-    const filteredStock = useMemo(() => {
-        const list = stock ?? [];
-        if (statusFilter === 'low') {
-            return list.filter((s) => s.reorder_point != null && s.available > 0 && s.available <= s.reorder_point);
-        }
-        if (statusFilter === 'out') {
-            return list.filter((s) => s.available <= 0);
-        }
-        if (statusFilter === 'negative') {
-            return list.filter((s) => s.on_hand < 0);
-        }
-        return list;
-    }, [stock, statusFilter]);
-
-    const totalPages = Math.max(1, Math.ceil(filteredStock.length / pageSize));
-    const paginatedItems = filteredStock.slice((page - 1) * pageSize, page * pageSize);
+    const paginatedItems = stockPage?.data ?? [];
+    const totalMatching = stockPage?.total ?? 0;
+    const totalPages = Math.max(1, Math.ceil(totalMatching / pageSize));
 
     // Bulk stock adjustment — the same shared dialog the Products and Adjustments pages open.
     const stockBulkActions: BulkAction[] = canAdjust ? [
         {
             key: 'bulk_adjust', label: 'Adjust stock',
             onClick: (ids) => {
-                const targets = filteredStock.filter((s) => ids.includes(s.id));
+                const targets = paginatedItems.filter((s) => ids.includes(s.id));
                 setBulkAdjustItems(targets.map((s) => ({ sku: s.sku, name: s.item_name })));
             },
         },
@@ -755,7 +745,7 @@ export default function StockPage() {
                             page={page}
                             totalPages={totalPages}
                             onPageChange={setPage}
-                            total={filteredStock.length}
+                            total={totalMatching}
                             pageSize={pageSize}
                             onPageSizeChange={setPageSize}
                         />

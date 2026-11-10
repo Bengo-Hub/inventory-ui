@@ -19,6 +19,18 @@ export function useStock(orgSlug: string, params?: StockListParams, enabled = tr
   });
 }
 
+/** One server page of the stock list, plus whole-scope low / out / below-zero counts. */
+export function useStockPage(orgSlug: string, params: StockListParams, page: number, limit: number) {
+  return useQuery({
+    queryKey: [STOCK_KEY, orgSlug, 'paged', params, page, limit],
+    queryFn: ({ signal }) => stockApi.listPaged(orgSlug, { ...params, page, limit }, signal),
+    enabled: !!orgSlug,
+    // Keep the current page on screen while the next page or search loads.
+    placeholderData: (previous) => previous,
+    staleTime: 30_000,
+  });
+}
+
 export function useAdjustments(orgSlug: string, params?: AdjustmentListParams) {
   return useQuery({
     queryKey: [ADJ_KEY, orgSlug, params],
