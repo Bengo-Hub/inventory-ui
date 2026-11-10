@@ -79,10 +79,11 @@ class ApiClient {
 
             const url: string = error.config?.url ?? '';
             if (!url.includes('/auth/me') && !error.config?._retried) {
+                const sent = String(error.config?.headers?.Authorization ?? '').replace(/^Bearer\s+/i, '');
                 const { refreshAccessToken } = await import('@/lib/auth/token-refresh');
                 let newToken: string | null;
                 try {
-                    newToken = await refreshAccessToken();
+                    newToken = await refreshAccessToken(sent || this.accessToken);
                 } catch {
                     // auth-api briefly unreachable — fail this request but keep the session;
                     // logging out here bounced users to PIN login on a mere network blip.
@@ -96,6 +97,10 @@ class ApiClient {
                     return this.instance.request(error.config);
                 }
 
+                this.on401Callback?.();
+            } else if (error.config?._retried) {
+                // Even a freshly renewed token was refused: the session is unusable, so send the
+                // person to sign in instead of leaving a page where every save fails.
                 this.on401Callback?.();
             }
         }

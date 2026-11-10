@@ -91,7 +91,7 @@ export const useAuthStore = create<AuthState>()(
                     if (session.refreshToken) {
                         try {
                             const { refreshAccessToken } = await import('@/lib/auth/token-refresh');
-                            const fresh = await refreshAccessToken();
+                            const fresh = await refreshAccessToken(session.accessToken);
                             if (fresh) {
                                 apiClient.setAccessToken(fresh);
                                 set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
