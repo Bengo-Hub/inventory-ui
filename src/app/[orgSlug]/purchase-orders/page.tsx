@@ -410,7 +410,16 @@ export default function PurchaseOrdersPage() {
 
         if (amendingId) {
             amendPO.mutate({ id: amendingId, data: payload }, {
-                onSuccess: () => { toast.success('Purchase order amended'); closePODialog(); },
+                onSuccess: (res) => {
+                    if (res?.returned_to_draft) {
+                        toast.warning('Purchase order amended and returned to draft', {
+                            description: 'The total or supplier changed, so send it to the supplier again (approval and budget are re-checked).',
+                        });
+                    } else {
+                        toast.success('Purchase order amended');
+                    }
+                    closePODialog();
+                },
                 onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to amend purchase order')),
             });
             return;
@@ -425,11 +434,21 @@ export default function PurchaseOrdersPage() {
     // Drawer action gating — derived when a PO is selected.
     const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
     const dStatus = poDetail?.status;
-    const canSend = canChangePO && dStatus === 'draft';
-    const canReceive = canChangePO && (dStatus === 'sent' || dStatus === 'partially_received' || dStatus === 'draft');
-    const canCancel = canCancelPO && (dStatus === 'draft' || dStatus === 'sent');
-    // Amend is allowed only before goods start arriving (draft or sent) — it replaces all lines.
-    const canAmend = canChangePO && (dStatus === 'draft' || dStatus === 'sent');
+    // A goods receipt already open on this order (draft, usually awaiting approval). While it is
+    // open the order is being received: no second receipt, no amend, no cancel. The server
+    // enforces the same rules (409 RECEIPT_OPEN); this just stops offering them.
+    const openReceipt = poDetail?.open_receipt;
+    const receiptAwaitingApproval = openReceipt?.approval_status === 'pending';
+    const nothingReceived = (poDetail?.line_items ?? []).every((l) => (l.received_qty ?? 0) === 0);
+    const canSend = canChangePO && dStatus === 'draft' && !openReceipt;
+    // Mark Received stays available for an approved (or approval-free) open receipt: the server
+    // posts that receipt instead of opening another one.
+    const canReceive = canChangePO && !receiptAwaitingApproval
+        && (dStatus === 'sent' || dStatus === 'partially_received' || dStatus === 'draft');
+    const canCancel = canCancelPO && !openReceipt && (dStatus === 'draft' || dStatus === 'sent');
+    // Amend: a draft, or a sent order with nothing received and no receipt open. Changing a sent
+    // order's total or supplier sends it back to draft so approval and budget run again.
+    const canAmend = canChangePO && !openReceipt && nothingReceived && (dStatus === 'draft' || dStatus === 'sent');
     // Approval-matrix awareness: offer "Submit for Approval" on drafts that have not
     // already entered (or cleared) an approval workflow.
     const approvalStatus = poApproval?.status;
@@ -863,13 +882,28 @@ export default function PurchaseOrdersPage() {
                             Send to Supplier
                         </Button>
                     )}
+                    {receiptAwaitingApproval && (
+                        <Badge variant="warning">
+                            <ShieldCheck className="h-3 w-3 mr-1" />
+                            Awaiting receipt approval · {openReceipt?.grn_number}
+                        </Badge>
+                    )}
                     {canReceive && (
                         <Button size="sm" variant="outline" disabled={isPOBusy}
                             onClick={() => receivePO.mutate({ id: poDetail.id }, {
-                                onSuccess: () => toast.success('PO received — stock updated'),
-                                onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to receive PO')),
+                                onSuccess: () => toast.success('PO received, stock updated'),
+                                onError: async (e) => {
+                                    // 409 APPROVAL_REQUIRED / APPROVAL_PENDING is not a failure: the
+                                    // receipt is recorded and waits for sign-off; it posts on approval.
+                                    const code = (e as { response?: { status?: number; data?: { error?: string } } })?.response;
+                                    if (code?.status === 409 && (code.data?.error === 'APPROVAL_REQUIRED' || code.data?.error === 'APPROVAL_PENDING')) {
+                                        toast.info('Receipt recorded and sent for approval. Stock is added as soon as it is approved.');
+                                        return;
+                                    }
+                                    toast.error(await apiErrorMessage(e, 'Failed to receive PO'));
+                                },
                             })}>
-                            Mark Received
+                            {openReceipt?.approval_status === 'approved' ? `Post approved receipt ${openReceipt.grn_number}` : 'Mark Received'}
                         </Button>
                     )}
                     {canCancel && (

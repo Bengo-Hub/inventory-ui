@@ -6,7 +6,7 @@ import { DetailDrawer } from '@/components/inventory/DetailDrawer';
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import { downloadBlob } from '@/components/inventory/ExportDialogs';
 import { DateRangePicker, type DateRange } from '@/components/ui/date-range-picker';
-import { useGoodsReceipts, useGoodsReceipt, usePostGoodsReceipt } from '@/hooks/useGoodsReceipts';
+import { useGoodsReceipts, useGoodsReceipt, usePostGoodsReceipt, useCancelGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { type GRNStatus } from '@/lib/api/goods-receipts';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
@@ -32,6 +32,7 @@ export default function GoodsReceiptsPage() {
 
     const { data, isLoading, isError, refetch } = useGoodsReceipts(org, { status: status || undefined, from: range.from || undefined, to: range.to || undefined, page, limit: pageSize });
     const post = usePostGoodsReceipt(org);
+    const cancelGRN = useCancelGoodsReceipt(org);
     // Only used to resolve PO numbers for display — pull the max page size rather than
     // paginating, since this isn't a user-facing list of purchase orders.
     const { data: ordersPage } = usePurchaseOrders(org, { limit: 100 });
@@ -142,6 +143,19 @@ export default function GoodsReceiptsPage() {
                         <DocFormatMenu label="Print / Export" onSelect={(format) => previewGRN(viewGRN, format)} />
                         {canChange && viewGRN.status === 'draft' && (
                             <Button size="sm" disabled={post.isPending} onClick={() => post.mutate(viewGRN.id, { onSuccess: () => { toast.success('GRN posted — stock updated'); setViewId(null); }, onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to post GRN')) })}>Post — update stock</Button>
+                        )}
+                        {canChange && viewGRN.status === 'draft' && (
+                            <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                                disabled={cancelGRN.isPending}
+                                onClick={() => {
+                                    if (!confirm(`Cancel ${viewGRN.grn_number}? No stock is added and its approval request is withdrawn.`)) return;
+                                    cancelGRN.mutate(viewGRN.id, {
+                                        onSuccess: () => { toast.success('Goods receipt cancelled'); setViewId(null); },
+                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to cancel goods receipt')),
+                                    });
+                                }}>
+                                Cancel receipt
+                            </Button>
                         )}
                     </>
                 )}

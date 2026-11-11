@@ -32,6 +32,18 @@ export function useCreateGoodsReceipt(org: string, poId: string) {
   });
 }
 
+export function useCancelGoodsReceipt(org: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => goodsReceiptsApi.cancel(org, id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [KEY, org] });
+      qc.invalidateQueries({ queryKey: ['purchase-orders', org] });
+      qc.invalidateQueries({ queryKey: ['approval-requests', org] });
+    },
+  });
+}
+
 export function usePostGoodsReceipt(org: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -51,10 +51,14 @@ export function useReceivePurchaseOrder(orgSlug: string) {
   return useMutation({
     mutationFn: ({ id, items }: { id: string; items?: { item_id: string; received_qty: number }[] }) =>
       purchaseOrdersApi.receive(orgSlug, id, items),
-    onSuccess: (_, { id }) => {
+    // Settled, not just success: a 409 "awaiting approval" still opened (or found) a goods
+    // receipt, and the drawer must refetch to show it instead of offering Mark Received again.
+    onSettled: (_, __, { id }) => {
       queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
       queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug, id] });
       queryClient.invalidateQueries({ queryKey: ['stock', orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipts', orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['approval-requests', orgSlug] });
     },
   });
 }

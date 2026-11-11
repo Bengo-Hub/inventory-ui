@@ -48,6 +48,36 @@ export interface PurchaseOrder {
   created_by_name?: string;
   created_at: string;
   updated_at: string;
+  /**
+   * The order's unposted goods receipt, if any (detail view only). While it is set the order is
+   * being received: Amend and Cancel are hidden, and Mark Received works on this receipt instead
+   * of opening another one.
+   */
+  open_receipt?: OpenReceipt;
+}
+
+export interface OpenReceipt {
+  id: string;
+  grn_number: string;
+  /** 'pending' while it waits for sign-off, 'approved' when signed off but not yet posted. */
+  approval_status?: 'pending' | 'approved';
+  /** More than one only for receipts created before the one-open-receipt rule. */
+  count: number;
+}
+
+export interface ReceivePOResult {
+  status: 'received';
+  goods_receipt_id?: string;
+  grn_number?: string;
+}
+
+export interface AmendPOResult {
+  id: string;
+  po_number: string;
+  total_amount: number;
+  status: POStatus;
+  /** True when a sent order's total or supplier changed, so it must be approved/sent again. */
+  returned_to_draft?: boolean;
 }
 
 export interface CreatePOInput {
@@ -117,10 +147,10 @@ export const purchaseOrdersApi = {
     apiClient.post<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders`, data),
 
   receive: (orgSlug: string, id: string, receivedItems?: { item_id: string; received_qty: number }[]) =>
-    apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/receive`, { items: receivedItems }),
+    apiClient.put<ReceivePOResult>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/receive`, { items: receivedItems }),
 
   amend: (orgSlug: string, id: string, data: CreatePOInput) =>
-    apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/amend`, data),
+    apiClient.put<AmendPOResult>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/amend`, data),
 
   /**
    * Sends the PO to the supplier. Treasury checks it against the tenant's budgets first: a stop

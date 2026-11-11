@@ -218,3 +218,11 @@ All detail views now open as a right-side `Sheet` (`src/components/ui/sheet.tsx`
 - Category filter pills are now dynamic (from `useCategories()`) instead of hardcoded
 - Filter passes `category_id` to backend for server-side filtering
 - Minimum contrast ratio: 4.5:1
+
+### Purchase Orders and Goods Receipts under approval (2026-11-11)
+
+- The purchase order drawer reads `open_receipt` from the order detail. While a goods receipt waits for approval it shows the badge "Awaiting receipt approval · GRN" and hides Mark Received, Amend, Send and Cancel Order.
+- When the open receipt is already approved but not posted, the receive button reads "Post approved receipt GRN" and posts that receipt (no new receipt is created).
+- A 409 `APPROVAL_REQUIRED` / `APPROVAL_PENDING` from Mark Received is shown as an information toast ("recorded and sent for approval"), not an error, and the drawer refetches.
+- Amend shows only for a draft, or a sent order with nothing received and no open receipt. When the server answers `returned_to_draft`, a warning toast explains the order must be sent again.
+- The goods receipt drawer has "Cancel receipt" for drafts. Rules and API: inventory-api `docs/procurement-approvals.md`.

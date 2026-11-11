@@ -91,6 +91,8 @@ export const goodsReceiptsApi = {
   get: (org: string, id: string) => apiClient.get<GoodsReceipt>(`${base(org)}/${id}`),
   create: (org: string, poId: string, data: CreateGRNInput) => apiClient.post<GoodsReceipt>(`${poBase(org)}/${poId}/goods-receipts`, data),
   post: (org: string, id: string) => apiClient.post<GoodsReceipt>(`${base(org)}/${id}/post`, {}),
+  /** Cancels a draft receipt (a duplicate, or one that will not be posted). Posted receipts cannot be cancelled. */
+  cancel: (org: string, id: string) => apiClient.post<GoodsReceipt>(`${base(org)}/${id}/cancel`, {}),
   match: (org: string, poId: string, invoicedQty?: number, invoiceTotal?: number): Promise<MatchResult> =>
     apiClient.get<MatchResult>(`${poBase(org)}/${poId}/match`, { invoiced_qty: invoicedQty, invoice_total: invoiceTotal }),
 };
