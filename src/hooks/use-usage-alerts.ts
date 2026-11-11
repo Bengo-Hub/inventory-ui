@@ -19,7 +19,7 @@ export function useUsageAlerts(): UsageAlert[] {
   const token = useAuthStore((s) => s.session?.accessToken);
   const user = useAuthStore((s) => s.user);
   const isPlatformOwner =
-    !!(user as any)?.is_platform_owner || (user as any)?.tenant_slug === 'codevertex';
+    !!(user as any)?.is_platform_owner;
 
   const { data } = useQuery<UsageAlert[]>({
     queryKey: ['usage-alerts', (user as any)?.tenant_id],

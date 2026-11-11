@@ -197,7 +197,7 @@ export async function fetchProfile(accessToken?: string): Promise<{
         permissions: Array.isArray(data.permissions) ? data.permissions : [],
         tenant_id: data.tenant_id ?? '',
         tenant_slug: data.tenant_slug ?? '',
-        isPlatformOwner: data.is_platform_owner === true || (data.tenant_slug ?? '') === 'codevertex',
+        isPlatformOwner: data.is_platform_owner === true,
         isSuperUser: roles.includes('superuser'),
         tenant: data.tenant,
     };

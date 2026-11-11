@@ -25,10 +25,9 @@ export function isPlatformOwner(
     | undefined,
 ): boolean {
   if (!user) return false;
-  const slug = user.tenant_slug ?? user.tenantSlug ?? "";
-  // Tenant superusers are intentionally excluded — platform access requires the platform-owner
-  // claim or the codevertex platform tenant.
-  return user.isPlatformOwner === true || slug === "codevertex";
+  // Platform access needs the signed platform-owner claim. Neither a tenant superuser nor a plain
+  // member of the codevertex tenant has it (security audit 2026-11-11).
+  return user.isPlatformOwner === true;
 }
 
 // Roles that grant full access to TENANT-level resources (settings, items, warehouses,
