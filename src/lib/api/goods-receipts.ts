@@ -63,6 +63,8 @@ export interface CreateGRNLineInput {
 export interface CreateGRNInput {
   warehouse_id?: string;
   received_by?: string;
+  /** Day the goods arrived (YYYY-MM-DD); omit for today. An earlier day back-dates the receipt. */
+  received_date?: string;
   notes?: string;
   lines: CreateGRNLineInput[];
 }

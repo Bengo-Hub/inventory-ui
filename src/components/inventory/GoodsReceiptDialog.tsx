@@ -6,9 +6,11 @@ import { usePurchaseOrders, usePurchaseOrder } from '@/hooks/usePurchaseOrders';
 import { useItems } from '@/hooks/useItems';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
+import { AdjustmentDateField } from '@/components/inventory/AdjustmentDateField';
+import { ADJUSTMENT_BACKDATE_DAYS, adjustmentDateParam } from '@/lib/adjustment-date';
 import { type CreateGRNLineInput } from '@/lib/api/goods-receipts';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { DECIMAL_STEP, localDateInput, parseDecimal } from '@/lib/utils';
 import { DollarSign, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -24,6 +26,9 @@ const selectClass = 'w-full rounded-lg border border-input bg-transparent px-3 p
 export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [poId, setPoId] = useState('');
     const [notes, setNotes] = useState('');
+    // Day the goods arrived. Today is a normal receipt; an earlier day back-dates it so stock
+    // history, the lot and the supplier bill sit on the day of delivery, not the day of entry.
+    const [receivedDate, setReceivedDate] = useState(() => localDateInput(0));
     const [received, setReceived] = useState<Record<string, string>>({});
     const [rejected, setRejected] = useState<Record<string, string>>({});
     const [reason, setReason] = useState<Record<string, string>>({});
@@ -61,6 +66,19 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         if (po?.warehouse_id) receivingWarehouse.setWarehouseId(po.warehouse_id);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [po?.warehouse_id]);
+
+    // Entering a past purchase: when the order itself was back-dated (its order date is before the
+    // day it was entered), the goods came in on that day too, so "Received on" starts there instead
+    // of today. A normal order raised earlier and delivered today keeps today. Still editable.
+    useEffect(() => {
+        const orderDay = po?.order_date?.slice(0, 10);
+        const enteredDay = po?.created_at ? localDateInput(0, new Date(po.created_at)) : '';
+        if (orderDay && enteredDay && orderDay < enteredDay && orderDay >= localDateInput(-ADJUSTMENT_BACKDATE_DAYS)) {
+            setReceivedDate(orderDay);
+        } else {
+            setReceivedDate(localDateInput(0));
+        }
+    }, [po?.id, po?.order_date, po?.created_at]);
 
     // Carry through a selling-price decision made when this PO was placed/amended — the buyer
     // already decided whether a price change applies to all stock or new stock only, so the
@@ -142,7 +160,12 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         if (invalid) { toast.error('Rejected quantity cannot exceed received quantity'); return; }
         if (lines.length === 0) { toast.error('Enter at least one received quantity'); return; }
         if (receivingWarehouse.unresolved) { toast.error('Select the receiving warehouse before posting'); return; }
-        create.mutate({ warehouse_id: receivingWarehouse.warehouseId || undefined, notes: notes.trim() || undefined, lines }, {
+        create.mutate({
+            warehouse_id: receivingWarehouse.warehouseId || undefined,
+            received_date: adjustmentDateParam(receivedDate),
+            notes: notes.trim() || undefined,
+            lines,
+        }, {
             onSuccess: () => { toast.success('Goods receipt created (draft) — post it to update stock'); onCreated(); },
             onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to create goods receipt')),
         });
@@ -327,6 +350,13 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                     <p className="text-xs text-muted-foreground">Accepted = Received − Rejected. Rejected units are recorded for the purchase-return flow and are excluded from the supplier bill.</p>
                                 </div>
                             )}
+
+                            <AdjustmentDateField
+                                label="Received on"
+                                value={receivedDate}
+                                onChange={setReceivedDate}
+                                hint="The day the goods arrived. Leave as today if they came in today; pick the delivery day if you are entering them later, and stock history and the supplier bill will show that day."
+                            />
 
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Notes</label>

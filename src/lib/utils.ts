@@ -42,8 +42,8 @@ export function parseDecimal(value: string | number | null | undefined, fallback
  * `new Date().toISOString().slice(0, 10)` is the UTC day, which in Kenya (UTC+3) is still
  * YESTERDAY until 03:00, so forms defaulted to it quietly recorded the wrong date.
  */
-export function localDateInput(days = 0): string {
-  const d = new Date();
+export function localDateInput(days = 0, base?: Date): string {
+  const d = base ? new Date(base.getTime()) : new Date();
   d.setDate(d.getDate() + days);
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');

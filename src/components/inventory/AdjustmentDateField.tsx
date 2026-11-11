@@ -8,6 +8,10 @@ interface AdjustmentDateFieldProps {
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** Field label; defaults to the adjustment wording. Goods receipts pass "Received on". */
+  label?: string;
+  /** Help text under the field; defaults to the adjustment wording. */
+  hint?: string;
 }
 
 /**
@@ -16,10 +20,10 @@ interface AdjustmentDateFieldProps {
  * instead of on top under today. Never a future date. Shared by the Adjustments page and the
  * stock drawer so the wording and bounds stay in one place.
  */
-export function AdjustmentDateField({ value, onChange, className }: AdjustmentDateFieldProps) {
+export function AdjustmentDateField({ value, onChange, className, label, hint }: AdjustmentDateFieldProps) {
   return (
     <div className={className ?? 'space-y-2'}>
-      <label className="text-sm font-medium">Adjustment date</label>
+      <label className="text-sm font-medium">{label ?? 'Adjustment date'}</label>
       <Input
         type="date"
         value={value}
@@ -28,8 +32,8 @@ export function AdjustmentDateField({ value, onChange, className }: AdjustmentDa
         onChange={(e) => onChange(e.target.value || localDateInput(0))}
       />
       <p className="text-xs text-muted-foreground">
-        Leave as today for a normal adjustment. Pick an earlier day if the stock moved then: it will appear on that day in
-        stock history and reports.
+        {hint ??
+          'Leave as today for a normal adjustment. Pick an earlier day if the stock moved then: it will appear on that day in stock history and reports.'}
       </p>
     </div>
   );
