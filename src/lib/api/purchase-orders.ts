@@ -164,4 +164,9 @@ export const purchaseOrdersApi = {
 
   cancel: (orgSlug: string, id: string) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/cancel`, {}),
+  /** Permanent delete. Platform owners only (the API checks the signed claim and answers 403 otherwise). */
+  hardDelete: (orgSlug: string, id: string) =>
+    apiClient.delete<{ deleted: boolean; id: string; receipts_deleted: number; approvals_deleted: number }>(
+      `/api/v1/${orgSlug}/inventory/purchase-orders/${id}?hard=true`,
+    ),
 };

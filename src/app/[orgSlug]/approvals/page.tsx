@@ -4,15 +4,17 @@ import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/ba
 import {
     useApprovalRequests,
     useApproveRequest,
+    useHardDeleteApprovalRequest,
     useRejectRequest,
 } from '@/hooks/useApprovals';
 import { APPROVAL_MODULE_LABELS, type ApprovalRequest, type ApprovalRequestStatus } from '@/lib/api/approvals';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildApprovalColumns, STATUS_VARIANT } from './approval-columns';
-import { CheckCircle2, ClipboardList, ShieldCheck, X, XCircle } from 'lucide-react';
+import { CheckCircle2, ClipboardList, ShieldCheck, Trash2, X, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
+import { usePermissions } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -47,11 +49,32 @@ export default function ApprovalsInboxPage() {
 
     const approve = useApproveRequest(orgSlug);
     const reject = useRejectRequest(orgSlug);
-    const isActing = approve.isPending || reject.isPending;
+    const hardDelete = useHardDeleteApprovalRequest(orgSlug);
+    const isActing = approve.isPending || reject.isPending || hardDelete.isPending;
+    // Platform owners only: the signed is_platform_owner claim, never the tenant slug or a role.
+    const { isPlatformOwner } = usePermissions();
+    const [confirmDelete, setConfirmDelete] = useState(false);
+    const [deleteReceiptToo, setDeleteReceiptToo] = useState(false);
 
     function closeDetail() {
         setSelected(null);
         setComment('');
+        setConfirmDelete(false);
+        setDeleteReceiptToo(false);
+    }
+
+    function handleHardDelete(req: ApprovalRequest) {
+        const withObject = req.module === 'goods_receipt' && deleteReceiptToo;
+        hardDelete.mutate(
+            { id: req.id, withObject },
+            {
+                onSuccess: () => {
+                    toast.success(withObject ? 'Approval and draft receipt deleted' : 'Approval deleted');
+                    closeDetail();
+                },
+                onError: (e: unknown) => toast.error(errMsg(e, 'Failed to delete approval')),
+            },
+        );
     }
 
     function handleApprove(req: ApprovalRequest) {
@@ -222,6 +245,51 @@ export default function ApprovalsInboxPage() {
                                     <p className="text-sm text-center text-muted-foreground">
                                         This request is <span className="font-medium">{selected.status}</span>.
                                     </p>
+                                )}
+
+                                {isPlatformOwner && (
+                                    <div className="border-t border-border pt-4 space-y-3">
+                                        {!confirmDelete ? (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full text-destructive border-destructive/30 hover:bg-destructive/10"
+                                                disabled={isActing}
+                                                onClick={() => setConfirmDelete(true)}
+                                            >
+                                                <Trash2 className="h-4 w-4 mr-2" /> Delete permanently
+                                            </Button>
+                                        ) : (
+                                            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 space-y-3">
+                                                <p className="text-sm font-medium">Delete this approval permanently?</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    The request and its approval decisions are removed and an audit entry is kept. The approval rule and its steps stay. This cannot be undone.
+                                                    Approvals that were already executed, or whose document was posted, cannot be deleted.
+                                                </p>
+                                                {selected.module === 'goods_receipt' && (
+                                                    <label className="flex items-start gap-2 text-xs">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="mt-0.5"
+                                                            checked={deleteReceiptToo}
+                                                            onChange={(e) => setDeleteReceiptToo(e.target.checked)}
+                                                        />
+                                                        <span>Also delete the draft goods receipt and its lines (only allowed while the receipt is still a draft).</span>
+                                                    </label>
+                                                )}
+                                                <div className="flex gap-3">
+                                                    <Button variant="outline" className="flex-1" disabled={hardDelete.isPending}
+                                                        onClick={() => { setConfirmDelete(false); setDeleteReceiptToo(false); }}>
+                                                        Keep it
+                                                    </Button>
+                                                    <Button className="flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                                        disabled={hardDelete.isPending}
+                                                        onClick={() => handleHardDelete(selected)}>
+                                                        Delete permanently
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>

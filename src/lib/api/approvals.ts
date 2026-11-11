@@ -161,6 +161,14 @@ export const approvalsApi = {
     apiClient.post<ApprovalRequest>(`${base(orgSlug)}/approval-requests/${id}/approve`, { comment }),
   reject: (orgSlug: string, id: string, comment?: string) =>
     apiClient.post<ApprovalRequest>(`${base(orgSlug)}/approval-requests/${id}/reject`, { comment }),
+  /**
+   * Permanent delete. Platform owners only (the API checks the signed claim and answers 403
+   * otherwise). withObject also deletes the draft goods receipt of a goods_receipt request.
+   */
+  hardDeleteRequest: (orgSlug: string, id: string, withObject = false) =>
+    apiClient.delete<{ deleted: boolean; id: string; actions_deleted: number; object_deleted: boolean }>(
+      `${base(orgSlug)}/approval-requests/${id}${withObject ? '?with_object=true' : ''}`,
+    ),
 
   // Submit a purchase order for approval (creates a request if a rule matches)
   submitPurchaseOrder: (orgSlug: string, poId: string) =>

@@ -21,6 +21,7 @@ import {
     useSendPurchaseOrder,
     useReceivePurchaseOrder,
     useCancelPurchaseOrder,
+    useHardDeletePurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder, POStatus, POBudgetCheck } from '@/lib/api/purchase-orders';
 import { useSuppliers, useCreateSupplier, useSupplierSearch } from '@/hooks/useSuppliers';
@@ -40,6 +41,7 @@ import { toast } from 'sonner';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { apiClient } from '@/lib/api/client';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { supplierOption } from '@/lib/supplier-balance';
@@ -215,10 +217,12 @@ export default function PurchaseOrdersPage() {
     const sendPO = useSendPurchaseOrder(orgSlug);
     const receivePO = useReceivePurchaseOrder(orgSlug);
     const cancelPO = useCancelPurchaseOrder(orgSlug);
+    const hardDeletePO = useHardDeletePurchaseOrder(orgSlug);
+    const [confirmHardDelete, setConfirmHardDelete] = useState(false);
     const { data: poApproval } = useApprovalForObject(orgSlug, selectedPO ?? undefined);
     const submitForApproval = useSubmitPurchaseOrderForApproval(orgSlug);
 
-    const { canAny } = usePermissions();
+    const { canAny, isPlatformOwner } = usePermissions();
     const canCreate = canAny([P.PURCHASES_ADD, P.PURCHASES_MANAGE]);
     const canChangePO = canAny([P.PURCHASES_CHANGE, P.PURCHASES_MANAGE]);
     // Mirrors inventory-api canOverrideBudget: approvals or procurement managers may send over budget.
@@ -918,6 +922,15 @@ export default function PurchaseOrdersPage() {
                             Cancel Order
                         </Button>
                     )}
+                    {/* Platform owners only (signed is_platform_owner claim). The API refuses once
+                        stock was received or a purchase return exists. */}
+                    {isPlatformOwner && poDetail.status !== 'received' && poDetail.status !== 'partially_received' && (
+                        <Button size="sm" variant="outline" className="text-destructive border-destructive/30 hover:bg-destructive/10"
+                            disabled={isPOBusy || hardDeletePO.isPending}
+                            onClick={() => setConfirmHardDelete(true)}>
+                            Delete permanently
+                        </Button>
+                    )}
                 </>
             )}
         >
@@ -971,6 +984,23 @@ export default function PurchaseOrdersPage() {
                 </>
             )}
         </DetailDrawer>
+
+        <ConfirmDialog
+            open={confirmHardDelete && !!poDetail}
+            variant="danger"
+            title={`Delete ${poDetail?.po_number ?? 'this order'} permanently?`}
+            description="This removes the order, its lines, its draft and cancelled goods receipts and every approval for them. It cannot be undone. Orders with received stock or a purchase return cannot be deleted."
+            confirmLabel="Delete permanently"
+            onCancel={() => setConfirmHardDelete(false)}
+            onConfirm={() => {
+                if (!poDetail) return;
+                setConfirmHardDelete(false);
+                hardDeletePO.mutate(poDetail.id, {
+                    onSuccess: () => { toast.success('Purchase order deleted'); setSelectedPO(null); },
+                    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to delete purchase order')),
+                });
+            }}
+        />
 
         <PdfPreview {...previewProps} />
         </>

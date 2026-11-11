@@ -75,6 +75,19 @@ export function useSendPurchaseOrder(orgSlug: string) {
   });
 }
 
+/** Permanently deletes a purchase order with its draft receipts and approvals (platform owners only). */
+export function useHardDeletePurchaseOrder(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => purchaseOrdersApi.hardDelete(orgSlug, id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['approval-requests', orgSlug] });
+      queryClient.invalidateQueries({ queryKey: ['goods-receipts', orgSlug] });
+    },
+  });
+}
+
 export function useCancelPurchaseOrder(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({

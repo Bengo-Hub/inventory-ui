@@ -93,6 +93,20 @@ export function useRejectRequest(orgSlug: string) {
   });
 }
 
+/** Permanently deletes an approval request (platform owners only). */
+export function useHardDeleteApprovalRequest(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, withObject }: { id: string; withObject?: boolean }) =>
+      approvalsApi.hardDeleteRequest(orgSlug, id, withObject),
+    onSuccess: () => {
+      invalidateRequests(orgSlug, qc);
+      qc.invalidateQueries({ queryKey: ['purchase-orders', orgSlug] });
+      qc.invalidateQueries({ queryKey: ['goods-receipts', orgSlug] });
+    },
+  });
+}
+
 export function useSubmitPurchaseOrderForApproval(orgSlug: string) {
   const qc = useQueryClient();
   return useMutation({
