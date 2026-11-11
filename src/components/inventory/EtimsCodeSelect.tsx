@@ -78,7 +78,10 @@ export function EtimsCodeSelect({ orgSlug, codeType, value, onChange, placeholde
     staleTime: 120_000,
   });
 
-  const list: EtimsCode[] = options.data ?? [];
+  // KRA's item code holds the package and quantity units in fixed 2-character slots, so codes of
+  // any other length on those lists (KRA's own "U" for pieces) can never register; hide them.
+  const unitList = codeType === 'PKG_UNIT' || codeType === 'QTY_UNIT';
+  const list: EtimsCode[] = (options.data ?? []).filter((c) => !unitList || /^[A-Z0-9]{2}$/i.test(c.code));
 
   const selectedName = useMemo(() => {
     const hit =
