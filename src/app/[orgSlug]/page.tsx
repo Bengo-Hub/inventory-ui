@@ -2,6 +2,8 @@
 
 import { Badge, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { RecipeHealthBanner } from '@/components/inventory/RecipeHealthBanner';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
+import { useSubscription } from '@/hooks/use-subscription';
 import { useAuthStore } from '@/store/auth';
 import { useOutletStore } from '@/store/outlet';
 import { useAnalyticsSummary, useStockTrends, useInventoryDistribution, useReorderAlerts, useTopItems } from '@/hooks/useAnalytics';
@@ -65,7 +67,11 @@ export default function DashboardPage() {
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary(orgSlug);
   const { data: trends = [], isLoading: trendsLoading } = useStockTrends(orgSlug, 30);
   const { data: distribution = [], isLoading: distributionLoading } = useInventoryDistribution(orgSlug);
-  const { data: reorderAlerts = [], isLoading: alertsLoading } = useReorderAlerts(orgSlug);
+  // Reorder alerts are the stock_alerts feature: without it the API refuses the call, so skip it
+  // and show the locked card rather than a silently empty table.
+  const { hasFeature, isLoading: subscriptionLoading } = useSubscription();
+  const stockAlertsAvailable = subscriptionLoading || hasFeature('stock_alerts');
+  const { data: reorderAlerts = [], isLoading: alertsLoading } = useReorderAlerts(orgSlug, stockAlertsAvailable);
   const { data: topItems = [], isLoading: topLoading } = useTopItems(orgSlug, 10, 30);
 
   const [activityPage, setActivityPage] = useState(1);
@@ -182,7 +188,9 @@ export default function DashboardPage() {
 
       {/* Tables Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <ReorderAlertsTable data={reorderAlerts} loading={alertsLoading} orgSlug={orgSlug} />
+        <SubscriptionGate feature="stock_alerts">
+          <ReorderAlertsTable data={reorderAlerts} loading={alertsLoading} orgSlug={orgSlug} />
+        </SubscriptionGate>
         <TopItemsTable data={topItems} loading={topLoading} orgSlug={orgSlug} />
       </div>
 

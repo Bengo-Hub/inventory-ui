@@ -16,6 +16,7 @@ import {
 import { usePermissions, P } from '@/hooks/usePermissions';
 import { VARIANCE_REASONS, type StockCountLine, type StockCountStatus } from '@/lib/api/stock-counts';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { approvalGateFromError } from '@/lib/api/approvals';
 import { apiClient } from '@/lib/api/client';
 import { searchItems, type Item } from '@/lib/api/items';
 import { SearchAddTable, type SearchAddOption } from '@bengo-hub/shared-ui-lib/search-add-table';
@@ -328,7 +329,7 @@ export default function StockTakeDetailPage() {
     }
 
     return (
-        <SubscriptionGate feature="stock_tracking">
+        <SubscriptionGate feature="stock_take">
             <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                     <button onClick={() => router.push(`/${orgSlug}/stock-take`)} className="text-muted-foreground hover:text-foreground" aria-label="Back to stock takes">
@@ -559,7 +560,20 @@ export default function StockTakeDetailPage() {
                                             else toast.success(`Approved · ${res.posted_lines ?? 0} variance adjustment(s) posted`);
                                             void refetch();
                                         },
-                                        onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to approve')),
+                                        onError: async (e) => {
+                                            // A stock_count approval rule answers 422 with the gate state. A
+                                            // rejected count is corrected and approved again, which resubmits it.
+                                            const gate = approvalGateFromError(e);
+                                            if (gate) {
+                                                toast.info(gate.state === 'pending'
+                                                    ? 'This count is waiting for approval. The variances post as soon as it is approved.'
+                                                    : gate.state === 'resubmitted'
+                                                        ? 'Sent for approval again. The variances post as soon as it is approved.'
+                                                        : 'This count needs approval; a request has been sent. The variances post as soon as it is approved.', { duration: 6000 });
+                                                return;
+                                            }
+                                            toast.error(await apiErrorMessage(e, 'Failed to approve'));
+                                        },
                                     })}
                                     disabled={approve.isPending}
                                 >

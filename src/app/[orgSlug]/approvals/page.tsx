@@ -4,6 +4,8 @@ import { Badge, Button, Card, CardContent, CardHeader } from '@/components/ui/ba
 import {
     useApprovalRequests,
     useApproveRequest,
+    useCancelApprovedRequest,
+    useExecuteApprovalRequest,
     useHardDeleteApprovalRequest,
     useRejectRequest,
 } from '@/hooks/useApprovals';
@@ -14,7 +16,7 @@ import { CheckCircle2, ClipboardList, ShieldCheck, Trash2, X, XCircle } from 'lu
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
-import { usePermissions } from '@/hooks/usePermissions';
+import { usePermissions, P } from '@/hooks/usePermissions';
 import { toast } from 'sonner';
 
 const ROLE_LABEL: Record<string, string> = {
@@ -50,17 +52,52 @@ export default function ApprovalsInboxPage() {
     const approve = useApproveRequest(orgSlug);
     const reject = useRejectRequest(orgSlug);
     const hardDelete = useHardDeleteApprovalRequest(orgSlug);
-    const isActing = approve.isPending || reject.isPending || hardDelete.isPending;
+    const cancelApproved = useCancelApprovedRequest(orgSlug);
+    const executeApproved = useExecuteApprovalRequest(orgSlug);
+    const isActing = approve.isPending || reject.isPending || hardDelete.isPending || cancelApproved.isPending || executeApproved.isPending;
     // Platform owners only: the signed is_platform_owner claim, never the tenant slug or a role.
-    const { isPlatformOwner } = usePermissions();
+    const { isPlatformOwner, can } = usePermissions();
+    // Approved but the action never ran (the run at approval failed): approvals.change holders can
+    // run it from here. Purchase orders and requisitions have nothing to run (an approved order is
+    // sent from the order itself).
+    const canExecute = (req: ApprovalRequest) =>
+        can(P.APPROVALS_CHANGE) && req.status === 'approved' && !req.executed_at
+        && req.module !== 'purchase_order' && req.module !== 'requisition';
+
+    function handleExecute(req: ApprovalRequest) {
+        executeApproved.mutate(req.id, {
+            onSuccess: () => {
+                toast.success('Approved action carried out');
+                closeDetail();
+            },
+            onError: (e: unknown) => toast.error(errMsg(e, 'The approved action could not be carried out')),
+        });
+    }
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [deleteReceiptToo, setDeleteReceiptToo] = useState(false);
+    const [confirmCancel, setConfirmCancel] = useState(false);
+    const [cancelReason, setCancelReason] = useState('');
 
     function closeDetail() {
         setSelected(null);
         setComment('');
         setConfirmDelete(false);
         setDeleteReceiptToo(false);
+        setConfirmCancel(false);
+        setCancelReason('');
+    }
+
+    function handleCancelApproved(req: ApprovalRequest) {
+        cancelApproved.mutate(
+            { id: req.id, reason: cancelReason.trim() || undefined },
+            {
+                onSuccess: () => {
+                    toast.success('Approval cancelled. Nothing was posted.');
+                    closeDetail();
+                },
+                onError: (e: unknown) => toast.error(errMsg(e, 'Failed to cancel approval')),
+            },
+        );
     }
 
     function handleHardDelete(req: ApprovalRequest) {
@@ -245,6 +282,59 @@ export default function ApprovalsInboxPage() {
                                     <p className="text-sm text-center text-muted-foreground">
                                         This request is <span className="font-medium">{selected.status}</span>.
                                     </p>
+                                )}
+
+                                {canExecute(selected) && (
+                                    <div className="border-t border-border pt-4 space-y-2">
+                                        <p className="text-xs text-muted-foreground">
+                                            Approved, but its action has not run yet (the run at approval failed). Fix the cause, then carry it out here. It runs only once.
+                                        </p>
+                                        <Button className="w-full" disabled={isActing} onClick={() => handleExecute(selected)}>
+                                            <CheckCircle2 className="h-4 w-4 mr-2" /> Execute approved action
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {isPlatformOwner && selected.status === 'approved' && !selected.executed_at && (
+                                    <div className="border-t border-border pt-4 space-y-3">
+                                        {/* An approval whose action never ran (it failed, or is old) can be
+                                            cancelled instead of carried out. It stays as history. */}
+                                        {!confirmCancel ? (
+                                            <Button
+                                                variant="outline"
+                                                className="w-full"
+                                                disabled={isActing}
+                                                onClick={() => setConfirmCancel(true)}
+                                            >
+                                                <XCircle className="h-4 w-4 mr-2" /> Cancel approval
+                                            </Button>
+                                        ) : (
+                                            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-3">
+                                                <p className="text-sm font-medium">Cancel this approval?</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    It was approved but its action never ran. Cancelling it means nothing is posted and it can no longer be carried out.
+                                                    The request stays in the list as cancelled, and an audit entry records who cancelled it and why.
+                                                </p>
+                                                <input
+                                                    value={cancelReason}
+                                                    onChange={(e) => setCancelReason(e.target.value)}
+                                                    placeholder="Reason (optional)"
+                                                    maxLength={500}
+                                                    className="w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
+                                                />
+                                                <div className="flex gap-3">
+                                                    <Button variant="outline" className="flex-1" disabled={cancelApproved.isPending}
+                                                        onClick={() => { setConfirmCancel(false); setCancelReason(''); }}>
+                                                        Keep it
+                                                    </Button>
+                                                    <Button className="flex-1" disabled={cancelApproved.isPending}
+                                                        onClick={() => handleCancelApproved(selected)}>
+                                                        Cancel approval
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
 
                                 {isPlatformOwner && (

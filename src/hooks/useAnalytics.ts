@@ -31,13 +31,15 @@ export function useInventoryDistribution(orgSlug: string) {
   });
 }
 
-export function useReorderAlerts(orgSlug: string) {
+// `enabled` lets a caller skip the call when the tenant's plan lacks stock_alerts (the API
+// answers 403 for that plan), so the table shows the locked state instead of an empty list.
+export function useReorderAlerts(orgSlug: string, enabled = true) {
   return useQuery({
     queryKey: ['analytics', 'reorder-alerts', orgSlug],
     queryFn: () => analyticsApi.getReorderAlerts(orgSlug),
     staleTime: 3 * 60_000,
     placeholderData: [],
-    enabled: !!orgSlug,
+    enabled: !!orgSlug && enabled,
   });
 }
 

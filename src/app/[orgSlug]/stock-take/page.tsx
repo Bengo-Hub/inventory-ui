@@ -383,7 +383,7 @@ export default function StockTakePage() {
     }
 
     return (
-        <SubscriptionGate feature="stock_tracking">
+        <SubscriptionGate feature="stock_take">
             <div className="p-4 sm:p-6 space-y-6">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="mr-auto">

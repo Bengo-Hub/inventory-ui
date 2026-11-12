@@ -91,9 +91,12 @@ export default function PurchaseReturnsPage() {
             onError: async (err) => {
                 const gate = approvalGateFromError(err);
                 if (gate) {
-                    toast.info(gate.state === 'rejected'
-                        ? 'This return was rejected by an approver.'
-                        : 'This return needs manager approval first; a request has been sent. Approve it again once it is signed off.', { duration: 6000 });
+                    // Approval takes the goods out by itself, so nobody presses Approve twice.
+                    toast.info(gate.state === 'pending'
+                        ? 'This return is still waiting for approval. The goods go out as soon as it is approved.'
+                        : gate.state === 'resubmitted'
+                            ? 'Sent for approval again. The goods go out as soon as it is approved.'
+                            : 'This return needs manager approval first; a request has been sent. The goods go out as soon as it is approved.', { duration: 6000 });
                     return;
                 }
                 toast.error(await apiErrorMessage(err, 'Failed to approve'));

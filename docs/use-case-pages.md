@@ -89,3 +89,9 @@ page sets, each scoped to the active outlet's use case. Gating is **(role permis
   hospitality (course/station/modifier) controls and menu categories. See
   `pos-service/pos-ui/docs/use-case-designs/retail-pos.md`.
 - Shared lib opportunity: a `@bengo-hub` use-case-config hook reused by pos-ui + inventory-ui.
+
+## Plan-locked sections (2026-11-12)
+- Stock Take (list and count sheet) checks `stock_take`, the same feature the API checks, and shows
+  the shared upgrade card when the plan lacks it.
+- The dashboard reorder alerts table needs `stock_alerts`. Without it I skip the call and show the
+  upgrade card instead of an empty table.

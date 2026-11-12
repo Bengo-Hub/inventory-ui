@@ -104,6 +104,25 @@ export interface ApprovalRequest {
   actions?: ApprovalAction[];
   created_at: string;
   decided_at?: string;
+  /** When the approved action ran. Approved without it means the action has not happened yet. */
+  executed_at?: string;
+}
+
+/**
+ * Short state label for a document's latest approval request. `action` names what the approval
+ * unlocks ("send" for a purchase order), used when an approved request has not been acted on yet.
+ */
+export function approvalStateLabel(req: ApprovalRequest, action: string): string {
+  switch (req.status) {
+    case 'pending':
+      return `Awaiting approval${req.current_step ? ` · ${req.current_step.name}` : ''}`;
+    case 'approved':
+      return req.executed_at ? 'Approved' : `Approved, ready to ${action}`;
+    case 'rejected':
+      return 'Approval rejected: fix it and submit again';
+    default:
+      return `Approval ${req.status}`;
+  }
 }
 
 export interface ApprovalRequestListParams {
@@ -120,8 +139,10 @@ export interface SubmitForApprovalResult {
 }
 
 /**
- * Shape of the 422 body the API returns when a stock adjustment / write-off falls in
- * an ApprovalRule band and must be signed off before it can post.
+ * Shape of the body the API returns when an action must be signed off first: 422 for stock
+ * adjustments, write-offs and stock counts, 409 for the other gated actions. `state` is
+ * "submitted" (first request opened), "resubmitted" (a new request after a rejection or a
+ * change), "pending" (still waiting) or "rejected".
  */
 export interface ApprovalGateResponse {
   approval_required: boolean;
@@ -168,6 +189,24 @@ export const approvalsApi = {
   hardDeleteRequest: (orgSlug: string, id: string, withObject = false) =>
     apiClient.delete<{ deleted: boolean; id: string; actions_deleted: number; object_deleted: boolean }>(
       `${base(orgSlug)}/approval-requests/${id}${withObject ? '?with_object=true' : ''}`,
+    ),
+
+  /**
+   * Carry out the action of an approved request whose action never ran (the run at approval
+   * failed). Needs inventory.approvals.change. Runs at most once: the API refuses an executed one.
+   */
+  executeRequest: (orgSlug: string, id: string) =>
+    apiClient.post<ApprovalRequest>(`${base(orgSlug)}/approval-requests/${id}/execute`, {}),
+
+  /**
+   * Cancel an approved request whose action never ran (no executed_at). Platform owners only (the
+   * API checks the signed claim and answers 403 otherwise). Nothing is posted; the request stays
+   * as history, cancelled, with an audit entry carrying the reason.
+   */
+  cancelApprovedRequest: (orgSlug: string, id: string, reason?: string) =>
+    apiClient.post<ApprovalRequest>(
+      `${base(orgSlug)}/approval-requests/${id}/cancel${reason ? `?reason=${encodeURIComponent(reason)}` : ''}`,
+      {},
     ),
 
   // Submit a purchase order for approval (creates a request if a rule matches)

@@ -107,6 +107,27 @@ export function useHardDeleteApprovalRequest(orgSlug: string) {
   });
 }
 
+export function useExecuteApprovalRequest(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => approvalsApi.executeRequest(orgSlug, id),
+    // The action may have moved stock or changed any gated document, so refresh broadly.
+    onSuccess: () => qc.invalidateQueries(),
+  });
+}
+
+export function useCancelApprovedRequest(orgSlug: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
+      approvalsApi.cancelApprovedRequest(orgSlug, id, reason),
+    onSuccess: () => {
+      invalidateRequests(orgSlug, qc);
+      qc.invalidateQueries({ queryKey: ['purchase-orders', orgSlug] });
+    },
+  });
+}
+
 export function useSubmitPurchaseOrderForApproval(orgSlug: string) {
   const qc = useQueryClient();
   return useMutation({

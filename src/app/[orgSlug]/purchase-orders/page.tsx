@@ -30,6 +30,7 @@ import { normalizeUnit, costPerBaseUnit } from '@/lib/units/convert';
 import type { Unit } from '@/lib/api/units';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { useApprovalForObject, useSubmitPurchaseOrderForApproval } from '@/hooks/useApprovals';
+import { approvalStateLabel } from '@/lib/api/approvals';
 import { BarChart3, DollarSign, Minus, Plus, Search, ShieldCheck, X } from 'lucide-react';
 import Link from 'next/link';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
@@ -453,10 +454,12 @@ export default function PurchaseOrdersPage() {
     // Amend: a draft, or a sent order with nothing received and no receipt open. Changing a sent
     // order's total or supplier sends it back to draft so approval and budget run again.
     const canAmend = canChangePO && !openReceipt && nothingReceived && (dStatus === 'draft' || dStatus === 'sent');
-    // Approval-matrix awareness: offer "Submit for Approval" on drafts that have not
-    // already entered (or cleared) an approval workflow.
+    // Approval-matrix awareness: offer "Submit for Approval" on drafts with no live request. A
+    // rejected order is amended and submitted again; an approval that was already used to send the
+    // order (executed_at set) does not cover a draft that came back, so that needs a new request too.
     const approvalStatus = poApproval?.status;
-    const showSubmit = canChangePO && dStatus === 'draft' && approvalStatus !== 'pending' && approvalStatus !== 'approved';
+    const approvalLive = approvalStatus === 'pending' || (approvalStatus === 'approved' && !poApproval?.executed_at);
+    const showSubmit = canChangePO && dStatus === 'draft' && !approvalLive;
 
     return (
         <>
@@ -843,12 +846,13 @@ export default function PurchaseOrdersPage() {
                     <Badge variant={STATUS_VARIANT[poDetail.status] ?? 'default'}>
                         {STATUS_LABEL[poDetail.status] ?? poDetail.status}
                     </Badge>
-                    {approvalStatus && (
+                    {poApproval && approvalStatus && (
                         <Badge variant={approvalStatus === 'approved' ? 'success' : approvalStatus === 'rejected' ? 'error' : 'warning'}>
                             <ShieldCheck className="h-3 w-3 mr-1" />
-                            {approvalStatus === 'pending'
-                                ? `Awaiting approval${poApproval?.current_step ? ` · ${poApproval.current_step.name}` : ''}`
-                                : `Approval ${approvalStatus}`}
+                            {/* Approval does not send the order: staff press Send (the budget check
+                                runs with the sender's rights), so an unused approval reads
+                                "Approved, ready to send". */}
+                            {approvalStateLabel(poApproval, 'send')}
                         </Badge>
                     )}
                 </>
