@@ -5,16 +5,13 @@
 
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { DeadstockItem } from '@/lib/api/reports';
+import { formatDate } from '@/lib/user-timezone';
 
 function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 function fmtDate(s: string) {
-  try {
-    return new Date(s).toLocaleDateString();
-  } catch {
-    return '—';
-  }
+  return formatDate(s, undefined, { fallback: '—' });
 }
 
 export function buildDeadstockColumns(currency: string): DataTableColumn<DeadstockItem>[] {

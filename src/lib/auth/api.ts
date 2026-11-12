@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/api/client';
 import { revokeServerSession as sharedRevokeServerSession } from '@bengo-hub/shared-ui-lib/auth';
+import { applyUserTimeZone } from '@/lib/user-timezone';
 
 /**
  * Fetch user profile from inventory-api GET /api/v1/{tenantSlug}/auth/me.
@@ -188,6 +189,8 @@ export async function fetchProfile(accessToken?: string): Promise<{
         throw err;
     }
     const data = await res.json();
+    // Screens show times in the user's zone (profile.timezone), then the tenant's.
+    applyUserTimeZone(data, data.tenant);
     const roles: string[] = Array.isArray(data.roles) ? data.roles : [];
     return {
         id: data.id ?? '',

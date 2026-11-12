@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchInventoryProfile } from '@/lib/auth/api';
+import { fetchInventoryProfile, fetchProfile } from '@/lib/auth/api';
 import { useAuthStore } from '@/store/auth';
 import { useParams } from 'next/navigation';
 
@@ -38,6 +38,8 @@ export function useMe(enabled = true) {
   const query = useQuery({
     queryKey: ['auth', 'me', orgSlug],
     queryFn: async (): Promise<MeResponse> => {
+      // inventory-api's /me has no time zones, so the SSO /me sets the screen zone alongside.
+      void fetchProfile(accessToken).catch(() => undefined);
       const data = await fetchInventoryProfile(orgSlug);
       return {
         ...data,

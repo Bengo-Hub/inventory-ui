@@ -7,17 +7,18 @@ import { Badge, Button } from '@/components/ui/base';
 import { Calendar, MapPin, Pencil, Share2, Ticket, Users, X } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Item } from '@/lib/api/items';
+import { formatDateTime } from '@/lib/user-timezone';
 
 function formatEventDate(iso?: string | null): string {
-  if (!iso) return '—';
-  return new Intl.DateTimeFormat(undefined, {
+  return formatDateTime(iso, undefined, {
+    fallback: '—',
     weekday: 'short',
     year: 'numeric',
     month: 'short',
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(new Date(iso));
+  });
 }
 
 export function availableSeats(event: Item): number {

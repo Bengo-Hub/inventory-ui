@@ -5,13 +5,13 @@
 
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { FastMovingItem } from '@/lib/api/reports';
+import { formatDate } from '@/lib/user-timezone';
 
 function fmtQty(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
 }
 function fmtDate(s: string) {
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString();
+  return Number.isNaN(new Date(s).getTime()) ? '—' : formatDate(s);
 }
 
 export function buildFastMovingColumns(days: number): DataTableColumn<FastMovingItem>[] {
