@@ -8,6 +8,7 @@ import { RECIPE_GRID_HEADER, RecipeIngredientRow, ingredientCostForSubmit, ingre
 import { convertQuantity, costPerBaseUnit, normalizeUnit, unitOptionsForBase } from '@/lib/units/convert';
 import { EtimsCodeSelect } from '@/components/inventory/EtimsCodeSelect';
 import { TaxCodeCombobox } from '@/components/inventory/TaxCodeCombobox';
+import { kraItemType } from '@/lib/inventory/etims-item-type';
 import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { SupplierFormDialog } from '@/components/inventory/SupplierFormDialog';
 import { AddCategoryDialog } from '@/components/inventory/CategoryCombobox';
@@ -451,6 +452,14 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
     retry: false,
   });
 
+  // What eTIMS will do with this item, shown under the eTIMS fields. A production recipe
+  // (kind bom) holds stock and registers as a finished product; a menu recipe as a service.
+  const kraType = kraItemType(type, recipeData?.kind === 'bom');
+  // With no class of its own the item registers with its category's class, so say which.
+  const classPlaceholder = item?.etims_item_cls_source === 'category' && item.etims_item_cls_effective
+    ? `From the category: ${item.etims_item_cls_effective}`
+    : 'Default: general goods (1000000000)';
+
   // Guards the hydration below to run ONCE per recipe. `units` starts as `placeholderData: []`
   // until its own fetch lands — a moment (or more, if it's still loading when the user opens the
   // dialog) after `recipeData` resolves — and was previously a second dependency-array trigger
@@ -654,6 +663,12 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
         tags: [],
         is_perishable: isPerishable,
         image_url: imageUrl || undefined,
+        // Same tax and eTIMS fields as the plain save below, so editing a recipe keeps them.
+        tax_code_id: taxCode.trim() || undefined,
+        tax_inclusive: taxInclusive,
+        etims_item_cls_cd: etimsClsCd.trim() || undefined,
+        etims_pkg_unit_cd: etimsPkgUnit.trim() || undefined,
+        etims_qty_unit_cd: etimsQtyUnit.trim() || undefined,
         ingredients: recipeIngredients.map((row) => {
           // Convert the line to the ingredient's base unit (e.g. 2.5 ml → 0.0025 L) so it
           // costs correctly against the per-base-unit cost. Cost fields carry the derived
@@ -744,7 +759,8 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
       tax_code_id: taxCode.trim() || undefined,
       tax_inclusive: taxInclusive,
       etims_item_cls_cd: etimsClsCd.trim() || undefined,
-      etims_pkg_unit_cd: etimsPkgUnit.trim() || undefined,
+      // The package unit field is hidden for a service, so nothing is sent for it.
+      etims_pkg_unit_cd: type !== 'SERVICE' ? (etimsPkgUnit.trim() || undefined) : undefined,
       etims_qty_unit_cd: etimsQtyUnit.trim() || undefined,
       barcode_type: barcodeType || undefined,
       requires_age_verification: requiresAge,
@@ -1232,19 +1248,30 @@ export function ItemFormDialog({ orgSlug, item, defaultDate, initialName, lockTo
                       drive treasury's eTIMS item registration (saveItem) instead of defaults. */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">eTIMS Classification <span className="text-muted-foreground font-normal">(optional)</span></label>
-                    <EtimsCodeSelect orgSlug={orgSlug} codeType="ITEM_CLS" value={etimsClsCd} onChange={setEtimsClsCd} placeholder="Default: general goods (1000000000)" />
-                    <p className="text-xs text-muted-foreground">KRA UNSPSC item class for eTIMS registration.</p>
+                    <EtimsCodeSelect orgSlug={orgSlug} codeType="ITEM_CLS" value={etimsClsCd} onChange={setEtimsClsCd} placeholder={classPlaceholder} />
+                    <p className="text-xs text-muted-foreground">
+                      KRA UNSPSC item class for eTIMS registration.
+                      {item?.etims_item_cls_effective
+                        ? ` Registers with ${item.etims_item_cls_effective} (${item.etims_item_cls_source === 'category' ? 'from its category' : 'set on this item'}).`
+                        : ''}
+                    </p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">eTIMS Package Unit</label>
-                      <EtimsCodeSelect orgSlug={orgSlug} codeType="PKG_UNIT" value={etimsPkgUnit} onChange={setEtimsPkgUnit} placeholder="Default: NT" />
-                    </div>
+                  {/* A service has no package, so KRA's package unit is not asked for it. */}
+                  <div className={`grid gap-3 ${type === 'SERVICE' ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                    {type !== 'SERVICE' && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">eTIMS Package Unit</label>
+                        <EtimsCodeSelect orgSlug={orgSlug} codeType="PKG_UNIT" value={etimsPkgUnit} onChange={setEtimsPkgUnit} placeholder="Default: NT" />
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <label className="text-sm font-medium">eTIMS Quantity Unit</label>
                       <EtimsCodeSelect orgSlug={orgSlug} codeType="QTY_UNIT" value={etimsQtyUnit} onChange={setEtimsQtyUnit} placeholder="Default: unit's KRA mapping" />
                     </div>
                   </div>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">
+                    eTIMS registers this item at KRA as item type {kraType.code} ({kraType.label}).
+                  </p>
                 </div>
 
               {/* Non-billable — applies to anything the POS can ring up or deduct: stockable

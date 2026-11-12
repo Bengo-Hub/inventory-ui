@@ -2,6 +2,7 @@
 
 import { Input } from '@/components/ui/base';
 import { useTaxes } from '@/hooks/useTaxes';
+import { taxBand, taxBandLabel } from '@/lib/inventory/etims-item-type';
 import { Check, ChevronsUpDown, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -67,7 +68,7 @@ export function TaxCodeCombobox({ orgSlug, value, onChange, disabled, placeholde
       >
         <span className={`truncate ${value ? 'text-foreground' : 'text-muted-foreground'}`}>
           {value
-            ? <span className="font-mono">{value}{selected ? <span className="font-sans text-muted-foreground"> · {selected.name}</span> : null}</span>
+            ? <span className="font-mono">{value}{selected ? <span className="font-sans text-muted-foreground"> · {selected.name}{taxBand(selected.kra_code) ? ` (band ${taxBand(selected.kra_code)})` : ''}</span> : null}</span>
             : placeholder}
         </span>
         <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -115,6 +116,14 @@ export function TaxCodeCombobox({ orgSlug, value, onChange, disabled, placeholde
                     {t.is_default ? <span className="ml-1 text-[10px] uppercase text-primary">default</span> : null}
                   </span>
                   <span className="flex items-center gap-2 shrink-0">
+                    {taxBand(t.kra_code) && (
+                      <span
+                        className="rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground"
+                        title={`Reaches KRA eTIMS as band ${taxBandLabel(t.kra_code)}`}
+                      >
+                        Band {taxBand(t.kra_code)}
+                      </span>
+                    )}
                     <span className="text-xs text-muted-foreground">{t.rate}%</span>
                     {value.toLowerCase() === t.code.toLowerCase() && <Check className="h-4 w-4 text-primary" />}
                   </span>

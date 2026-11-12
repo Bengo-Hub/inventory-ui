@@ -7,6 +7,8 @@ export interface TaxCode {
   rate: number;
   tax_type: string;
   is_default: boolean;
+  /** KRA band letter the code reaches eTIMS as (A exempt, B 16%, C zero, D non-VAT, E 8%). */
+  kra_code?: string;
 }
 
 export const taxesApi = {

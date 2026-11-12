@@ -87,6 +87,10 @@ export interface Item {
   etims_item_cls_cd?: string;
   etims_pkg_unit_cd?: string;
   etims_qty_unit_cd?: string;
+  // Read only: the class the item registers with at KRA (its own, else its category's) and
+  // where it came from ('item' or 'category'; empty when neither is set).
+  etims_item_cls_effective?: string;
+  etims_item_cls_source?: 'item' | 'category' | '';
   // Read-only effective price + tax split enriched by inventory-api for POS/ordering
   selling_price?: number | null;
   net_price?: number | null;
@@ -718,6 +722,12 @@ export interface MenuItemCompositeRequest {
   unit_content_qty?: number;
   unit_content_uom?: string;
   image_url?:    string;
+  /** Tax and KRA eTIMS fields, the same ones the plain item form saves. */
+  tax_code_id?:       string;
+  tax_inclusive?:     boolean;
+  etims_item_cls_cd?: string;
+  etims_pkg_unit_cd?: string;
+  etims_qty_unit_cd?: string;
   servings?:     number;
   target_margin_percent?: number;
   prep_time_minutes?:     number;
