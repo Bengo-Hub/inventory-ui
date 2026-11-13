@@ -48,6 +48,7 @@ import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documen
 import { supplierOption } from '@/lib/supplier-balance';
 import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
 import { POLineTaxFields } from '@/components/inventory/POLineTaxFields';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 interface POLine {
     itemId: string;
@@ -863,7 +864,7 @@ export default function PurchaseOrdersPage() {
                 {
                     label: 'Date',
                     value: isOverriddenPODate(poDetail)
-                        ? `${new Date(effectivePODate(poDetail)).toLocaleDateString()} (entered ${new Date(poDetail.created_at).toLocaleDateString()})`
+                        ? `${new Date(effectivePODate(poDetail)).toLocaleDateString()} (entered ${new Date(poDetail.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })})`
                         : new Date(effectivePODate(poDetail)).toLocaleDateString(),
                 },
                 { label: 'Total', value: poDetail.total_amount.toLocaleString() },

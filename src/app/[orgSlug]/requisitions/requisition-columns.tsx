@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/base';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Requisition, RequisitionStatus } from '@/lib/api/requisitions';
 import type { ReactNode } from 'react';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<RequisitionStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline', submitted: 'warning', procurement_review: 'warning',
@@ -62,7 +63,7 @@ export function buildRequisitionColumns(cb: RequisitionColumnCallbacks): DataTab
       hideBelow: 'lg',
       accessor: (r) => r.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (r) => new Date(r.created_at).toLocaleDateString(),
+      render: (r) => new Date(r.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'actions',

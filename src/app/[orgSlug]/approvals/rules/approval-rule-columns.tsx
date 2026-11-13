@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { ApprovalRule } from '@/lib/api/approvals';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface ApprovalRuleColumnCallbacks {
   canChange: boolean;
@@ -66,7 +67,7 @@ export function buildApprovalRuleColumns(cb: ApprovalRuleColumnCallbacks): DataT
       hideBelow: 'lg',
       accessor: (r) => r.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
+      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',

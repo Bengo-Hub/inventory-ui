@@ -32,6 +32,7 @@ import { ArrowLeft, CheckCircle2, ScanBarcode, Search, Send } from 'lucide-react
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const STATUS_VARIANT: Record<StockCountStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
     draft: 'outline', counting: 'warning', review: 'default', approved: 'success', cancelled: 'error',
@@ -341,7 +342,7 @@ export default function StockTakeDetailPage() {
                         </h1>
                         <p className="text-sm text-muted-foreground">
                             {whName(count?.warehouse_id)}
-                            {count ? ` · started ${new Date(count.created_at).toLocaleString()}` : ''}
+                            {count ? ` · started ${new Date(count.created_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}` : ''}
                         </p>
                     </div>
                     {status && <Badge variant={STATUS_VARIANT[status]}>{STATUS_LABEL[status]}</Badge>}

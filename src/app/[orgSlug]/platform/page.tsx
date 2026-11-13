@@ -27,6 +27,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 /* ─── Types ──────────────────────────────────────────────────────────── */
 
@@ -283,7 +284,7 @@ export default function PlatformPage() {
                                         <div className="flex items-center gap-3">
                                             {conn.lastSync && (
                                                 <span className="text-xs text-muted-foreground hidden sm:inline">
-                                                    Last sync: {new Date(conn.lastSync).toLocaleDateString()}
+                                                    Last sync: {new Date(conn.lastSync).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}
                                                 </span>
                                             )}
                                             <Badge variant={conn.status === 'active' ? 'success' : conn.status === 'error' ? 'error' : 'outline'}>

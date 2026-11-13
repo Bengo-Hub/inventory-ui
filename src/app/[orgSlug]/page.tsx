@@ -32,6 +32,7 @@ import {
   ReorderAlertsTable,
   TopItemsTable,
 } from './_components/DashboardCharts';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 interface ActivityItem {
   id: string;
@@ -228,7 +229,7 @@ export default function DashboardPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.description}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(item.timestamp).toLocaleString()}
+                        {new Date(item.timestamp).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}
                       </p>
                     </div>
                     {item.delta != null && (

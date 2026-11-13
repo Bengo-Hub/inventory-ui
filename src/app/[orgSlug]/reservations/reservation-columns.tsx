@@ -6,6 +6,7 @@
 import { Badge } from '@/components/ui/base';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Reservation } from '@/lib/api/reservations';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<string, 'default' | 'success' | 'outline' | 'warning' | 'error'> = {
   pending: 'warning',
@@ -83,7 +84,7 @@ export function buildReservationColumns(): DataTableColumn<Reservation>[] {
       sortable: true,
       accessor: (r) => r.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (r) => new Date(r.created_at).toLocaleDateString(),
+      render: (r) => new Date(r.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
   ];
 }

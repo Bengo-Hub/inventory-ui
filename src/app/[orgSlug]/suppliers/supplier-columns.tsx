@@ -8,6 +8,7 @@ import { Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Supplier } from '@/lib/api/suppliers';
 import { supplierBalance, supplierBalanceLabel } from '@/lib/supplier-balance';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const PAYMENT_LABEL: Record<string, string> = {
   mpesa: 'M-Pesa',
@@ -104,7 +105,7 @@ export function buildSupplierColumns(cb: SupplierColumnCallbacks): DataTableColu
       hideBelow: 'md',
       accessor: (s) => s.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (s) => new Date(s.created_at).toLocaleDateString(),
+      render: (s) => new Date(s.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'actions',

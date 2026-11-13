@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { Pencil, Sparkles, Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { PricingTier } from '@/lib/api/pricing';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface PricingProfileColumnCallbacks {
   isDeleting: boolean;
@@ -62,7 +63,7 @@ export function buildPricingProfileColumns(cb: PricingProfileColumnCallbacks): D
       hideBelow: 'md',
       accessor: (t) => t.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (t) => new Date(t.created_at).toLocaleDateString(),
+      render: (t) => new Date(t.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'actions',

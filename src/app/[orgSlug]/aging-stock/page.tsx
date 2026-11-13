@@ -14,11 +14,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const KES = (n?: number | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
 
-const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString() : '—');
+const fmtDate = (s?: string) => (s ? new Date(s).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—');
 
 function AgingStockContent({ org }: { org: string }) {
   const { data: settings, isLoading: settingsLoading } = useInventorySettings(org);

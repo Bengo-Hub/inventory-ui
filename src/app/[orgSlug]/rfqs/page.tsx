@@ -20,6 +20,7 @@ import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
 import { apiClient } from '@/lib/api/client';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 interface LineDraft {
     itemId: string;
@@ -299,7 +300,7 @@ export default function RFQListPage() {
                 fields={viewRFQ ? [
                     { label: 'Title', value: viewRFQ.title || '—' },
                     { label: 'Due date', value: viewRFQ.due_date ? new Date(viewRFQ.due_date).toLocaleDateString() : '—' },
-                    { label: 'Created', value: new Date(viewRFQ.created_at).toLocaleDateString() },
+                    { label: 'Created', value: new Date(viewRFQ.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) },
                     { label: 'Suppliers invited', value: String(viewRFQ.responses?.length ?? 0) },
                     { label: 'Notes', value: viewRFQ.notes, full: true, hideIfEmpty: true },
                 ] : []}

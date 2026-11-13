@@ -12,6 +12,7 @@ import { comboLabel } from '@/lib/inventory/variant-matrix';
 import type { SerialRow } from './page';
 import { Trash2 } from 'lucide-react';
 import Link from 'next/link';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export function buildItemPricingColumns(
   outletName?: (id: string) => string | undefined,
@@ -99,7 +100,7 @@ export function buildSerialColumns(): DataTableColumn<SerialRow>[] {
       sortable: true,
       accessor: (s) => s.received_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (s) => (s.received_at ? new Date(s.received_at).toLocaleDateString() : '—'),
+      render: (s) => (s.received_at ? new Date(s.received_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'sold_at',
@@ -108,7 +109,7 @@ export function buildSerialColumns(): DataTableColumn<SerialRow>[] {
       sortable: true,
       accessor: (s) => s.sold_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (s) => (s.sold_at ? new Date(s.sold_at).toLocaleDateString() : '—'),
+      render: (s) => (s.sold_at ? new Date(s.sold_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
   ];
 }

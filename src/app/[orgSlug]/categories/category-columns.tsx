@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { Pencil, Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Category } from './page';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export type CategoryRow = Category & { indent?: boolean };
 
@@ -61,7 +62,7 @@ export function buildCategoryColumns(cb: CategoryColumnCallbacks): DataTableColu
       hideBelow: 'md',
       accessor: (c) => c.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (c) => (c.created_at ? new Date(c.created_at).toLocaleDateString() : '—'),
+      render: (c) => (c.created_at ? new Date(c.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',

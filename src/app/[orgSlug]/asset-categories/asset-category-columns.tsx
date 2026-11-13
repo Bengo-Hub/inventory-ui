@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/base';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { AssetCategory } from '@/lib/api/assets';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface AssetCategoryColumnCallbacks {
   canChange: boolean;
@@ -54,7 +55,7 @@ export function buildAssetCategoryColumns(cb: AssetCategoryColumnCallbacks): Dat
       hideBelow: 'lg',
       accessor: (c) => c.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (c) => new Date(c.created_at).toLocaleDateString(),
+      render: (c) => new Date(c.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'actions',

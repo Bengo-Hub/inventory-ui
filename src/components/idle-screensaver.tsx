@@ -7,6 +7,7 @@ import { useBranding } from '@/providers/branding-provider';
 import { DEFAULT_IDLE_SECONDS, useIdle } from '@/hooks/use-idle';
 import { resolveIdleSeconds } from '@/hooks/use-screensaver-timeout';
 import { MediaImage } from '@bengo-hub/shared-ui-lib/media';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 interface IdleScreensaverProps {
   /** Enable detection. Pass false on screens where a screensaver is unwanted. */
@@ -61,10 +62,10 @@ export function IdleScreensaver({ enabled = true, timeoutSeconds, onWake }: Idle
   };
 
   const timeLabel = now
-    ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: getActiveTimeZone() })
     : '';
   const dateLabel = now
-    ? now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    ? now.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: getActiveTimeZone() })
     : '';
 
   return (

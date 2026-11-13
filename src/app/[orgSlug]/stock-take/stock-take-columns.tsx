@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockCount, StockCountStatus } from '@/lib/api/stock-counts';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<StockCountStatus, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline',
@@ -59,7 +60,7 @@ export function buildStockTakeColumns(cb: StockTakeColumnCallbacks): DataTableCo
       hideBelow: 'sm',
       accessor: (c) => c.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (c) => new Date(c.created_at).toLocaleDateString(),
+      render: (c) => new Date(c.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       // Line-status breakdown so a manager can tell which sessions still need attention without

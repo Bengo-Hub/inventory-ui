@@ -7,6 +7,7 @@ import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatM
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockAdjustment } from '@/lib/api/stock';
 import { isBackdatedAdjustment } from '@/lib/adjustment-date';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface AdjustmentColumnCallbacks {
   onPrint: (a: StockAdjustment, format: DocFormat) => void;
@@ -37,8 +38,8 @@ export function buildAdjustmentColumns(cb: AdjustmentColumnCallbacks): DataTable
         <div>
           <div>{new Date(a.adjusted_at ?? a.created_at).toLocaleDateString()}</div>
           {isBackdatedAdjustment(a) && (
-            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(a.created_at).toLocaleString()}`}>
-              entered {new Date(a.created_at).toLocaleDateString()}
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(a.created_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}`}>
+              entered {new Date(a.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}
             </div>
           )}
         </div>

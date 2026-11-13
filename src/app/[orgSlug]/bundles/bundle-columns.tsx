@@ -8,6 +8,7 @@ import { Trash2 } from 'lucide-react';
 import { DocFormatMenu, type DocFormat } from '@/components/inventory/DocFormatMenu';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Bundle } from '@/lib/api/bundles';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface BundleColumnCallbacks {
   onEdit: (bundle: Bundle) => void;
@@ -53,7 +54,7 @@ export function buildBundleColumns(cb: BundleColumnCallbacks): DataTableColumn<B
       hideBelow: 'md',
       accessor: (b) => b.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (b) => (b.created_at ? new Date(b.created_at).toLocaleDateString() : '—'),
+      render: (b) => (b.created_at ? new Date(b.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/base';
 import { RowActions } from '@/components/inventory/RowActions';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { RFQ } from '@/lib/api/rfq';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline',
@@ -57,7 +58,7 @@ export function buildRfqColumns(cb: RfqColumnCallbacks): DataTableColumn<RFQ>[] 
       hideBelow: 'md',
       accessor: (r) => r.created_at,
       cellClassName: 'text-muted-foreground',
-      render: (r) => new Date(r.created_at).toLocaleDateString(),
+      render: (r) => new Date(r.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'actions',

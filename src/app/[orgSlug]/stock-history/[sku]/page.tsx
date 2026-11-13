@@ -17,6 +17,7 @@ import { useWarehouses } from '@/hooks/useWarehouses';
 import { stockApi } from '@/lib/api/stock';
 import type { StockMovementRow } from '@/lib/api/stock';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const MOVEMENT_TYPE_OPTIONS: { value: StockMovementRow['type']; label: string }[] = [
   { value: 'opening_stock', label: 'Opening Stock' },
@@ -172,8 +173,8 @@ export default function StockHistoryPage() {
           <div>
             <div>{new Date(r.occurred_at).toLocaleString()}</div>
             {r.entered_at && (
-              <div className="text-[10px] text-amber-600" title={`Entered ${new Date(r.entered_at).toLocaleString()}`}>
-                entered {new Date(r.entered_at).toLocaleDateString()}
+              <div className="text-[10px] text-amber-600" title={`Entered ${new Date(r.entered_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}`}>
+                entered {new Date(r.entered_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}
               </div>
             )}
           </div>

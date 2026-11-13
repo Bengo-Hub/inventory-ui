@@ -33,6 +33,7 @@ import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 // Slide-over detail for a single transfer, replacing the old inline expand-row. Fetches the
 // full transfer and surfaces ship/receive/cancel + the line table in a consistent DetailDrawer.
@@ -102,7 +103,7 @@ function TransferDetailDrawer({ orgSlug, transferId, onClose, onEdit, onReceive 
                 {
                     label: 'Transfer Date',
                     value: isOverriddenTransferDate(transfer)
-                        ? `${new Date(effectiveTransferDate(transfer)).toLocaleDateString()} (entered ${new Date(transfer.created_at).toLocaleDateString()})`
+                        ? `${new Date(effectiveTransferDate(transfer)).toLocaleDateString()} (entered ${new Date(transfer.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })})`
                         : new Date(effectiveTransferDate(transfer)).toLocaleDateString(),
                 },
                 { label: 'Reference', value: transfer.reference_no, hideIfEmpty: true },

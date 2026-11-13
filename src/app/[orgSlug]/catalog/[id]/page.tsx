@@ -23,6 +23,7 @@ import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const KES = (n?: number | null) =>
   n == null ? '—' : new Intl.NumberFormat(undefined, { style: 'currency', currency: 'KES', maximumFractionDigits: 2 }).format(n);
@@ -291,8 +292,8 @@ export default function ItemDetailPage() {
                 {isStockable && item.shelf_life_days != null && <Field label="Shelf Life" value={`${item.shelf_life_days} days`} />}
                 {isStockable && item.weight_kg != null && <Field label="Weight" value={`${item.weight_kg} kg`} />}
                 {item.type === 'SERVICE' && item.duration_minutes != null && <Field label="Service Duration" value={`${item.duration_minutes} min`} />}
-                <Field label="Created" value={new Date(item.created_at).toLocaleDateString()} />
-                <Field label="Updated" value={new Date(item.updated_at).toLocaleDateString()} />
+                <Field label="Created" value={new Date(item.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })} />
+                <Field label="Updated" value={new Date(item.updated_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })} />
                 {item.description && (
                   <div className="col-span-2">
                     <dt className="text-muted-foreground">Description</dt>

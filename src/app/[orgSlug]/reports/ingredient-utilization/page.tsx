@@ -22,6 +22,7 @@ import { Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 import { UtilizationChart } from './_components/UtilizationChart';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 function formatNumber(v: number, decimals = 2): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: decimals });
@@ -237,7 +238,7 @@ export default function IngredientUtilizationPage() {
               },
               {
                 label: 'Last Restock',
-                value: s?.last_restock_at ? new Date(s.last_restock_at).toLocaleDateString('en', { month: 'short', day: 'numeric' }) : '—',
+                value: s?.last_restock_at ? new Date(s.last_restock_at).toLocaleDateString('en', { month: 'short', day: 'numeric', timeZone: getActiveTimeZone() }) : '—',
               },
             ].map((tile) => (
               <Card key={tile.label}>

@@ -5,6 +5,7 @@
 
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { AuditLogEntry } from '@/lib/api/audit';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 // Friendly labels + colour bands for the actions the audit log records.
 export const ACTION_META: Record<string, { label: string; cls: string }> = {
@@ -25,7 +26,7 @@ export function buildAuditColumns(): DataTableColumn<AuditLogEntry>[] {
       sortable: true,
       accessor: (e) => e.created_at,
       cellClassName: 'whitespace-nowrap text-xs text-muted-foreground',
-      render: (e) => new Date(e.created_at).toLocaleString(),
+      render: (e) => new Date(e.created_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() }),
     },
     {
       key: 'action',

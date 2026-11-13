@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { FlaskConical, Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Recipe } from '@/lib/api/recipes';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 function formatCurrency(value?: number | null): string {
   if (value == null || isNaN(value)) return '—';
@@ -69,7 +70,7 @@ export function buildRecipeColumns(cb: RecipeColumnCallbacks): DataTableColumn<R
       hideBelow: 'xl',
       accessor: (r) => r.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString() : '—'),
+      render: (r) => (r.created_at ? new Date(r.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',

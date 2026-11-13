@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/base';
 import { RowActions } from '@/components/inventory/RowActions';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { PurchaseOrder } from '@/lib/api/purchase-orders';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline',
@@ -98,8 +99,8 @@ export function buildPurchaseOrderColumns(cb: PurchaseOrderColumnCallbacks): Dat
         <div>
           <div>{new Date(effectivePODate(po)).toLocaleDateString()}</div>
           {isOverriddenPODate(po) && (
-            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(po.created_at).toLocaleString()}`}>
-              entered {new Date(po.created_at).toLocaleDateString()}
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(po.created_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}`}>
+              entered {new Date(po.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}
             </div>
           )}
         </div>

@@ -9,6 +9,7 @@ import { Package } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { TransferSummary } from '@/lib/api/transfers';
 import { localDateInput } from '@/lib/utils';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'error' | 'outline'> = {
   draft: 'outline',
@@ -115,8 +116,8 @@ export function buildTransferColumns(cb: TransferColumnCallbacks): DataTableColu
         <div>
           <div>{new Date(effectiveTransferDate(t)).toLocaleDateString()}</div>
           {isOverriddenTransferDate(t) && (
-            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(t.created_at).toLocaleString()}`}>
-              entered {new Date(t.created_at).toLocaleDateString()}
+            <div className="text-[10px] text-amber-600" title={`Entered ${new Date(t.created_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}`}>
+              entered {new Date(t.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}
             </div>
           )}
         </div>

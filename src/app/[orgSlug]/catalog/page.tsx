@@ -42,6 +42,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { parseDecimal } from '@/lib/utils';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 
 // Item types that hold physical on-hand stock — mirrors the backend's stockableTypes filter
@@ -323,8 +324,8 @@ function ItemDrawer({ item, onClose, onEdit, canEdit, onMoveStock, onViewHistory
     { label: 'Weight', value: item.weight_kg != null ? `${item.weight_kg} kg` : null, hideIfEmpty: true },
     { label: 'Service Duration', value: item.duration_minutes != null ? `${item.duration_minutes} min` : null, hideIfEmpty: true },
     { label: 'Description', value: item.description, full: true, hideIfEmpty: true },
-    { label: 'Created', value: new Date(item.created_at).toLocaleDateString() },
-    { label: 'Updated', value: new Date(item.updated_at).toLocaleDateString() },
+    { label: 'Created', value: new Date(item.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) },
+    { label: 'Updated', value: new Date(item.updated_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) },
   ];
 
   return (

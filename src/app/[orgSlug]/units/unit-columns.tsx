@@ -6,6 +6,7 @@
 import { Button } from '@/components/ui/base';
 import { Eye, Pencil, Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export const TYPE_LABELS: Record<string, string> = {
   weight: 'Weight',
@@ -76,7 +77,7 @@ export function buildUnitColumns(cb: UnitColumnCallbacks): DataTableColumn<Unit>
       hideBelow: 'md',
       accessor: (u) => u.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (u) => (u.created_at ? new Date(u.created_at).toLocaleDateString() : '—'),
+      render: (u) => (u.created_at ? new Date(u.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',

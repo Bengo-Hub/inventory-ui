@@ -11,6 +11,7 @@ import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const STATUS_STYLES: Record<string, string> = {
   issued: 'bg-green-500/10 text-green-700 dark:text-green-400',
@@ -181,7 +182,7 @@ export default function TicketCheckInPage() {
               {ticket.tier_name && (<><span className="text-muted-foreground">Tier</span><span className="text-right font-medium">{ticket.tier_name}</span></>)}
               <span className="text-muted-foreground">Seats</span><span className="text-right font-medium">{ticket.quantity}</span>
               {ticket.buyer_name && (<><span className="text-muted-foreground">Buyer</span><span className="text-right font-medium truncate">{ticket.buyer_name}</span></>)}
-              {ticket.redeemed_at && (<><span className="text-muted-foreground">Redeemed</span><span className="text-right font-medium">{new Date(ticket.redeemed_at).toLocaleString()}</span></>)}
+              {ticket.redeemed_at && (<><span className="text-muted-foreground">Redeemed</span><span className="text-right font-medium">{new Date(ticket.redeemed_at).toLocaleString(undefined, { timeZone: getActiveTimeZone() })}</span></>)}
             </div>
             {ticket.status === 'issued' && (
               <div className="flex gap-2">

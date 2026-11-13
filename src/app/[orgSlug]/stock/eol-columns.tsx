@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { RotateCcw } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { Item } from '@/lib/api/items';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -28,9 +29,9 @@ function PurgeCountdown({ item }: { item: Item }) {
   const label = left <= 0 ? 'Due now' : days <= 1 ? 'Under a day' : `${days} days`;
   const variant = left <= 0 || days <= 3 ? 'error' : days <= 7 ? 'warning' : 'default';
   return (
-    <span title={`Deleted on ${at.toLocaleString()}`}>
+    <span title={`Deleted on ${at.toLocaleString(undefined, { timeZone: getActiveTimeZone() })}`}>
       <Badge variant={variant}>{label}</Badge>
-      <span className="ml-1.5 text-xs text-muted-foreground hidden lg:inline">{at.toLocaleDateString()}</span>
+      <span className="ml-1.5 text-xs text-muted-foreground hidden lg:inline">{at.toLocaleDateString(undefined, { timeZone: getActiveTimeZone() })}</span>
     </span>
   );
 }
@@ -64,7 +65,7 @@ export function buildEOLColumns(cb: EOLColumnCallbacks): DataTableColumn<Item>[]
       sortable: true,
       accessor: (it) => it.end_of_life_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (it) => (it.end_of_life_at ? new Date(it.end_of_life_at).toLocaleDateString() : '—'),
+      render: (it) => (it.end_of_life_at ? new Date(it.end_of_life_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'eol_purge_at',

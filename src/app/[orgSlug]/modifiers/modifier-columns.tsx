@@ -7,6 +7,7 @@ import { Badge, Button } from '@/components/ui/base';
 import { Trash2 } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { ModifierGroup } from '@/lib/api/modifiers';
+import { getActiveTimeZone } from '@/lib/user-timezone';
 
 export interface ModifierColumnCallbacks {
   onEdit: (group: ModifierGroup) => void;
@@ -76,7 +77,7 @@ export function buildModifierColumns(cb: ModifierColumnCallbacks): DataTableColu
       hideBelow: 'lg',
       accessor: (g) => g.created_at ?? '',
       cellClassName: 'text-muted-foreground',
-      render: (g) => (g.created_at ? new Date(g.created_at).toLocaleDateString() : '—'),
+      render: (g) => (g.created_at ? new Date(g.created_at).toLocaleDateString(undefined, { timeZone: getActiveTimeZone() }) : '—'),
     },
     {
       key: 'actions',
