@@ -13,7 +13,9 @@ import {
     useConvertRFQToPOs,
     useDeleteRFQ,
 } from '@/hooks/useRFQs';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
+import { supplierOption } from '@/lib/supplier-balance';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
 import { usePermissions, P } from '@/hooks/usePermissions';
 import type { AwardEntry, RFQLine, RFQAward, SupplierResponse } from '@/lib/api/rfq';
 import { apiErrorMessage } from '@/lib/api/error-message';
@@ -40,6 +42,7 @@ export default function RFQDetailPage() {
     const { data: rfq, isLoading } = useRFQ(orgSlug, rfqID);
     const { data: suppliersPage } = useSuppliers(orgSlug);
     const suppliers = suppliersPage?.data ?? [];
+    const searchSuppliers = useSupplierSearch(orgSlug);
 
     const hasSubmitted = (rfq?.responses ?? []).some((r) => r.status === 'submitted');
     const { data: comparison } = useRFQComparison(orgSlug, rfqID, hasSubmitted);
@@ -59,7 +62,8 @@ export default function RFQDetailPage() {
 
     // Invite picker
     const [inviteOpen, setInviteOpen] = useState(false);
-    const [picked, setPicked] = useState<Record<string, boolean>>({});
+    // supplier id -> display name, for the chosen-to-invite list.
+    const [picked, setPicked] = useState<Record<string, string>>({});
 
     // Quote capture
     const [quoteResp, setQuoteResp] = useState<SupplierResponse | null>(null);
@@ -137,7 +141,7 @@ export default function RFQDetailPage() {
     }
 
     function doInvite() {
-        const ids = Object.entries(picked).filter(([, v]) => v).map(([k]) => k);
+        const ids = Object.keys(picked);
         if (ids.length === 0) { toast.error('Select at least one supplier'); return; }
         invite.mutate(ids, {
             onSuccess: (res) => { toast.success(`${res.invited} supplier(s) invited`); setInviteOpen(false); setPicked({}); },
@@ -362,24 +366,39 @@ export default function RFQDetailPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-3">
-                                {suppliers.length === 0 ? (
-                                    <p className="text-sm text-muted-foreground">No suppliers found. Add suppliers first.</p>
-                                ) : (
+                                {/* Pick-to-add with the shared combobox: the prefetched page holds only
+                                    the first 20 suppliers, so the rest are found by typing (server search). */}
+                                <SearchableCombobox
+                                    options={suppliers
+                                        .filter((s) => !invitedSupplierIds.has(s.id) && !picked[s.id])
+                                        .map((s) => { const o = supplierOption(s); return { value: o.id, label: o.name, hint: o.hint }; })}
+                                    value=""
+                                    onChange={(id, opt) => {
+                                        if (!id || invitedSupplierIds.has(id)) return;
+                                        setPicked((p) => ({ ...p, [id]: opt?.label ?? id }));
+                                    }}
+                                    onRemoteSearch={async (q, ctx) => (await searchSuppliers(q, ctx))
+                                        .filter((o) => !invitedSupplierIds.has(o.id))
+                                        .map((o) => ({ value: o.id, label: o.name, hint: o.hint }))}
+                                    placeholder="Search supplier to invite..."
+                                    searchPlaceholder="Search suppliers..."
+                                    emptyText="No supplier matches. Add it on the Suppliers page first."
+                                />
+                                {Object.keys(picked).length > 0 && (
                                     <div className="space-y-1 max-h-72 overflow-y-auto">
-                                        {suppliers.map((s) => {
-                                            const already = invitedSupplierIds.has(s.id);
-                                            return (
-                                                <label key={s.id} className={'flex items-center gap-3 p-2 rounded-lg ' + (already ? 'opacity-50' : 'hover:bg-accent/40 cursor-pointer')}>
-                                                    <input
-                                                        type="checkbox"
-                                                        disabled={already}
-                                                        checked={already || !!picked[s.id]}
-                                                        onChange={(e) => setPicked({ ...picked, [s.id]: e.target.checked })}
-                                                    />
-                                                    <span className="text-sm">{s.name}{already && <span className="text-xs text-muted-foreground"> (invited)</span>}</span>
-                                                </label>
-                                            );
-                                        })}
+                                        {Object.entries(picked).map(([id, name]) => (
+                                            <div key={id} className="flex items-center justify-between gap-3 p-2 rounded-lg border border-border">
+                                                <span className="text-sm">{name}</span>
+                                                <button
+                                                    type="button"
+                                                    aria-label={`Remove ${name}`}
+                                                    className="p-1 rounded hover:bg-accent text-muted-foreground"
+                                                    onClick={() => setPicked((p) => { const n = { ...p }; delete n[id]; return n; })}
+                                                >
+                                                    <X className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
                                 <div className="flex gap-3 pt-2">

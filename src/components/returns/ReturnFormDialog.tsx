@@ -9,17 +9,16 @@ import { ItemSearchInput } from '@/components/inventory/ItemSearchInput';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { SupplierBalanceNote } from '@/components/inventory/SupplierBalanceNote';
 import { useCreatePurchaseReturn } from '@/hooks/usePurchaseReturns';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import type { ReturnDestination } from '@/lib/api/purchase-returns';
 import { apiErrorMessage } from '@/lib/api/error-message';
-import { supplierBalanceLabel } from '@/lib/supplier-balance';
+import { supplierOption } from '@/lib/supplier-balance';
 import { DECIMAL_STEP, localDateInput, parseDecimal } from '@/lib/utils';
 import { Minus, Plus, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-
-const selectClass = 'w-full rounded-lg border border-input bg-transparent px-4 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none';
 
 interface Line { itemId: string; itemName: string; sku: string; quantity: string; unitCost: string; subTotal: string }
 const emptyLine = (): Line => ({ itemId: '', itemName: '', sku: '', quantity: '1', unitCost: '', subTotal: '' });
@@ -41,6 +40,7 @@ export function ReturnFormDialog({ org, open, onClose, providerSuggestions = [] 
   const create = useCreatePurchaseReturn(org);
   const { data: suppliersPage } = useSuppliers(org);
   const suppliers = suppliersPage?.data ?? [];
+  const searchSuppliers = useSupplierSearch(org);
   // Where the goods leave from: defaults to the active outlet's warehouse (same shared resolver
   // as Adjustments, Purchase Orders and Transfers), required when "All Outlets" is selected.
   const activeWarehouse = useActiveWarehouse(org);
@@ -161,13 +161,15 @@ export function ReturnFormDialog({ org, open, onClose, providerSuggestions = [] 
               ) : (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Supplier</label>
-                  <select className={selectClass} value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
-                    <option value="">— Select supplier —</option>
-                    {suppliers.map((s) => {
-                      const bal = supplierBalanceLabel(s);
-                      return <option key={s.id} value={s.id}>{bal ? `${s.name} — ${bal}` : s.name}</option>;
-                    })}
-                  </select>
+                  {/* Searchable and server-backed: the prefetched page holds only the first 20
+                      suppliers, so anything past it is found by typing (useSupplierSearch). */}
+                  <CreatableSelect
+                    value={supplierId}
+                    onChange={setSupplierId}
+                    options={suppliers.map(supplierOption)}
+                    placeholder="Search supplier..."
+                    onRemoteSearch={searchSuppliers}
+                  />
                   <SupplierBalanceNote orgSlug={org} supplierId={supplierId} />
                 </div>
               )}

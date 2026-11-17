@@ -26,7 +26,9 @@ export default function ProcurementAnalyticsPage() {
     const { data: dash, isLoading } = useProcurementDashboard(org);
     const { data: perf } = useSupplierPerformance(org);
     const recompute = useRecomputeSupplierPerformance(org);
-    const { data: suppliersPage } = useSuppliers(org);
+    // Performance rows carry only supplier_id: load every supplier (API max 500) so names past
+    // the default first page of 20 still resolve.
+    const { data: suppliersPage } = useSuppliers(org, { limit: 500 });
     const suppliers = suppliersPage?.data ?? [];
     const nameOf = (id: string) => suppliers.find((s) => s.id === id)?.name ?? id.slice(0, 8);
 

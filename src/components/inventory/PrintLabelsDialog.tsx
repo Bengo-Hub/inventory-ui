@@ -7,13 +7,14 @@ import { barcodeApi, type LabelFormat, type LabelTemplateName, type PrintLabelsR
 import { agentAvailable, blobToHex, listLocalPrinters, printRawToLocalName } from '@/lib/inventory/print-agent';
 import { getLabelPrintPrefs, setLabelPrintPrefs } from '@/lib/inventory/label-print-prefs';
 import { useCategories } from '@/hooks/useCategories';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
+import { CreatableSelect } from '@/components/inventory/CreatableSelect';
 import { usePurchaseOrders } from '@/hooks/usePurchaseOrders';
 import { Download, Printer, Usb, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
-import { supplierBalanceLabel } from '@/lib/supplier-balance';
+import { supplierOption } from '@/lib/supplier-balance';
 
 type SelectionMode = 'category' | 'supplier' | 'purchase_order' | 'item_ids';
 
@@ -129,8 +130,10 @@ export function PrintLabelsDialog({
   // Only offer categories that actually have items linked — picking an empty
   // category would otherwise fail server-side with EMPTY_SELECTION.
   const { data: categories } = useCategories(orgSlug, { hasItems: true });
-  const suppliersQuery = useSuppliers(orgSlug, { limit: 200 });
+  const suppliersQuery = useSuppliers(orgSlug);
   const suppliers = suppliersQuery.data?.data ?? [];
+  // Suppliers past the prefetched page are found by typing (server-side search).
+  const searchSuppliers = useSupplierSearch(orgSlug);
   const purchaseOrdersQuery = usePurchaseOrders(orgSlug, { limit: 100 });
   const purchaseOrders = purchaseOrdersQuery.data?.data ?? [];
 
@@ -311,17 +314,13 @@ export function PrintLabelsDialog({
                 By supplier
               </label>
               {mode === 'supplier' && (
-                <select
+                <CreatableSelect
                   value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus:ring-1 focus:ring-ring focus:outline-none"
-                >
-                  <option value="">Select a supplier…</option>
-                  {suppliers.map((s) => {
-                    const bal = supplierBalanceLabel(s);
-                    return <option key={s.id} value={s.id}>{bal ? `${s.name} — ${bal}` : s.name}</option>;
-                  })}
-                </select>
+                  onChange={setSupplierId}
+                  options={suppliers.map(supplierOption)}
+                  placeholder="Search supplier…"
+                  onRemoteSearch={searchSuppliers}
+                />
               )}
               <label className="flex items-center gap-2 text-sm">
                 <input type="radio" checked={mode === 'purchase_order'} onChange={() => setMode('purchase_order')} />

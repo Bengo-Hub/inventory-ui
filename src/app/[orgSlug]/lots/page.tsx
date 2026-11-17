@@ -6,18 +6,20 @@ import { DateRangePicker, type DateRange } from '@/components/ui/date-range-pick
 import { useLots, useCreateLot, useUpdateLot, useDeleteLot } from '@/hooks/useLots';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
-import { useSuppliers } from '@/hooks/useSuppliers';
+import { useSuppliers, useSupplierSearch } from '@/hooks/useSuppliers';
+import { SearchableCombobox } from '@bengo-hub/shared-ui-lib/combobox';
+import type { SelectOption } from '@/components/inventory/CreatableSelect';
 import type { Lot, CreateLotInput } from '@/lib/api/lots';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildLotColumns, isExpired, isExpiringSoon } from './lot-columns';
-import { AlertTriangle, ChevronDown, Plus, RefreshCw, Search, X } from 'lucide-react';
+import { AlertTriangle, Plus, RefreshCw, Search, X } from 'lucide-react';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { apiErrorMessage } from '@/lib/api/error-message';
 import { DECIMAL_STEP, parseDecimal } from '@/lib/utils';
-import { supplierBalanceLabel } from '@/lib/supplier-balance';
+import { supplierOption } from '@/lib/supplier-balance';
 
 const EXPIRY_WARNING_DAYS = 30;
 // isExpiringSoon / isExpired live in ./lot-columns (shared with column render logic).
@@ -31,72 +33,29 @@ function SupplierRefCombobox({
     value: string;
     onChange: (v: string) => void;
 }) {
-    const [query, setQuery] = useState('');
-    const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement>(null);
-
+    // The lot stores a free-text reference: a supplier's name, or a PO / invoice number typed in.
+    // Option values are therefore supplier NAMES, and onCreate keeps whatever was typed. Suppliers
+    // past the prefetched first page are found by the server-side search as the user types.
     const { data: suppliersPage } = useSuppliers(orgSlug);
-    const suppliers = suppliersPage?.data ?? [];
-
-    const filtered = useMemo(() => {
-        if (query.length < 2) return [];
-        const q = query.toLowerCase();
-        return suppliers.filter((s) =>
-            s.name.toLowerCase().includes(q) ||
-            (s.email ?? '').toLowerCase().includes(q) ||
-            (s.phone ?? '').toLowerCase().includes(q)
-        ).slice(0, 8);
-    }, [suppliers, query]);
-
-    useEffect(() => {
-        function handler(e: MouseEvent) {
-            if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-        }
-        document.addEventListener('mousedown', handler);
-        return () => document.removeEventListener('mousedown', handler);
-    }, []);
+    const searchSuppliers = useSupplierSearch(orgSlug);
+    const toOption = (o: SelectOption) => ({ value: o.name, label: o.name, hint: o.hint });
 
     return (
-        <div className="relative" ref={ref}>
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                    value={query || value}
-                    onChange={(e) => {
-                        setQuery(e.target.value);
-                        onChange(e.target.value);
-                        setOpen(true);
-                    }}
-                    onFocus={() => setOpen(true)}
-                    placeholder="Search supplier or type PO / invoice number..."
-                    className="pl-10 pr-8"
-                />
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            </div>
-            {open && filtered.length > 0 && (
-                <div className="absolute z-50 mt-1 w-full rounded-lg border border-border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                    <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/30 border-b border-border">
-                        Suppliers
-                    </div>
-                    {filtered.map((s) => (
-                        <button
-                            key={s.id}
-                            type="button"
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-accent transition-colors"
-                            onMouseDown={() => {
-                                onChange(s.name);
-                                setQuery('');
-                                setOpen(false);
-                            }}
-                        >
-                            <span className="font-medium">{s.name}</span>
-                            {s.phone && <span className="ml-2 text-xs text-muted-foreground">{s.phone}</span>}
-                            {supplierBalanceLabel(s) && <span className="ml-2 text-xs font-semibold text-amber-600">{supplierBalanceLabel(s)}</span>}
-                        </button>
-                    ))}
-                </div>
-            )}
-        </div>
+        <SearchableCombobox
+            options={(suppliersPage?.data ?? []).map(supplierOption).map(toOption)}
+            value={value}
+            valueLabel={value}
+            onChange={(v) => onChange(v)}
+            onRemoteSearch={async (q, ctx) => (await searchSuppliers(q, ctx)).map(toOption)}
+            onCreate={(text) => {
+                const t = text.trim();
+                return t ? { value: t, label: t } : undefined;
+            }}
+            createLabel="Use as reference"
+            placeholder="Search supplier or type PO / invoice number..."
+            searchPlaceholder="Search supplier or type a reference..."
+            clearable
+        />
     );
 }
 

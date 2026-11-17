@@ -49,7 +49,9 @@ export default function ContractsPage() {
     const update = useUpdateContract(org);
     const activate = useActivateContract(org);
     const terminate = useTerminateContract(org);
-    const { data: suppliersPage } = useSuppliers(org);
+    // Contracts carry only supplier_id, so nameOf() needs every supplier on hand, not just the
+    // default first page of 20 (500 is the API's max page size).
+    const { data: suppliersPage } = useSuppliers(org, { limit: 500 });
     const suppliers = suppliersPage?.data ?? [];
     const searchSuppliers = useSupplierSearch(org);
     const createSupplier = useCreateSupplier(org);
