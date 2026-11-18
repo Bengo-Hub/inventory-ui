@@ -364,6 +364,12 @@ export const useAuthStore = create<AuthState>()(
                     try { sessionStorage.clear(); } catch { /* no-op */ }
                     // Land on the tenant app root: arriving there unauthenticated re-triggers
                     // SSO with tenant=<slug>, so the login screen shows the RIGHT organisation.
+                    // A PIN terminal session ends here only: going through the SSO logout would also
+                    // sign out a manager signed in through SSO on the same shared desk (as in pos-ui).
+                    if (isTerminalSession(token)) {
+                        window.location.href = slug ? `/${slug}/auth/pin-login` : '/';
+                        return;
+                    }
                     window.location.href = slug
                         ? buildLogoutUrl(`${window.location.origin}/${slug}`)
                         : buildLogoutUrl(`https://accounts.codevertexafrica.com/login?return_to=${encodeURIComponent(window.location.origin)}`);
