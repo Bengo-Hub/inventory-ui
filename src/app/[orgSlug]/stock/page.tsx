@@ -94,7 +94,7 @@ function StockDrawer({
     const createAdj = useCreateAdjustment(orgSlug);
     const createBreakdown = useCreateBreakdown(orgSlug);
 
-    const status = stockStatus(item.available, item.reorder_point);
+    const status = stockStatus(item.available, item.reorder_point, item.type);
 
     function handleAdjSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -197,7 +197,7 @@ function StockDrawer({
 
                 {/* Status */}
                 <div>
-                    <Badge variant={status}>{stockLabel(item.available, item.reorder_point)}</Badge>
+                    <Badge variant={status}>{stockLabel(item.available, item.reorder_point, item.type)}</Badge>
                 </div>
 
                 {/* Stats grid */}

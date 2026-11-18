@@ -8,13 +8,27 @@ import { History, PackageX, SlidersHorizontal, Split } from 'lucide-react';
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
 import type { StockLevel } from '@/lib/api/stock';
 
-export function stockStatus(available: number, reorderPoint?: number): 'success' | 'warning' | 'error' | 'outline' {
+// An item that holds no stock of its own never reads "Out of Stock" (KRA review 2026-11-11: menu
+// recipes showed out of stock). A service or voucher is never stocked; a recipe with nothing on
+// hand is made to order from its ingredients. A production recipe that holds stock still shows
+// its real balance once it has some.
+function noOwnStockLabel(available: number, itemType?: string): string | null {
+  const t = (itemType ?? '').toUpperCase();
+  if (t === 'SERVICE' || t === 'VOUCHER') return 'Not stocked';
+  if (t === 'RECIPE' && available <= 0) return 'Made to order';
+  return null;
+}
+
+export function stockStatus(available: number, reorderPoint?: number, itemType?: string): 'success' | 'warning' | 'error' | 'outline' {
+  if (noOwnStockLabel(available, itemType)) return 'outline';
   if (available <= 0) return 'error';
   if (reorderPoint != null && available <= reorderPoint) return 'warning';
   return 'success';
 }
 
-export function stockLabel(available: number, reorderPoint?: number): string {
+export function stockLabel(available: number, reorderPoint?: number, itemType?: string): string {
+  const own = noOwnStockLabel(available, itemType);
+  if (own) return own;
   if (available <= 0) return 'Out of Stock';
   if (reorderPoint != null && available <= reorderPoint) return 'Low Stock';
   return 'In Stock';
@@ -87,8 +101,8 @@ export function buildStockColumns(cb: StockColumnCallbacks): DataTableColumn<Sto
       key: 'status',
       header: 'Status',
       filterable: true,
-      accessor: (item) => stockLabel(item.available, item.reorder_point),
-      render: (item) => <Badge variant={stockStatus(item.available, item.reorder_point)}>{stockLabel(item.available, item.reorder_point)}</Badge>,
+      accessor: (item) => stockLabel(item.available, item.reorder_point, item.type),
+      render: (item) => <Badge variant={stockStatus(item.available, item.reorder_point, item.type)}>{stockLabel(item.available, item.reorder_point, item.type)}</Badge>,
     },
     {
       key: 'actions',
