@@ -1,52 +1,50 @@
 'use client';
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
-import { CreatableSelect } from '@/components/inventory/CreatableSelect';
+import { ReportLocationPicker, useReportLocation } from '@/components/reports/report-location-scope';
+import { ReportItemFilterBar, ReportPager, useReportItemFilters } from '@/components/reports/report-item-filters';
 import { useStockValuation } from '@/hooks/useReports';
-import { useWarehouses } from '@/hooks/useWarehouses';
 import { reportsApi } from '@/lib/api/reports';
-import type { StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
+import type { StockValuationBrand, StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
-import { buildStockValuationCategoryColumns, buildStockValuationTopItemColumns } from './stock-valuation-columns';
-import { Boxes, DollarSign, ArrowLeft, Layers, Printer, RefreshCw, MapPin } from 'lucide-react';
+import {
+    buildStockValuationBrandColumns,
+    buildStockValuationCategoryColumns,
+    buildStockValuationTopItemColumns,
+} from './stock-valuation-columns';
+import { Boxes, DollarSign, ArrowLeft, Layers, Printer, RefreshCw } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { PdfPreview, useDocumentPreview } from '@bengo-hub/shared-ui-lib/documents';
 
-const ALL_LOCATIONS_ID = '__all__';
+const PAGE_SIZE = 25;
 
 function fmt(n: number) {
     return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
 }
 
-// StockValuationPage shows total inventory value (on-hand × unit cost), broken down by category
-// and the highest-value items. Read-only admin report.
+// StockValuationPage shows total inventory value (on-hand x unit cost), broken down by category
+// and brand, and the items by value. Read-only admin report.
 //
-// Location-scoped (2026-09-04): used to always blend every warehouse into one tenant-wide
-// number, so a multi-outlet tenant comparing locations always saw the SAME figure regardless of
-// which outlet they cared about — reported live as "everything shows as [the dominant location]
-// instead of its own numbers." Defaults to "All Locations" (the prior behaviour, still useful for
-// an HQ overview) with an explicit picker to drill into exactly one warehouse's own valuation.
+// Scoped like Deadstock (2026-11-18): the top-nav outlet narrows it to that outlet's own
+// locations and the picker drills into one; with no outlet it blends every location. Category,
+// brand and search filters narrow the totals too, not just the list.
 export default function StockValuationPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
-    const { data: warehouses } = useWarehouses(org);
-    const [warehouseId, setWarehouseId] = useState('');
-    const locationOptions = useMemo(
-        () => [{ id: ALL_LOCATIONS_ID, name: 'All Locations' }, ...(warehouses ?? []).map((w) => ({ id: w.id, name: w.name }))],
-        [warehouses],
-    );
-    const scopedWarehouseId = warehouseId && warehouseId !== ALL_LOCATIONS_ID ? warehouseId : undefined;
-    const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org, scopedWarehouseId);
+    const { scope, scopeName, picker } = useReportLocation(org);
+    const { filters, bar, setOffset } = useReportItemFilters(org, PAGE_SIZE);
+    const { data, isLoading, isError, refetch, isFetching } = useStockValuation(org, scope, filters);
     const cur = data?.currency ?? 'KES';
+    const [breakdown, setBreakdown] = useState<'category' | 'brand'>('category');
 
-    // Print / Export — streams the branded PDF from inventory-api into the shared previewer.
+    // Print / Export streams the branded PDF for the same location and filters.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
     function printReport() {
         openPreview(
-            () => reportsApi.stockValuationDoc(org, 'pdf', scopedWarehouseId),
+            () => reportsApi.stockValuationDoc(org, 'pdf', scope, { ...filters, offset: undefined, limit: undefined }),
             { fileName: 'stock-valuation.pdf', title: 'Stock Valuation' },
         );
     }
@@ -58,6 +56,7 @@ export default function StockValuationPage() {
     ];
 
     const categoryColumns = useMemo(() => buildStockValuationCategoryColumns(cur), [cur]);
+    const brandColumns = useMemo(() => buildStockValuationBrandColumns(cur), [cur]);
     const topItemColumns = useMemo(() => buildStockValuationTopItemColumns(cur), [cur]);
 
     return (
@@ -69,9 +68,9 @@ export default function StockValuationPage() {
                 <div className="flex-1">
                     <h1 className="text-2xl font-bold tracking-tight">Stock Valuation</h1>
                     <p className="text-muted-foreground text-sm">
-                        On-hand × unit cost, by category and top items
-                        {scopedWarehouseId && (
-                            <> &middot; <span className="font-medium text-foreground">{locationOptions.find((o) => o.id === scopedWarehouseId)?.name}</span></>
+                        On-hand x unit cost, by category, brand and item
+                        {scopeName && (
+                            <> &middot; <span className="font-medium text-foreground">{scopeName}</span></>
                         )}
                     </p>
                 </div>
@@ -85,27 +84,8 @@ export default function StockValuationPage() {
                 </div>
             </div>
 
-            <Card>
-                <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                        <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
-                        <div className="w-full sm:w-64">
-                            <CreatableSelect
-                                value={warehouseId || ALL_LOCATIONS_ID}
-                                onChange={(v) => setWarehouseId(v === ALL_LOCATIONS_ID ? '' : v)}
-                                options={locationOptions}
-                                placeholder="All Locations"
-                                required
-                            />
-                        </div>
-                        <p className="text-xs text-muted-foreground hidden sm:block">
-                            {scopedWarehouseId
-                                ? "Showing this location's own valuation only."
-                                : 'Showing every location blended together — pick one to see its own numbers.'}
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
+            <ReportLocationPicker {...picker} noun="stock value" />
+            <ReportItemFilterBar {...bar} />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {kpis.map((k) => (
@@ -122,25 +102,56 @@ export default function StockValuationPage() {
             </div>
 
             <Card>
-                <CardHeader><h2 className="text-lg font-semibold">Value by Category</h2></CardHeader>
+                <CardHeader>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-lg font-semibold">Value by {breakdown === 'category' ? 'Category' : 'Brand'}</h2>
+                        <div className="flex items-center gap-1.5" role="tablist" aria-label="Breakdown">
+                            {(['category', 'brand'] as const).map((b) => (
+                                <button
+                                    key={b}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={breakdown === b}
+                                    onClick={() => setBreakdown(b)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${breakdown === b ? 'bg-primary text-primary-foreground' : 'bg-card border border-border text-muted-foreground hover:text-foreground'}`}
+                                >
+                                    {b === 'category' ? 'Category' : 'Brand'}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">
-                        <DataTable<StockValuationCategory>
-                            columns={categoryColumns}
-                            rows={data?.by_category ?? []}
-                            rowKey={(c) => c.category_name}
-                            loading={isLoading}
-                            loadingRows={8}
-                            error={isError}
-                            onRetry={() => refetch()}
-                            emptyText="No stock on hand."
-                        />
+                        {breakdown === 'category' ? (
+                            <DataTable<StockValuationCategory>
+                                columns={categoryColumns}
+                                rows={data?.by_category ?? []}
+                                rowKey={(c) => c.category_name}
+                                loading={isLoading}
+                                loadingRows={8}
+                                error={isError}
+                                onRetry={() => refetch()}
+                                emptyText="No stock on hand."
+                            />
+                        ) : (
+                            <DataTable<StockValuationBrand>
+                                columns={brandColumns}
+                                rows={data?.by_brand ?? []}
+                                rowKey={(b) => b.brand_name}
+                                loading={isLoading}
+                                loadingRows={8}
+                                error={isError}
+                                onRetry={() => refetch()}
+                                emptyText="No stock on hand."
+                            />
+                        )}
                     </div>
                 </CardContent>
             </Card>
 
             <Card>
-                <CardHeader><h2 className="text-lg font-semibold">Top Items by Value</h2></CardHeader>
+                <CardHeader><h2 className="text-lg font-semibold">Items by Value</h2></CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">
                         <DataTable<StockValuationItem>
@@ -154,6 +165,13 @@ export default function StockValuationPage() {
                             emptyText="No valued items."
                         />
                     </div>
+                    <ReportPager
+                        offset={data?.offset ?? 0}
+                        limit={data?.limit ?? PAGE_SIZE}
+                        total={data?.item_count ?? 0}
+                        shown={data?.top_items?.length ?? 0}
+                        onOffset={setOffset}
+                    />
                 </CardContent>
             </Card>
 

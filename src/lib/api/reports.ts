@@ -51,13 +51,25 @@ export interface StockValuationCategory {
   total_value: number;
 }
 
+export interface StockValuationBrand {
+  brand_id?: string;
+  brand_name: string;
+  item_count: number;
+  total_units: number;
+  total_value: number;
+}
+
 export interface StockValuation {
   currency: string;
   total_value: number;
   total_units: number;
   item_count: number;
   by_category: StockValuationCategory[];
+  by_brand?: StockValuationBrand[];
+  /** One page of items by value (offset, limit); totals cover every matching item. */
   top_items: StockValuationItem[];
+  offset?: number;
+  limit?: number;
 }
 
 export interface DeadstockItem {
@@ -65,10 +77,16 @@ export interface DeadstockItem {
   sku: string;
   name: string;
   category_name?: string;
+  brand_name?: string;
   on_hand: number;
   unit_cost: number;
   value: number;
   last_activity: string;
+  /** No sale or usage was ever recorded here; last_activity is then the last stock change. */
+  never_used?: boolean;
+  /** When the oldest unit still held arrived. */
+  held_since?: string;
+  days_held?: number;
 }
 
 export interface DeadstockReport {
@@ -76,7 +94,33 @@ export interface DeadstockReport {
   currency: string;
   item_count: number;
   total_dead_value: number;
+  /** Idle stock that arrived inside the window: not judged yet. */
+  too_new_count?: number;
+  too_new_value?: number;
+  /** Earliest stock record in scope; before it there is no history. */
+  history_since?: string;
+  offset?: number;
+  limit?: number;
   items: DeadstockItem[];
+}
+
+/** Item filters shared by the stock reports (all optional). */
+export interface ReportItemFilters {
+  categoryId?: string;
+  brandId?: string;
+  search?: string;
+  offset?: number;
+  limit?: number;
+}
+
+function filterParams(f?: ReportItemFilters): Record<string, string> {
+  const out: Record<string, string> = {};
+  if (f?.categoryId) out.category_id = f.categoryId;
+  if (f?.brandId) out.brand_id = f.brandId;
+  if (f?.search?.trim()) out.search = f.search.trim();
+  if (f?.offset) out.offset = String(f.offset);
+  if (f?.limit) out.limit = String(f.limit);
+  return out;
 }
 
 export interface FastMovingItem {
@@ -92,8 +136,10 @@ export interface FastMovingItem {
 /** Items ranked by units moved (sold, used in production or meals) within the window. */
 export interface FastMovingReport {
   days: number;
-  /** Every item that moved; items lists the busiest 100. */
+  /** Every item that moved; items is one page of them, busiest first. */
   item_count: number;
+  offset?: number;
+  limit?: number;
   items: FastMovingItem[];
 }
 
@@ -185,29 +231,28 @@ export const reportsApi = {
   menuEngineering: (orgSlug: string, params?: MenuEngineeringParams): Promise<MenuMatrixItem[]> =>
     apiClient.get<MenuMatrixItem[]>(`/api/v1/${orgSlug}/inventory/reports/menu-engineering`, params),
 
-  // warehouseId scopes the report to one location; omitted/empty = All Locations (tenant-wide).
-  stockValuation: (orgSlug: string, warehouseId?: string): Promise<StockValuation> =>
-    apiClient.get<StockValuation>(`/api/v1/${orgSlug}/inventory/reports/stock-valuation`, warehouseId ? { warehouse_id: warehouseId } : undefined),
-
   // Scope: warehouseId picks one location; else outletId covers that outlet's own locations;
-  // neither means every location.
-  deadstock: (orgSlug: string, days = 90, scope?: ReportLocationScope): Promise<DeadstockReport> =>
-    apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days), ...locationParams(scope) }),
+  // neither means every location. Filters narrow by category, brand and search.
+  stockValuation: (orgSlug: string, scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<StockValuation> =>
+    apiClient.get<StockValuation>(`/api/v1/${orgSlug}/inventory/reports/stock-valuation`, { ...locationParams(scope), ...filterParams(filters) }),
+
+  deadstock: (orgSlug: string, days = 90, scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<DeadstockReport> =>
+    apiClient.get<DeadstockReport>(`/api/v1/${orgSlug}/inventory/reports/deadstock`, { days: String(days), ...locationParams(scope), ...filterParams(filters) }),
 
   // Branded document exports (PDF/CSV) — streamed from inventory-api's *.pdf report endpoints and
   // fed to the shared PDF previewer. Each mirrors the JSON report's query params so the exported
   // document matches what the page shows.
-  stockValuationDoc: (orgSlug: string, format: 'pdf' | 'csv' = 'pdf', warehouseId?: string): Promise<Blob> =>
-    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/stock-valuation.pdf`, { format, ...(warehouseId ? { warehouse_id: warehouseId } : {}) }),
+  stockValuationDoc: (orgSlug: string, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/stock-valuation.pdf`, { format, ...locationParams(scope), ...filterParams(filters) }),
 
-  fastMoving: (orgSlug: string, days = 90, scope?: ReportLocationScope): Promise<FastMovingReport> =>
-    apiClient.get<FastMovingReport>(`/api/v1/${orgSlug}/inventory/reports/fast-moving`, { days: String(days), ...locationParams(scope) }),
+  fastMoving: (orgSlug: string, days = 90, scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<FastMovingReport> =>
+    apiClient.get<FastMovingReport>(`/api/v1/${orgSlug}/inventory/reports/fast-moving`, { days: String(days), ...locationParams(scope), ...filterParams(filters) }),
 
-  fastMovingDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope): Promise<Blob> =>
-    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/fast-moving.pdf`, { days: String(days), format, ...locationParams(scope) }),
+  fastMovingDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/fast-moving.pdf`, { days: String(days), format, ...locationParams(scope), ...filterParams(filters) }),
 
-  deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope): Promise<Blob> =>
-    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format, ...locationParams(scope) }),
+  deadstockDoc: (orgSlug: string, days = 90, format: 'pdf' | 'csv' = 'pdf', scope?: ReportLocationScope, filters?: ReportItemFilters): Promise<Blob> =>
+    apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/deadstock.pdf`, { days: String(days), format, ...locationParams(scope), ...filterParams(filters) }),
 
   foodCostVarianceDoc: (orgSlug: string, params?: FoodCostVarianceParams & { format?: 'pdf' | 'csv' }): Promise<Blob> =>
     apiClient.getBlob(`/api/v1/${orgSlug}/inventory/reports/food-cost-variance.pdf`, params as Record<string, string | boolean | undefined>),

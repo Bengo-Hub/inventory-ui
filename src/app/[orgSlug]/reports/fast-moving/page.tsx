@@ -2,6 +2,7 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { ReportLocationPicker, useReportLocation } from '@/components/reports/report-location-scope';
+import { ReportItemFilterBar, ReportPager, useReportItemFilters } from '@/components/reports/report-item-filters';
 import { useFastMoving } from '@/hooks/useReports';
 import { reportsApi } from '@/lib/api/reports';
 import type { FastMovingItem } from '@/lib/api/reports';
@@ -28,13 +29,14 @@ export default function FastMovingPage() {
     const org = params?.orgSlug as string;
     const [days, setDays] = useState(30);
     const { scope, scopeName, picker } = useReportLocation(org);
-    const { data, isLoading, isError, refetch, isFetching } = useFastMoving(org, days, scope);
+    const { filters, bar, setOffset } = useReportItemFilters(org, 50);
+    const { data, isLoading, isError, refetch, isFetching } = useFastMoving(org, days, scope, filters);
     const items = data?.items ?? [];
 
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
     function printReport() {
         openPreview(
-            () => reportsApi.fastMovingDoc(org, days, 'pdf', scope),
+            () => reportsApi.fastMovingDoc(org, days, 'pdf', scope, { ...filters, offset: undefined, limit: undefined }),
             { fileName: `fast-moving-${days}d.pdf`, title: 'Fast Moving' },
         );
     }
@@ -43,7 +45,7 @@ export default function FastMovingPage() {
     const outOfStock = items.filter((it) => it.on_hand <= 0).length;
     const kpis = [
         { label: 'Items Moving', value: fmt(data?.item_count ?? 0), icon: TrendingUp },
-        { label: 'Busy Items Out of Stock', value: fmt(outOfStock), icon: PackageX, hint: 'Among the top 100 listed' },
+        { label: 'Busy Items Out of Stock', value: fmt(outOfStock), icon: PackageX, hint: 'Among the items on this page' },
         { label: 'Window', value: `${days} days`, icon: Clock },
     ];
 
@@ -86,6 +88,7 @@ export default function FastMovingPage() {
             </div>
 
             <ReportLocationPicker {...picker} noun="stock movement" />
+            <ReportItemFilterBar {...bar} />
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {kpis.map((k) => (
@@ -103,7 +106,7 @@ export default function FastMovingPage() {
             </div>
 
             <Card>
-                <CardHeader><h2 className="text-lg font-semibold">Busiest Items (top 100 by units moved)</h2></CardHeader>
+                <CardHeader><h2 className="text-lg font-semibold">Busiest Items (by units moved)</h2></CardHeader>
                 <CardContent className="p-0">
                     <div className="px-2 pb-2">
                         <DataTable<FastMovingItem>
@@ -117,6 +120,13 @@ export default function FastMovingPage() {
                             emptyText="Nothing moved in this window."
                         />
                     </div>
+                    <ReportPager
+                        offset={data?.offset ?? 0}
+                        limit={data?.limit ?? 50}
+                        total={data?.item_count ?? 0}
+                        shown={items.length}
+                        onOffset={setOffset}
+                    />
                 </CardContent>
             </Card>
 

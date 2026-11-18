@@ -39,6 +39,24 @@ export function buildDeadstockColumns(currency: string): DataTableColumn<Deadsto
       render: (it) => it.category_name || '—',
     },
     {
+      key: 'brand_name',
+      header: 'Brand',
+      hideBelow: 'lg',
+      accessor: (it) => it.brand_name || '',
+      cellClassName: 'text-muted-foreground',
+      render: (it) => it.brand_name || '—',
+    },
+    {
+      key: 'days_held',
+      header: 'Held',
+      align: 'right',
+      hideBelow: 'md',
+      sortable: true,
+      accessor: (it) => it.days_held ?? 0,
+      cellClassName: 'tabular-nums text-muted-foreground',
+      render: (it) => (it.days_held != null ? `${it.days_held} days` : '—'),
+    },
+    {
       key: 'on_hand',
       header: 'On hand',
       align: 'right',
@@ -60,12 +78,14 @@ export function buildDeadstockColumns(currency: string): DataTableColumn<Deadsto
     },
     {
       key: 'last_activity',
-      header: 'Last activity',
+      header: 'Last sale or use',
       hideBelow: 'lg',
       sortable: true,
       accessor: (it) => it.last_activity,
       cellClassName: 'text-muted-foreground',
-      render: (it) => fmtDate(it.last_activity),
+      render: (it) => (it.never_used
+        ? `Never sold${it.held_since ? `, in stock since ${fmtDate(it.held_since)}` : ''}`
+        : fmtDate(it.last_activity)),
     },
     {
       key: 'value',

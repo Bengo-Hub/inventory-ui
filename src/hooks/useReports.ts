@@ -1,10 +1,11 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import {
   reportsApi,
   type DeadstockReport,
   type FastMovingReport,
+  type ReportItemFilters,
   type ReportLocationScope,
   type FoodCostVarianceParams,
   type IngredientUtilizationParams,
@@ -38,32 +39,40 @@ export function useMenuEngineering(orgSlug: string, params?: MenuEngineeringPara
   });
 }
 
-export function useStockValuation(orgSlug: string, warehouseId?: string) {
+// Scope and filters are part of every key, so switching outlet, location or filter never shows
+// another selection's report. Previous data stays on screen while the next page or filter loads.
+function scopeKey(scope?: ReportLocationScope, filters?: ReportItemFilters) {
+  return [scope?.outletId ?? 'all', scope?.warehouseId ?? 'all', filters?.categoryId ?? '', filters?.brandId ?? '',
+    filters?.search?.trim() ?? '', filters?.offset ?? 0, filters?.limit ?? 0];
+}
+
+export function useStockValuation(orgSlug: string, scope?: ReportLocationScope, filters?: ReportItemFilters) {
   return useQuery<StockValuation>({
-    queryKey: [REPORTS_KEY, 'stock-valuation', orgSlug, warehouseId ?? 'all'],
-    queryFn: () => reportsApi.stockValuation(orgSlug, warehouseId),
+    queryKey: [REPORTS_KEY, 'stock-valuation', orgSlug, ...scopeKey(scope, filters)],
+    queryFn: () => reportsApi.stockValuation(orgSlug, scope, filters),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
-// The scope is part of the key, so switching outlet or location never shows another one's report.
-export function useDeadstock(orgSlug: string, days = 90, scope?: ReportLocationScope) {
+export function useDeadstock(orgSlug: string, days = 90, scope?: ReportLocationScope, filters?: ReportItemFilters) {
   return useQuery<DeadstockReport>({
-    queryKey: [REPORTS_KEY, 'deadstock', orgSlug, days, scope?.outletId ?? 'all', scope?.warehouseId ?? 'all'],
-    queryFn: () => reportsApi.deadstock(orgSlug, days, scope),
+    queryKey: [REPORTS_KEY, 'deadstock', orgSlug, days, ...scopeKey(scope, filters)],
+    queryFn: () => reportsApi.deadstock(orgSlug, days, scope, filters),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 
-// Same scope keying as useDeadstock.
-export function useFastMoving(orgSlug: string, days = 90, scope?: ReportLocationScope) {
+export function useFastMoving(orgSlug: string, days = 90, scope?: ReportLocationScope, filters?: ReportItemFilters) {
   return useQuery<FastMovingReport>({
-    queryKey: [REPORTS_KEY, 'fast-moving', orgSlug, days, scope?.outletId ?? 'all', scope?.warehouseId ?? 'all'],
-    queryFn: () => reportsApi.fastMoving(orgSlug, days, scope),
+    queryKey: [REPORTS_KEY, 'fast-moving', orgSlug, days, ...scopeKey(scope, filters)],
+    queryFn: () => reportsApi.fastMoving(orgSlug, days, scope, filters),
     enabled: !!orgSlug,
     staleTime: 5 * 60_000,
+    placeholderData: keepPreviousData,
   });
 }
 

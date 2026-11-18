@@ -2,12 +2,14 @@
 
 import { Button, Card, CardContent, CardHeader } from '@/components/ui/base';
 import { ReportLocationPicker, useReportLocation } from '@/components/reports/report-location-scope';
+import { ReportItemFilterBar, ReportPager, useReportItemFilters } from '@/components/reports/report-item-filters';
 import { useDeadstock } from '@/hooks/useReports';
 import { reportsApi } from '@/lib/api/reports';
 import type { DeadstockItem } from '@/lib/api/reports';
+import { formatDate } from '@/lib/user-timezone';
 import { DataTable } from '@bengo-hub/shared-ui-lib/data-table';
 import { buildDeadstockColumns } from './deadstock-columns';
-import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Printer, RefreshCw } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Boxes, DollarSign, Info, Printer, RefreshCw, Sprout } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
@@ -19,6 +21,7 @@ function fmt(n: number) {
 }
 
 const DAYS_OPTIONS = [30, 60, 90, 180];
+const PAGE_SIZE = 50;
 
 // DeadstockPage lists stock on hand that has NOT moved within the window: capital tied up in
 // non-moving inventory. Read-only admin report.
@@ -26,26 +29,42 @@ const DAYS_OPTIONS = [30, 60, 90, 180];
 // Location-scoped like Stock Valuation: the top-nav outlet narrows it to that outlet's own
 // locations (stock and movement both), and the picker drills into one location. An item selling
 // at one location is still dead stock where it sits idle.
+//
+// Stock is only judged once it has been held for the whole window; younger idle stock shows as
+// "too new" so a business that started recently does not see everything it just received as dead.
 export default function DeadstockPage() {
     const params = useParams();
     const org = params?.orgSlug as string;
     const [days, setDays] = useState(90);
     const { scope, scopeName, picker } = useReportLocation(org);
-    const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days, scope);
+    const { filters, bar, setOffset } = useReportItemFilters(org, PAGE_SIZE);
+    const { data, isLoading, isError, refetch, isFetching } = useDeadstock(org, days, scope, filters);
     const cur = data?.currency ?? 'KES';
 
-    // Print / Export streams the branded deadstock PDF for the active window and location.
+    // Print / Export streams the branded deadstock PDF for the active window, location and filters.
     const { openPreview, previewProps } = useDocumentPreview({ onError: (m: string) => toast.error(m) });
     function printReport() {
         openPreview(
-            () => reportsApi.deadstockDoc(org, days, 'pdf', scope),
+            () => reportsApi.deadstockDoc(org, days, 'pdf', scope, { ...filters, offset: undefined, limit: undefined }),
             { fileName: `deadstock-${days}d.pdf`, title: 'Deadstock' },
         );
     }
 
+    // History shorter than the window: say so, so a short history is never read as "nothing sells".
+    const historyDays = data?.history_since
+        ? Math.floor((Date.now() - new Date(data.history_since).getTime()) / 86_400_000)
+        : undefined;
+    const shortHistory = historyDays != null && historyDays < days;
+
     const kpis = [
         { label: 'Capital Tied Up', value: `${cur} ${fmt(data?.total_dead_value ?? 0)}`, icon: DollarSign },
         { label: 'Non-Moving Items', value: fmt(data?.item_count ?? 0), icon: Boxes },
+        {
+            label: 'Too New To Judge',
+            value: `${fmt(data?.too_new_count ?? 0)} items`,
+            sub: `${cur} ${fmt(data?.too_new_value ?? 0)} received in the last ${days} days`,
+            icon: Sprout,
+        },
         { label: 'No Sale In', value: `${days} days`, icon: AlertTriangle },
     ];
 
@@ -87,8 +106,20 @@ export default function DeadstockPage() {
             </div>
 
             <ReportLocationPicker {...picker} noun="idle stock" />
+            <ReportItemFilterBar {...bar} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {shortHistory && data?.history_since && (
+                <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm">
+                    <Info className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
+                    <p>
+                        Stock records here start on <span className="font-medium">{formatDate(data.history_since)}</span>,
+                        {' '}{historyDays} days ago. Items are only listed once they have been in stock for the full {days} days;
+                        {' '}newer stock is counted under Too New To Judge. Try a shorter window to see slow sellers sooner.
+                    </p>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {kpis.map((k) => (
                     <Card key={k.label}>
                         <CardContent className="p-5">
@@ -97,6 +128,7 @@ export default function DeadstockPage() {
                                 <k.icon className="h-4 w-4 text-muted-foreground" />
                             </div>
                             <p className="text-2xl font-bold mt-2 tabular-nums">{isLoading ? '…' : k.value}</p>
+                            {'sub' in k && k.sub && <p className="text-xs text-muted-foreground mt-1">{isLoading ? '' : k.sub}</p>}
                         </CardContent>
                     </Card>
                 ))}
@@ -114,9 +146,18 @@ export default function DeadstockPage() {
                             loadingRows={8}
                             error={isError}
                             onRetry={() => refetch()}
-                            emptyText="No deadstock — everything is moving."
+                            emptyText={(data?.too_new_count ?? 0) > 0
+                                ? `Nothing has been idle for ${days} days yet. ${data?.too_new_count} newer items are still too new to judge.`
+                                : 'No deadstock: everything is moving.'}
                         />
                     </div>
+                    <ReportPager
+                        offset={data?.offset ?? 0}
+                        limit={data?.limit ?? PAGE_SIZE}
+                        total={data?.item_count ?? 0}
+                        shown={data?.items?.length ?? 0}
+                        onOffset={setOffset}
+                    />
                 </CardContent>
             </Card>
 

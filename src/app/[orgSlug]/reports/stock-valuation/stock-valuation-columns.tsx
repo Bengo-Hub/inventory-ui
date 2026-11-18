@@ -4,7 +4,7 @@
 // mirror the platform's <page>-columns.tsx convention.
 
 import type { DataTableColumn } from '@bengo-hub/shared-ui-lib/data-table';
-import type { StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
+import type { StockValuationBrand, StockValuationCategory, StockValuationItem } from '@/lib/api/reports';
 
 function fmt(n: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -46,6 +46,21 @@ export function buildStockValuationCategoryColumns(currency: string): DataTableC
       accessor: (c) => c.total_value,
       cellClassName: 'tabular-nums font-semibold',
       render: (c) => fmt(c.total_value),
+    },
+  ];
+}
+
+export function buildStockValuationBrandColumns(currency: string): DataTableColumn<StockValuationBrand>[] {
+  return [
+    { key: 'brand_name', header: 'Brand', primary: true, sortable: true, accessor: (b) => b.brand_name, cellClassName: 'font-medium' },
+    { key: 'item_count', header: 'Items', align: 'right', sortable: true, accessor: (b) => b.item_count, cellClassName: 'tabular-nums' },
+    {
+      key: 'total_units', header: 'Units', align: 'right', hideBelow: 'sm', sortable: true,
+      accessor: (b) => b.total_units, cellClassName: 'tabular-nums', render: (b) => fmt(b.total_units),
+    },
+    {
+      key: 'total_value', header: `Value (${currency})`, align: 'right', sortable: true,
+      accessor: (b) => b.total_value, cellClassName: 'tabular-nums font-semibold', render: (b) => fmt(b.total_value),
     },
   ];
 }
