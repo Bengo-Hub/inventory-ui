@@ -9,8 +9,29 @@ import {
     storeState,
     storeVerifier
 } from '@/lib/auth/pkce';
+import { cookieMode } from '@/lib/auth/session-mode';
+import { isTerminalSession } from '@/lib/auth/session-kind';
+import { scrubStoredSession } from '@bengo-hub/shared-ui-lib/auth';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+
+const AUTH_STORAGE_KEY = 'inventory-auth-storage';
+
+/** True when the stored session is a PIN desk's terminal JWT (kept across reloads). */
+function storedTerminalSession(): boolean {
+    try {
+        const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+        const parsed = raw ? (JSON.parse(raw) as { state?: { session?: { accessToken?: string } } }) : null;
+        return isTerminalSession(parsed?.state?.session?.accessToken);
+    } catch {
+        return false;
+    }
+}
+
+// Cookie session (fleet plan G11): sso tokens an earlier build stored are dropped before the store
+// loads; from here on an sso sign-in persists only the profile. A PIN desk's terminal JWT has no
+// sso cookie behind it, so it stays stored and the desk stays signed in across reloads.
+if (cookieMode() && !storedTerminalSession()) scrubStoredSession(AUTH_STORAGE_KEY);
 
 export interface UserProfile {
     id: string;
@@ -54,6 +75,19 @@ interface AuthState {
     fetchUser: () => Promise<void>;
 }
 
+/**
+ * Cookie session: hands a fresh sign-in's refresh token to auth-api's HttpOnly cookie. The cookie
+ * session's onChange mirrors the access token into the store and the API client. True when the
+ * store now holds that token.
+ */
+async function startCookieSession(refreshToken: string): Promise<boolean> {
+    const { getCookieSession } = await import('@/lib/auth/cookie-session');
+    // A new sign-in replaces whoever was stored, so it is not taken for a user switch.
+    useAuthStore.setState({ user: null, session: null });
+    const started = await getCookieSession().start(refreshToken);
+    return 'token' in started && !!useAuthStore.getState().session;
+}
+
 export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
@@ -66,6 +100,30 @@ export const useAuthStore = create<AuthState>()(
             lastAuthenticatedAt: null,
 
             initialize: async () => {
+                // A stored PIN terminal session takes the stored-token path below, as before.
+                if (cookieMode() && !isTerminalSession(get().session?.accessToken)) {
+                    // No sso token is stored: a known profile gets its first token through the
+                    // sso cookie.
+                    const known = get().user;
+                    if (!known) {
+                        set({ status: 'idle' });
+                        return;
+                    }
+                    set({ status: 'loading' });
+                    const { getCookieSession } = await import('@/lib/auth/cookie-session');
+                    const renewed = await getCookieSession().refresh();
+                    if (!('token' in renewed)) {
+                        // A transient failure (auth-api unreachable) keeps the profile, so the next
+                        // load tries again; a refused cookie drops it.
+                        set('transient' in renewed
+                            ? { status: 'idle', session: null }
+                            : { status: 'idle', session: null, user: null });
+                        return;
+                    }
+                    apiClient.setTenantInfo(known.tenant_id, known.tenant_slug);
+                    set({ status: 'authenticated', lastAuthenticatedAt: Date.now() });
+                    return;
+                }
                 const { session, user } = get();
                 if (!session) {
                     set({ status: 'idle' });
@@ -183,8 +241,17 @@ export const useAuthStore = create<AuthState>()(
                         expiresAt: new Date(Date.now() + tokens.expires_in * 1000).toISOString(),
                     };
 
-                    apiClient.setAccessToken(session.accessToken);
-                    set({ session });
+                    if (cookieMode()) {
+                        // The refresh token goes into auth-api's HttpOnly cookie and is dropped
+                        // here; the store holds only the in-memory access token it hands back.
+                        if (!(await startCookieSession(session.refreshToken))) {
+                            set({ status: 'error', error: 'Sign-in failed' });
+                            return;
+                        }
+                    } else {
+                        apiClient.setAccessToken(session.accessToken);
+                        set({ session });
+                    }
 
                     // Call inventory-api /auth/me to sync local RBAC roles and permissions.
                     // Retries on transient errors but stops immediately on 401/403.
@@ -221,8 +288,19 @@ export const useAuthStore = create<AuthState>()(
                         expiresAt: new Date(Date.now() + tokens.expiresIn * 1000).toISOString(),
                     };
 
-                    apiClient.setAccessToken(session.accessToken);
-                    set({ session });
+                    if (cookieMode() && session.refreshToken) {
+                        // Biometric sign-in hands back sso tokens: move them onto the cookie the
+                        // same way as the SSO callback.
+                        if (!(await startCookieSession(session.refreshToken))) {
+                            set({ status: 'error', error: 'Biometric sign-in failed' });
+                            return;
+                        }
+                    } else {
+                        // A PIN terminal JWT (no refresh token). It is stored as before, also in
+                        // the cookie session, so the desk stays signed in across reloads.
+                        apiClient.setAccessToken(session.accessToken);
+                        set({ session });
+                    }
 
                     const slug = tenantSlug ?? (typeof window !== 'undefined' ? localStorage.getItem('tenantSlug') : null) ?? '';
                     let attempts = 0;
@@ -262,7 +340,13 @@ export const useAuthStore = create<AuthState>()(
                 slug = slug || get().user?.tenant_slug || '';
 
                 const token = get().session?.accessToken;
-                await revokeServerSession(token);
+                if (cookieMode() && !isTerminalSession(token)) {
+                    // Revokes the session, clears the sso cookie and signs the other tabs out.
+                    const { getCookieSession } = await import('@/lib/auth/cookie-session');
+                    await getCookieSession().end();
+                } else {
+                    await revokeServerSession(token);
+                }
                 set({ status: 'idle', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
@@ -275,7 +359,7 @@ export const useAuthStore = create<AuthState>()(
                     try { slug = slug || (localStorage.getItem('tenantSlug') ?? ''); } catch { /* no-op */ }
                     try { localStorage.removeItem('tenantId'); } catch { /* no-op */ }
                     // Keep `tenantSlug` as the last-used hint so the bare-root landing routes back here.
-                    try { localStorage.removeItem('inventory-auth-storage'); } catch { /* no-op */ }
+                    try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch { /* no-op */ }
                     try { localStorage.removeItem('inventory-outlet-storage'); } catch { /* no-op */ }
                     try { sessionStorage.clear(); } catch { /* no-op */ }
                     // Land on the tenant app root: arriving there unauthenticated re-triggers
@@ -305,12 +389,13 @@ export const useAuthStore = create<AuthState>()(
             },
         }),
         {
-            name: 'inventory-auth-storage',
+            name: AUTH_STORAGE_KEY,
             storage: createJSONStorage(() => localStorage),
-            partialize: (state) => ({
-                session: state.session,
-                user: state.user,
-            }),
+            // The cookie session persists an sso sign-in's profile only; its access token stays in
+            // memory. A PIN desk's terminal JWT is stored as before, so the desk survives a reload.
+            partialize: (state) => (cookieMode() && !isTerminalSession(state.session?.accessToken)
+                ? { user: state.user }
+                : { session: state.session, user: state.user }),
         }
     )
 );

@@ -8,6 +8,7 @@ import { useLimitModal } from '@/store/limit-modal';
 import { useMe } from '@/hooks/useMe';
 import { useAuthStore } from '@/store/auth';
 import { AUTH_STORAGE_KEY } from '@/lib/auth/token-refresh';
+import { cookieMode } from '@/lib/auth/session-mode';
 import { watchSessionAcrossTabs } from '@bengo-hub/shared-ui-lib/auth';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, usePathname, useRouter } from 'next/navigation';
@@ -38,9 +39,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Another tab renewed or replaced the session: load it here and point the API client at the
     // new token, so this tab neither sends a rotated-away token nor writes its stale copy back.
+    // The cookie session stores no token; its BroadcastChannel shares new tokens instead.
     useEffect(
         () =>
-            watchSessionAcrossTabs(AUTH_STORAGE_KEY, () => {
+            cookieMode() ? undefined : watchSessionAcrossTabs(AUTH_STORAGE_KEY, () => {
                 void Promise.resolve(useAuthStore.persist.rehydrate()).then(() => {
                     const token = useAuthStore.getState().session?.accessToken;
                     if (token) apiClient.setAccessToken(token);
