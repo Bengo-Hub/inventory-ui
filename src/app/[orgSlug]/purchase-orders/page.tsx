@@ -21,6 +21,7 @@ import {
     useSendPurchaseOrder,
     useReceivePurchaseOrder,
     useCancelPurchaseOrder,
+    useCloseShortPurchaseOrder,
     useHardDeletePurchaseOrder,
 } from '@/hooks/usePurchaseOrders';
 import type { PurchaseOrder, POStatus, POBudgetCheck } from '@/lib/api/purchase-orders';
@@ -219,6 +220,7 @@ export default function PurchaseOrdersPage() {
     const sendPO = useSendPurchaseOrder(orgSlug);
     const receivePO = useReceivePurchaseOrder(orgSlug);
     const cancelPO = useCancelPurchaseOrder(orgSlug);
+    const closeShortPO = useCloseShortPurchaseOrder(orgSlug);
     const hardDeletePO = useHardDeletePurchaseOrder(orgSlug);
     const [confirmHardDelete, setConfirmHardDelete] = useState(false);
     const { data: poApproval } = useApprovalForObject(orgSlug, selectedPO ?? undefined);
@@ -438,7 +440,7 @@ export default function PurchaseOrdersPage() {
     }
 
     // Drawer action gating — derived when a PO is selected.
-    const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending;
+    const isPOBusy = sendPO.isPending || receivePO.isPending || cancelPO.isPending || closeShortPO.isPending;
     const dStatus = poDetail?.status;
     // A goods receipt already open on this order (draft, usually awaiting approval). While it is
     // open the order is being received: no second receipt, no amend, no cancel. The server
@@ -452,6 +454,9 @@ export default function PurchaseOrdersPage() {
     const canReceive = canChangePO && !receiptAwaitingApproval
         && (dStatus === 'sent' || dStatus === 'partially_received' || dStatus === 'draft');
     const canCancel = canCancelPO && !openReceipt && (dStatus === 'draft' || dStatus === 'sent');
+    // Part of the order arrived and the supplier will not send the rest (a shortage, not damage):
+    // settle it for what came instead of leaving it partially received forever.
+    const canCloseShort = canChangePO && !openReceipt && dStatus === 'partially_received';
     // Amend: a draft, or a sent order with nothing received and no receipt open. Changing a sent
     // order's total or supplier sends it back to draft so approval and budget run again.
     const canAmend = canChangePO && !openReceipt && nothingReceived && (dStatus === 'draft' || dStatus === 'sent');
@@ -925,6 +930,23 @@ export default function PurchaseOrdersPage() {
                                 });
                             }}>
                             Cancel Order
+                        </Button>
+                    )}
+                    {canCloseShort && (
+                        <Button size="sm" variant="outline" disabled={isPOBusy}
+                            title="The supplier will not send the rest. Stock keeps what was received."
+                            onClick={() => {
+                                const reason = window.prompt('Close this order short? What was received stays in stock and the rest is no longer expected.\n\nWhy will the rest not come? (optional, e.g. supplier out of stock)', '');
+                                if (reason === null) return;
+                                closeShortPO.mutate({ id: poDetail.id, reason }, {
+                                    onSuccess: (res) => {
+                                        const n = res.not_delivered?.length ?? 0;
+                                        toast.success(`Order closed short: ${n} line${n === 1 ? '' : 's'} not delivered recorded`);
+                                    },
+                                    onError: async (e) => toast.error(await apiErrorMessage(e, 'Failed to close the order short')),
+                                });
+                            }}>
+                            Close Short
                         </Button>
                     )}
                     {/* Platform owners only (signed is_platform_owner claim). The API refuses once

@@ -164,6 +164,11 @@ export const purchaseOrdersApi = {
 
   cancel: (orgSlug: string, id: string) =>
     apiClient.put<PurchaseOrder>(`/api/v1/${orgSlug}/inventory/purchase-orders/${id}/cancel`, {}),
+  /** The supplier sent part of the order and will not send the rest: settle it as received for what
+   *  came. Stock already holds what was received; the shortfall goes in the notes and audit log. */
+  closeShort: (orgSlug: string, id: string, reason?: string) =>
+    apiClient.post<{ status: string; closed_short: boolean; not_delivered: { name: string; ordered: number; received: number; missing: number }[] }>(
+      `/api/v1/${orgSlug}/inventory/purchase-orders/${id}/close-short`, { reason: reason?.trim() || undefined }),
   /** Permanent delete. Platform owners only (the API checks the signed claim and answers 403 otherwise). */
   hardDelete: (orgSlug: string, id: string) =>
     apiClient.delete<{ deleted: boolean; id: string; receipts_deleted: number; approvals_deleted: number }>(

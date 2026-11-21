@@ -88,6 +88,17 @@ export function useHardDeletePurchaseOrder(orgSlug: string) {
   });
 }
 
+export function useCloseShortPurchaseOrder(orgSlug: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason?: string }) => purchaseOrdersApi.closeShort(orgSlug, id, reason),
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug] });
+      queryClient.invalidateQueries({ queryKey: [PO_KEY, orgSlug, id] });
+    },
+  });
+}
+
 export function useCancelPurchaseOrder(orgSlug: string) {
   const queryClient = useQueryClient();
   return useMutation({
