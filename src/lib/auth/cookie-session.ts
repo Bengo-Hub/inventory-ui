@@ -14,7 +14,7 @@
 import { createCookieSession, type CookieSession, type CookieSessionState } from '@bengo-hub/shared-ui-lib/auth';
 import { apiClient } from '@/lib/api/client';
 import { isTerminalSession } from '@/lib/auth/session-kind';
-import { useAuthStore } from '@/store/auth';
+import { isLoggingOut, useAuthStore } from '@/store/auth';
 
 const SSO_BASE_URL = process.env.NEXT_PUBLIC_SSO_URL || 'https://sso.codevertexafrica.com';
 const SSO_CLIENT_ID = process.env.NEXT_PUBLIC_SSO_CLIENT_ID || 'inventory-ui';
@@ -36,6 +36,8 @@ function onChange(s: CookieSessionState | null) {
   if (isTerminalSession(store.session?.accessToken)) return;
   if (!s) {
     apiClient.setAccessToken(null);
+    // During logout the store already says 'loading'; going idle here would start a new sign-in.
+    if (isLoggingOut()) return;
     if (store.session || store.status === 'authenticated') useAuthStore.setState({ session: null, status: 'idle' });
     return;
   }

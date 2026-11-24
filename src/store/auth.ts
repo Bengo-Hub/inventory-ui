@@ -88,6 +88,18 @@ async function startCookieSession(refreshToken: string): Promise<boolean> {
     return 'token' in started && !!useAuthStore.getState().session;
 }
 
+/** True from the first logout call until the browser leaves the page. */
+let loggingOut = false;
+
+/**
+ * Whether a logout is under way. While it is, nothing may start an SSO sign-in: an /authorize
+ * navigation cancels the /auth/logout one, the SSO session survives and the user is signed
+ * straight back in (the logout loop erp-ui hit, fixed there in 867c8b7).
+ */
+export function isLoggingOut(): boolean {
+    return loggingOut;
+}
+
 export const useAuthStore = create<AuthState>()(
     persist(
         (set, get) => ({
@@ -181,6 +193,7 @@ export const useAuthStore = create<AuthState>()(
             },
 
             redirectToSSO: async (orgSlug: string, returnTo?: string, opts?: { silent?: boolean }) => {
+                if (loggingOut) return;
                 set({ status: 'loading', error: null });
                 try {
                     const verifier = generateCodeVerifier();
@@ -328,6 +341,8 @@ export const useAuthStore = create<AuthState>()(
             },
 
             logout: async () => {
+                if (loggingOut) return;
+                loggingOut = true;
                 // Capture the tenant we're leaving BEFORE clearing any state/storage, so
                 // re-login returns to the SAME tenant rather than a default one: URL path
                 // first (every tenant page is /{orgSlug}/...), then the signed-in profile,
@@ -347,7 +362,9 @@ export const useAuthStore = create<AuthState>()(
                 } else {
                     await revokeServerSession(token);
                 }
-                set({ status: 'idle', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
+                // 'loading', never 'idle': idle makes the auth guard start a new sign-in, which
+                // would cancel the logout navigation below.
+                set({ status: 'loading', user: null, session: null, subscriptionInfo: undefined, lastAuthenticatedAt: null });
                 apiClient.setAccessToken(null);
                 apiClient.setTenantInfo(null, null);
                 // Drop the outlet context too — a retained outlet (store + X-Outlet-ID +
