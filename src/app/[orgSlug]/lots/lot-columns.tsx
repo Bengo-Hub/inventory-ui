@@ -92,6 +92,18 @@ export function buildLotColumns(cb: LotColumnCallbacks): DataTableColumn<Lot>[] 
       render: (l) => l.quantity.toLocaleString(),
     },
     {
+      // What this batch cost per unit (its own receipt cost under FIFO/LIFO/FEFO, the running
+      // average under wavg), so old and new stock bought at different prices are visible.
+      key: 'cost_per_unit',
+      header: 'Unit cost',
+      align: 'right',
+      sortable: true,
+      hideBelow: 'md',
+      accessor: (l) => l.cost_per_unit ?? 0,
+      cellClassName: 'tabular-nums',
+      render: (l) => (l.cost_per_unit != null ? l.cost_per_unit.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—'),
+    },
+    {
       key: 'status',
       header: 'Status',
       filterable: true,

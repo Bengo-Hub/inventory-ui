@@ -3,7 +3,10 @@
 import { Button, Card, CardContent, CardHeader, Input } from '@/components/ui/base';
 import { useCreateGoodsReceipt } from '@/hooks/useGoodsReceipts';
 import { usePurchaseOrders, usePurchaseOrder } from '@/hooks/usePurchaseOrders';
-import { useItems } from '@/hooks/useItems';
+import { useQueries } from '@tanstack/react-query';
+import { itemsApi } from '@/lib/api/items';
+import { useInventorySettings } from '@/hooks/useInventorySettings';
+import { receiptCostPreview } from '@/lib/receipt-cost';
 import { useActiveWarehouse } from '@/hooks/useActiveWarehouse';
 import { ActiveWarehousePicker } from '@/components/inventory/ActiveWarehousePicker';
 import { AdjustmentDateField } from '@/components/inventory/AdjustmentDateField';
@@ -107,16 +110,36 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [po?.id]);
 
-    // Map item_id -> lot-tracking flags so we can surface lot/expiry inputs only where relevant.
-    const { data: itemsPage } = useItems(org, { limit: 500 });
+    // Map item_id -> lot flags, current price, current cost and on-hand for the PO's own items.
+    // Fetched per line item (a PO has a handful), not a capped catalog page: the old 500-item page
+    // silently lost the price and lot flags of every item past the first 500.
+    const lineItemIds = useMemo(() => [...new Set((po?.line_items ?? []).map((l) => l.item_id))], [po?.line_items]);
+    const itemQueries = useQueries({
+        queries: lineItemIds.map((id) => ({
+            queryKey: ['inventory-item-by-id', org, id],
+            queryFn: () => itemsApi.getById(org, id),
+            enabled: !!org && !!id,
+            staleTime: 60_000,
+        })),
+    });
+    const { data: invSettings } = useInventorySettings(org);
+    const costingMethod = invSettings?.costing_method ?? 'wavg';
     const lotInfo = useMemo(() => {
-        const m = new Map<string, { track: boolean; currentPrice?: number }>();
-        for (const it of itemsPage?.data ?? []) {
+        const m = new Map<string, { track: boolean; currentPrice?: number; currentCost?: number; onHand?: number }>();
+        for (const q of itemQueries) {
+            const it = q.data;
+            if (!it) continue;
             const currentPrice = it.selling_price ?? it.max_selling_price ?? undefined;
-            m.set(it.id, { track: !!it.track_lots || !!it.is_perishable, currentPrice: currentPrice ?? undefined });
+            m.set(it.id, {
+                track: !!it.track_lots || !!it.is_perishable,
+                currentPrice: currentPrice ?? undefined,
+                currentCost: it.cost_price ?? undefined,
+                onHand: it.on_hand ?? undefined,
+            });
         }
         return m;
-    }, [itemsPage]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [itemQueries.map((q) => q.dataUpdatedAt).join(',')]);
 
     const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
     const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); setUnitCost({}); setNewPrice({}); setPriceScope({}); };
@@ -258,11 +281,30 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                       onChange={(e) => setUnitCost((s) => ({ ...s, [l.id]: e.target.value }))}
                                                     />
                                                   </div>
-                                                  {costChanged && (
-                                                    <p className="text-[11px] text-muted-foreground">
-                                                      This receipt's stock will carry its own cost ({cost.toFixed(2)}) — stock already on hand keeps what it actually cost.
-                                                    </p>
-                                                  )}
+                                                  {(() => {
+                                                    const p = receiptCostPreview({
+                                                      method: costingMethod,
+                                                      onHand: info?.onHand,
+                                                      currentCost: info?.currentCost,
+                                                      receivedQty: acc,
+                                                      receiptCost: cost,
+                                                      sellingPrice: priceChanged && priceVal !== undefined && scope === 'all_stock' ? priceVal : currentPrice,
+                                                    });
+                                                    if (!p) return null;
+                                                    return (
+                                                      <p className="text-[11px] text-muted-foreground">
+                                                        Current cost {p.currentCost.toFixed(2)} · this receipt {p.receiptCost.toFixed(2)}.{' '}
+                                                        {p.method === 'wavg'
+                                                          ? <>Average cost becomes <span className="font-semibold text-foreground">{p.resultingCost.toFixed(2)}</span>, used for every unit sold from now on (the receipt keeps its own cost on record).</>
+                                                          : <>Stock already on hand keeps selling at its own cost; this receipt's units cost {p.receiptCost.toFixed(2)} when they sell ({p.method.toUpperCase()}).</>}
+                                                        {p.marginPct !== undefined && (
+                                                          <span className={p.marginPct < 0 ? 'ml-1 text-destructive' : 'ml-1'}>
+                                                            Margin at {p.sellingPrice!.toFixed(2)}: {p.marginPct.toFixed(1)}%.
+                                                          </span>
+                                                        )}
+                                                      </p>
+                                                    );
+                                                  })()}
 
                                                   {/* Selling-price adjustment — always visible (not a collapsed disclosure)
                                                       so it reads as a first-class part of receiving, not an easy-to-miss extra. */}
