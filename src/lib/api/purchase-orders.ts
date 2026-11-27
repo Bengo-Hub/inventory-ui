@@ -9,6 +9,8 @@ export interface POLineItem {
   item_sku?: string;
   quantity: number;
   received_qty: number;
+  /** Part of the line closed as never coming (on a receipt or by Close Short). */
+  closed_qty?: number;
   unit_cost: number;
   total_cost: number;
   unit_id?: string;

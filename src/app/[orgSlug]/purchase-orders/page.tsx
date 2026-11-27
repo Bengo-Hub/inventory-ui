@@ -989,7 +989,12 @@ export default function PurchaseOrdersPage() {
                                                 </td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{line.quantity}</td>
                                                 <td className="px-3 py-2 text-muted-foreground">{line.unit || '—'}</td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{line.received_qty ?? 0}</td>
+                                                <td className="px-3 py-2 text-right tabular-nums">
+                                                    {line.received_qty ?? 0}
+                                                    {(line.closed_qty ?? 0) > 0 && (
+                                                        <div className="text-[11px] text-amber-600">{line.closed_qty} not delivered</div>
+                                                    )}
+                                                </td>
                                                 <td className="px-3 py-2 text-right tabular-nums">{line.unit_cost.toLocaleString()}</td>
                                                 <td className="px-3 py-2 text-right font-semibold tabular-nums">{line.total_cost.toLocaleString()}</td>
                                             </tr>

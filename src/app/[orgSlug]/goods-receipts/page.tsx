@@ -183,6 +183,9 @@ export default function GoodsReceiptsPage() {
                                                         {[l.sku, l.barcode, l.serials?.join(', ')].filter(Boolean).join(' · ')}
                                                     </span>
                                                 )}
+                                                {l.close_remaining && (
+                                                    <span className="block text-[11px] text-amber-600">Rest of the order line closed: will not be delivered</span>
+                                                )}
                                             </td>
                                             <td className="px-3 py-2 text-right tabular-nums">{l.quantity_received}</td>
                                             <td className="px-3 py-2 text-right tabular-nums">{l.quantity_accepted}</td>

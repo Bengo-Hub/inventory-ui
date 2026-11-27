@@ -17,6 +17,7 @@ export interface GRNLine {
   rejection_reason?: string;
   serials?: string[];
   lot_number?: string;
+  close_remaining?: boolean;
 }
 
 export interface GoodsReceipt {
@@ -58,6 +59,8 @@ export interface CreateGRNLineInput {
    * cost layer that existed before this receipt has sold through.
    */
   price_scope?: 'all_stock' | 'new_stock_only';
+  /** The rest of this order line will not be delivered: closed on the PO line when the receipt posts. */
+  close_remaining?: boolean;
 }
 
 export interface CreateGRNInput {

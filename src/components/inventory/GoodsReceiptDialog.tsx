@@ -35,6 +35,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
     const [received, setReceived] = useState<Record<string, string>>({});
     const [rejected, setRejected] = useState<Record<string, string>>({});
     const [reason, setReason] = useState<Record<string, string>>({});
+    // Per line: the rest will not be delivered (supplier short). On post, whatever is still
+    // outstanding after this receipt is closed, so the order can settle as received.
+    const [closeRest, setCloseRest] = useState<Record<string, boolean>>({});
     // Actual unit cost paid on THIS receipt — pre-filled from the PO line but editable, since the
     // supplier's delivered price often differs from what was originally ordered. This is the value
     // that becomes the new stock's own cost layer; it never rewrites the cost of stock already on
@@ -141,8 +144,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [itemQueries.map((q) => q.dataUpdatedAt).join(',')]);
 
-    const outstanding = (lineQty: number, recvd: number) => Math.max(0, lineQty - (recvd || 0));
-    const resetLines = () => { setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); setUnitCost({}); setNewPrice({}); setPriceScope({}); };
+    // Outstanding excludes the part already closed as never coming.
+    const outstanding = (lineQty: number, recvd: number, closed?: number) => Math.max(0, lineQty - (recvd || 0) - (closed || 0));
+    const resetLines = () => { setCloseRest({}); setReceived({}); setRejected({}); setReason({}); setSerials({}); setLotNumber({}); setExpiryDate({}); setUnitCost({}); setNewPrice({}); setPriceScope({}); };
     const parseSerials = (raw: string | undefined) =>
         (raw ?? '').split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
 
@@ -152,8 +156,9 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
         let invalid = false;
         const lines: CreateGRNLineInput[] = (po.line_items ?? [])
             .map((l) => {
-                const out = outstanding(l.quantity, l.received_qty);
+                const out = outstanding(l.quantity, l.received_qty, l.closed_qty);
                 const rec = received[l.id] !== undefined ? parseDecimal(received[l.id]) : out;
+                const closeRemaining = !!closeRest[l.id] && Math.max(0, rec - (rejected[l.id] !== undefined ? parseDecimal(rejected[l.id]) : 0)) < out;
                 const rej = rejected[l.id] !== undefined ? parseDecimal(rejected[l.id]) : 0;
                 const acc = rec - rej;
                 if (rej > rec || acc < 0) invalid = true;
@@ -177,11 +182,12 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                     expiry_date: exp ? new Date(exp).toISOString() : undefined,
                     new_selling_price: price && price > 0 ? price : undefined,
                     price_scope: price && price > 0 ? (priceScope[l.id] ?? 'all_stock') : undefined,
+                    close_remaining: closeRemaining || undefined,
                 };
             })
-            .filter((l) => l.quantity_received > 0);
+            .filter((l) => l.quantity_received > 0 || l.close_remaining);
         if (invalid) { toast.error('Rejected quantity cannot exceed received quantity'); return; }
-        if (lines.length === 0) { toast.error('Enter at least one received quantity'); return; }
+        if (lines.length === 0) { toast.error('Enter a received quantity, or close a line that will not be delivered'); return; }
         if (receivingWarehouse.unresolved) { toast.error('Select the receiving warehouse before posting'); return; }
         create.mutate({
             warehouse_id: receivingWarehouse.warehouseId || undefined,
@@ -234,10 +240,12 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                     </div>
                                     <div className="rounded-lg border border-border divide-y divide-border">
                                         {(po.line_items ?? []).map((l) => {
-                                            const out = outstanding(l.quantity, l.received_qty);
+                                            const out = outstanding(l.quantity, l.received_qty, l.closed_qty);
                                             const rec = received[l.id] !== undefined ? parseDecimal(received[l.id]) : out;
                                             const rej = rejected[l.id] !== undefined ? parseDecimal(rejected[l.id]) : 0;
                                             const acc = Math.max(0, rec - rej);
+                                            // Only accepted units count as received, so rejected ones stay outstanding too.
+                                            const leftAfter = Number.isFinite(acc) ? Math.max(0, out - acc) : 0;
                                             const snCount = parseSerials(serials[l.id]).length;
                                             const snMismatch = snCount > 0 && snCount !== acc;
                                             const info = lotInfo.get(l.item_id);
@@ -263,6 +271,26 @@ export function GoodsReceiptDialog({ org, onClose, onCreated }: Props) {
                                                     <Input className="col-span-2" type="number" min="0" max={rec} step={DECIMAL_STEP} value={rejected[l.id] ?? ''} placeholder="0" onChange={(e) => setRejected((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                     <Input className="col-span-3" type="text" placeholder="e.g. damaged" value={reason[l.id] ?? ''} disabled={rej <= 0} onChange={(e) => setReason((s) => ({ ...s, [l.id]: e.target.value }))} />
                                                   </div>
+                                                  {leftAfter > 0 && (
+                                                    <label className="flex items-start gap-2 text-xs cursor-pointer">
+                                                      <input
+                                                        type="checkbox"
+                                                        className="mt-0.5"
+                                                        checked={!!closeRest[l.id]}
+                                                        onChange={(e) => setCloseRest((s) => ({ ...s, [l.id]: e.target.checked }))}
+                                                      />
+                                                      <span>
+                                                        <span className="font-medium">
+                                                          The remaining {leftAfter}{rej > 0 ? ' (including the rejected)' : ''} will not be delivered{rej > 0 ? ' or replaced' : ''}
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                          {closeRest[l.id]
+                                                            ? ` · closed on this line when the receipt posts, so the order does not stay partially received`
+                                                            : ` · leave unticked if the supplier will still send them`}
+                                                        </span>
+                                                      </span>
+                                                    </label>
+                                                  )}
                                                   <div className="grid grid-cols-12 gap-2 items-center">
                                                     <label className="col-span-5 text-[11px] font-medium text-muted-foreground">
                                                       Actual unit cost <span className="font-semibold text-foreground">(PO price: {l.unit_cost.toFixed(2)})</span>
