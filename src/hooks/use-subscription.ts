@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth";
 import type { SubscriptionInfo } from "@/lib/auth/subscription";
 import { fetchSubscriptionInfo } from "@/lib/auth/subscription";
@@ -26,6 +26,51 @@ function decodeSubExempt(token: string | null | undefined): boolean {
   }
 }
 
+// useSubscription is called by many components at once (a catalog page mounts one per row), and
+// every instance used to run its own fetch and its own re-arm timer and listeners. Each re-arm
+// cleared the shared store, so every mounted instance fetched again: one browser on a long catalog
+// page sent about one /api/subscription request a second (ingress logs, 27 November 2026). These
+// module-level guards keep it to one request per lookup and one set of listeners per tab.
+let inflight: { tenantId: string; promise: Promise<SubscriptionInfo | null> } | null = null;
+let lookupRetries = 0;
+let rearmUsers = 0;
+let rearmTeardown: (() => void) | null = null;
+
+/** Starts the lookup, or returns null when another instance already has it in flight. */
+function startLookup(tenantId: string, slug: string, token: string): Promise<SubscriptionInfo | null> | null {
+  if (inflight && inflight.tenantId === tenantId) return null;
+  const promise = fetchSubscriptionInfo(tenantId, slug, token).finally(() => {
+    if (inflight?.promise === promise) inflight = null;
+  });
+  inflight = { tenantId, promise };
+  return promise;
+}
+
+/** One 60 s timer plus focus and visibility listeners per tab, shared by every hook instance. */
+function acquireRearm(): () => void {
+  rearmUsers += 1;
+  if (!rearmTeardown) {
+    const rearm = () => useAuthStore.getState().setSubscriptionInfo(undefined as any);
+    const interval = setInterval(rearm, 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') rearm(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', rearm);
+    rearmTeardown = () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', rearm);
+    };
+  }
+  return () => {
+    rearmUsers -= 1;
+    if (rearmUsers <= 0 && rearmTeardown) {
+      rearmTeardown();
+      rearmTeardown = null;
+      rearmUsers = 0;
+    }
+  };
+}
+
 export function useSubscription() {
   const session = useAuthStore((s) => s.session);
   const user = useAuthStore((s) => s.user);
@@ -34,8 +79,6 @@ export function useSubscription() {
   const setSubscriptionInfo = useAuthStore((s) => s.setSubscriptionInfo);
 
   const subStore = useSubscriptionStore();
-  // Bounded retry counter for a FAILED subscription lookup (see the fetch effect). Reset per auth.
-  const lookupRetries = useRef(0);
 
   const tenantSlug = user?.tenant_slug as string | undefined;
   // Platform-owner detection: snake_case (is_platform_owner) AND camelCase (isPlatformOwner) AND
@@ -67,12 +110,11 @@ export function useSubscription() {
     if (status !== 'authenticated' || !session?.accessToken || !user) return;
     if (subscriptionInfo !== undefined) return;
 
-    setSubscriptionInfo(null);
-
     const tenantId = user.tenant_id;
     const slug = tenantSlug ?? '';
 
     if (!tenantId || isPlatformOwner) {
+      setSubscriptionInfo(null);
       const platformInfo = {
         status: 'active', planCode: 'enterprise', planName: 'Enterprise', features: [], limits: {},
       };
@@ -104,20 +146,25 @@ export function useSubscription() {
         // and the tenant is never locked out on a transient lookup failure.
         setSubscriptionInfo({ status: 'unknown', planCode: '', planName: '', features: [], limits: {} } as any);
       }
-      if (lookupRetries.current < 4) {
-        lookupRetries.current += 1;
-        // Re-arm the effect (subscriptionInfo → undefined) after a short delay to re-fetch.
-        setTimeout(() => setSubscriptionInfo(undefined as any), 8000);
+      if (lookupRetries < 4) {
+        lookupRetries += 1;
+        // Re-arm (subscriptionInfo -> undefined) after a growing delay: 8, 16, 32 then 64 s.
+        setTimeout(() => setSubscriptionInfo(undefined as any), 8000 * 2 ** (lookupRetries - 1));
       }
     };
 
-    fetchSubscriptionInfo(tenantId, slug, session.accessToken)
+    // Only the instance that starts the lookup handles its result; the others render from the
+    // shared store when it lands.
+    const lookup = startLookup(tenantId, slug, session.accessToken);
+    if (!lookup) return;
+    setSubscriptionInfo(null);
+    lookup
       .then((info) => {
         if (info === null) {
           handleLookupFailure();
           return;
         }
-        lookupRetries.current = 0;
+        lookupRetries = 0;
         setSubscriptionInfo(info as any);
         useSubscriptionStore.getState().setFromRaw(
           {
@@ -138,19 +185,11 @@ export function useSubscription() {
   // in one tab and switches back to another tab showing it should see it correct within a beat,
   // not stay stale indefinitely. Matches the 60s window the /api/subscription proxy route already
   // uses for its own Next.js fetch-cache revalidation.
+  const signedIn = status === 'authenticated' && !!session?.accessToken && !!user;
   useEffect(() => {
-    if (status !== 'authenticated' || !session?.accessToken || !user) return;
-    const rearm = () => setSubscriptionInfo(undefined as any);
-    const interval = setInterval(rearm, 60_000);
-    const onVisible = () => { if (document.visibilityState === 'visible') rearm(); };
-    document.addEventListener('visibilitychange', onVisible);
-    window.addEventListener('focus', rearm);
-    return () => {
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-      window.removeEventListener('focus', rearm);
-    };
-  }, [status, session?.accessToken, user, setSubscriptionInfo]);
+    if (!signedIn) return;
+    return acquireRearm();
+  }, [signedIn]);
 
   const info = subscriptionInfo as SubscriptionInfo | null | undefined;
   const subStatus = info?.status ?? null;
