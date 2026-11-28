@@ -7,7 +7,8 @@ import { useBranding } from '@/providers/branding-provider';
 const SUBSCRIPTIONS_UI_URL =
   process.env.NEXT_PUBLIC_SUBSCRIPTIONS_UI_URL || 'https://pricing.codevertexafrica.com';
 
-const UPGRADE_URL = `${SUBSCRIPTIONS_UI_URL}/plans?service=inventory`;
+// Upgrades open the subscriptions billing page (owner, 28 November 2026).
+const UPGRADE_URL = `${SUBSCRIPTIONS_UI_URL}/billing?service=inventory`;
 const BILLING_URL = `${SUBSCRIPTIONS_UI_URL}/billing`;
 
 export function SubscriptionBanner() {
